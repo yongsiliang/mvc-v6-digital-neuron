@@ -331,7 +331,7 @@ export default function Home() {
                                   )}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                  距离: {styleInfo.distance.toFixed(2)}
+                                  距离: {styleInfo.distance?.toFixed(2) ?? '计算中'}
                                 </span>
                               </div>
                               <div className="text-xs text-muted-foreground">
