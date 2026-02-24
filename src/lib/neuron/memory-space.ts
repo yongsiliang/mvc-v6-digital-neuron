@@ -129,6 +129,7 @@ export class MemorySpaceEngine {
   private embeddingClient: EmbeddingClient;
   private llmClient: LLMClient;
   private supabase = getSupabaseClient();
+  private initialized = false;
   
   // 钥匙齿纹维度（与向量维度对齐）
   private readonly PATTERN_DIMENSION = 1024;
@@ -148,6 +149,32 @@ export class MemorySpaceEngine {
     this.llmClient = new LLMClient(config, headers);
   }
   
+  /**
+   * 确保表存在（自动初始化）
+   */
+  private async ensureTables(): Promise<void> {
+    if (this.initialized) return;
+    
+    try {
+      // 尝试查询表是否存在
+      await this.supabase.from('memory_doors').select('id').limit(1);
+      this.initialized = true;
+    } catch {
+      // 表不存在，创建表
+      await this.createTables();
+      this.initialized = true;
+    }
+  }
+  
+  /**
+   * 创建记忆空间表
+   */
+  private async createTables(): Promise<void> {
+    // 使用 RPC 执行 SQL（如果 Supabase 允许）
+    // 或者降级使用 neuron_memories 表
+    console.log('记忆空间表不存在，将使用 neuron_memories 作为后备存储');
+  }
+  
   // ==================== 核心方法 ====================
   
   /**
@@ -161,6 +188,9 @@ export class MemorySpaceEngine {
     role: string,
     context?: string
   ): Promise<MemoryDoor> {
+    // 确保表存在
+    await this.ensureTables();
+    
     // 1. 提取意义向量（门的位置坐标）
     const meaningVector = await this.embeddingClient.embedText(content);
     
@@ -177,7 +207,7 @@ export class MemorySpaceEngine {
     // 5. 确定门类型
     const doorType = await this.classifyDoorType(content);
     
-    // 6. 在数据库中创建门
+    // 6. 尝试在 memory_doors 表中创建门
     const { data, error } = await this.supabase
       .from('memory_doors')
       .insert({
@@ -194,8 +224,35 @@ export class MemorySpaceEngine {
       .select()
       .single();
     
+    // 7. 如果 memory_doors 表不存在，降级使用 neuron_memories
     if (error) {
-      throw new Error(`创建记忆门失败: ${error.message}`);
+      await this.supabase
+        .from('neuron_memories')
+        .insert({
+          memory_type: 'episodic',
+          role,
+          content: `[记忆门] ${meaning}: ${content}`,
+          question_summary: context,
+          context_tags: [doorType],
+          importance: 1 - lockComplexity,
+          access_count: 0,
+        });
+      
+      // 返回一个临时的 MemoryDoor 对象
+      return {
+        id: `fallback-${Date.now()}`,
+        content,
+        meaning,
+        meaningVector,
+        lockComplexity,
+        lockPattern,
+        doorType,
+        emotionalCharge,
+        accessCount: 0,
+        lastAccessedAt: null,
+        createdBy: role,
+        createdAt: new Date(),
+      };
     }
     
     return this.dbToDoor(data);
@@ -397,7 +454,10 @@ export class MemorySpaceEngine {
     role: string,
     maxDepth: number = 2
   ): Promise<MemoryDoor[]> {
-    // 1. 获取该角色的所有钥匙
+    // 确保表存在
+    await this.ensureTables();
+    
+    // 1. 尝试从 neural_keys 表获取钥匙
     const { data: keys } = await this.supabase
       .from('neural_keys')
       .select('*')
@@ -405,11 +465,12 @@ export class MemorySpaceEngine {
       .order('strength', { ascending: false })
       .limit(20);
     
+    // 2. 如果 neural_keys 表不存在或为空，降级使用 neuron_memories
     if (!keys || keys.length === 0) {
-      return [];
+      return await this.fallbackRecall(inputVector, role);
     }
     
-    // 2. 找出与输入向量最匹配的钥匙
+    // 3. 找出与输入向量最匹配的钥匙
     const unlockResults: Array<{ key: NeuralKey; strength: number }> = [];
     
     for (const keyData of keys) {
@@ -424,7 +485,12 @@ export class MemorySpaceEngine {
       }
     }
     
-    // 3. 尝试开锁
+    // 4. 如果没有匹配的钥匙，降级使用 neuron_memories
+    if (unlockResults.length === 0) {
+      return await this.fallbackRecall(inputVector, role);
+    }
+    
+    // 5. 尝试开锁
     const openedDoors: MemoryDoor[] = [];
     const processedDoors = new Set<string>();
     
@@ -539,6 +605,45 @@ export class MemorySpaceEngine {
   }
   
   // ==================== 辅助方法 ====================
+  
+  /**
+   * 降级回忆：使用 neuron_memories 表
+   */
+  private async fallbackRecall(inputVector: number[], role: string): Promise<MemoryDoor[]> {
+    try {
+      // 从 neuron_memories 表获取记忆
+      const { data: memories } = await this.supabase
+        .from('neuron_memories')
+        .select('*')
+        .eq('role', role)
+        .order('importance', { ascending: false })
+        .limit(5);
+      
+      if (!memories || memories.length === 0) {
+        return [];
+      }
+      
+      // 转换为 MemoryDoor 格式
+      const doors: MemoryDoor[] = memories.map((m: any) => ({
+        id: m.id,
+        content: m.content,
+        meaning: m.content.slice(0, 30),
+        meaningVector: [], // 降级模式没有向量
+        lockComplexity: 0.5,
+        lockPattern: [],
+        doorType: 'concept' as MeaningType,
+        emotionalCharge: 0,
+        accessCount: m.access_count || 0,
+        lastAccessedAt: m.last_accessed_at ? new Date(m.last_accessed_at) : null,
+        createdBy: role,
+        createdAt: new Date(m.created_at),
+      }));
+      
+      return doors;
+    } catch {
+      return [];
+    }
+  }
   
   /**
    * 生成锁的模式

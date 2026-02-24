@@ -26,6 +26,12 @@ import {
   type ResonanceResult,
   type DecisionInfluence 
 } from './meaning-memory';
+import {
+  MemorySpaceEngine,
+  getMemorySpaceEngine,
+  type MemoryDoor,
+  type UnlockResult
+} from './memory-space';
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
@@ -394,45 +400,62 @@ export class LatentGameEngine {
   private llmClient: LLMClient;
   private memory: PersistentMemory;
   private meaningMemory: MeaningMemoryEngine;
+  private memorySpace: MemorySpaceEngine;
   
   constructor(headers: Record<string, string>) {
     const config = new Config();
     this.llmClient = new LLMClient(config, headers);
     this.memory = getMemory();
     this.meaningMemory = getMeaningMemoryEngine(headers);
+    this.memorySpace = getMemorySpaceEngine(headers);
   }
   
   /**
-   * 快速博弈（带意义记忆）
+   * 快速博弈（带记忆空间）
    * 
    * 流程：
-   * 1. 输入触发意义共鸣，激活相关记忆
-   * 2. 记忆影响各模型的思考
+   * 1. 用钥匙尝试打开记忆门（回忆）
+   * 2. 打开的记忆门影响思考
    * 3. 博弈决策
-   * 4. 提取意义并存储
+   * 4. 创建新的记忆门 + 锻造钥匙（学习）
    */
   async play(question: string, sessionId?: string): Promise<GameResult> {
     const sid = sessionId || 'default-session';
     const conversationCtx = getConversationContext();
     
-    // 【核心改动1】意义共鸣：输入激活相关记忆
+    // 【核心1】意义共鸣：输入激活相关记忆
     const resonances = await Promise.all(
       PLAYERS.map(p => this.meaningMemory.resonate(question, p.role))
+    );
+    
+    // 【核心2】记忆空间：尝试打开记忆门
+    const { EmbeddingClient } = await import('coze-coding-dev-sdk');
+    const embeddingClient = new EmbeddingClient();
+    const inputVector = await embeddingClient.embedText(question);
+    
+    const openedDoors = await Promise.all(
+      PLAYERS.map(p => this.memorySpace.resonantUnlock(inputVector, p.role, 1))
     );
     
     // 获取对话上下文
     const contextPrompt = await conversationCtx.buildContextPrompt(sid);
     
-    // 【核心改动2】并行思考（带意义记忆影响）
+    // 【核心3】并行思考（带记忆影响）
     const thoughts = await Promise.all(
-      PLAYERS.map((p, i) => this.think(p, question, contextPrompt, resonances[i]))
+      PLAYERS.map((p, i) => this.think(
+        p, 
+        question, 
+        contextPrompt, 
+        resonances[i],
+        openedDoors[i]
+      ))
     );
     
     // 快速评估
     const result = this.fastEvaluate(thoughts);
     
-    // 【核心改动3】存储意义记忆（后台执行）
-    this.storeMeaningMemory(question, result).catch(() => {});
+    // 【核心4】存储到记忆空间（后台执行）
+    this.storeToMemorySpace(question, result).catch(() => {});
     
     // 记录博弈结果
     for (const t of thoughts) {
@@ -480,16 +503,22 @@ export class LatentGameEngine {
   }
   
   /**
-   * 单模型思考（带意义记忆影响）
+   * 单模型思考（带记忆空间影响）
    */
   private async think(
     player: typeof PLAYERS[0], 
     question: string, 
     contextPrompt: string,
-    resonance: ResonanceResult
+    resonance: ResonanceResult,
+    openedDoors: MemoryDoor[]
   ): Promise<InnerThought> {
     // 【核心】获取意义记忆的影响
     const meaningInfluence = this.meaningMemory.influenceDecision(resonance);
+    
+    // 【核心】构建记忆空间提示（打开的门）
+    const doorHints = openedDoors.length > 0
+      ? `\n记忆之门已打开: ${openedDoors.slice(0, 3).map(d => d.meaning).join('；')}`
+      : '';
     
     // 获取传统记忆提示
     const [memoryHint, stats] = await Promise.all([
@@ -508,7 +537,7 @@ export class LatentGameEngine {
       .replace('{QUESTION}', question)
       .replace('{ROLE}', player.role)
       .replace('{STRENGTH}', player.strength)
-      .replace('{MEMORY_HINT}', memoryHint + meaningHint);
+      .replace('{MEMORY_HINT}', memoryHint + meaningHint + doorHints);
     
     try {
       let response = '';
@@ -523,8 +552,8 @@ export class LatentGameEngine {
       
       const parsed = this.parseThought(response);
       
-      // 【核心】意义加成：激活的记忆提供额外信心
-      const meaningBonus = meaningInfluence.confidence;
+      // 【核心】意义加成：激活的记忆 + 打开的门提供额外信心
+      const meaningBonus = meaningInfluence.confidence + (openedDoors.length * 0.05);
       
       return {
         modelId: player.id,
@@ -741,21 +770,35 @@ ${hints || '无'}
   }
   
   /**
-   * 获取统计摘要
+   * 获取统计摘要（包含记忆空间）
    */
   async getStatsSummary() {
-    const [basicStats, meaningStats] = await Promise.all([
+    const [basicStats, meaningStats, spaceSnapshots] = await Promise.all([
       this.memory.getStatsSummary(),
-      Promise.all(PLAYERS.map(p => this.meaningMemory.getStats(p.role)))
+      Promise.all(PLAYERS.map(p => this.meaningMemory.getStats(p.role))),
+      Promise.all(PLAYERS.map(p => this.memorySpace.getSnapshot(p.role)))
     ]);
     
     return basicStats.map((s, i) => ({
       ...s,
+      // 意义记忆统计
       meaningMemories: meaningStats[i].total,
       meaningByType: meaningStats[i].byType,
       avgActivation: meaningStats[i].avgActivation.toFixed(3),
       totalResonance: meaningStats[i].totalResonance,
+      // 记忆空间统计
+      memoryDoors: spaceSnapshots[i].totalDoors,
+      neuralKeys: spaceSnapshots[i].totalKeys,
+      lockedDoors: spaceSnapshots[i].lockedDoors,
+      accessibleDoors: spaceSnapshots[i].accessibleDoors,
     }));
+  }
+  
+  /**
+   * 获取记忆空间快照
+   */
+  async getMemorySpaceSnapshot(role?: string) {
+    return this.memorySpace.getSnapshot(role);
   }
   
   /**
@@ -786,6 +829,46 @@ ${hints || '无'}
     // 定期演化记忆
     for (const player of PLAYERS) {
       await this.meaningMemory.evolve(player.role);
+    }
+  }
+  
+  /**
+   * 存储到记忆空间（后台执行）
+   * 
+   * 核心流程：
+   * 1. 为每次博弈创建记忆门
+   * 2. 为每个角色锻造钥匙
+   */
+  private async storeToMemorySpace(question: string, result: GameResult): Promise<void> {
+    try {
+      // 1. 创建记忆门（胜者的思考作为门的内容）
+      const door = await this.memorySpace.createMemoryDoor(
+        `问题: ${question}\n回答: ${result.winner.core}`,
+        result.winner.role,
+        `博弈结果: ${result.evaluationReason}`
+      );
+      
+      // 2. 为每个角色锻造钥匙
+      for (const thought of result.allThoughts) {
+        // 学习强度：胜者更高
+        const intensity = thought.role === result.winner.role ? 0.8 : 0.5;
+        
+        await this.memorySpace.forgeNeuralKey(
+          door.id,
+          thought.role,
+          intensity
+        );
+      }
+      
+      // 3. 同时存储到意义记忆系统（兼容）
+      await this.storeMeaningMemory(question, result);
+      
+      // 4. 定期锈蚀钥匙（模拟遗忘）
+      await this.memorySpace.rustKeys();
+      
+    } catch (error) {
+      // 存储失败，忽略
+      console.error('记忆空间存储失败:', error);
     }
   }
 }
