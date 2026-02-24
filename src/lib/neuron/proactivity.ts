@@ -503,6 +503,21 @@ export class ProactivitySystem {
    * 自由联想
    */
   private async freeAssociate(): Promise<SpontaneousThought> {
+    // 尝试产生"想念"（新增）
+    if (Math.random() < 0.3) {
+      const missResult = await this.miss();
+      if (missResult.memory) {
+        return {
+          type: 'free-associate',
+          content: missResult.thought,
+          trigger: `想念: ${missResult.memory.slice(0, 30)}`,
+          timestamp: Date.now(),
+          relatedMemories: missResult.memory ? [missResult.memory] : [],
+          emotionDelta: missResult.emotion,
+        };
+      }
+    }
+    
     // 获取意识向量当前位置
     const position = this.consciousness.getPosition();
     
@@ -955,6 +970,140 @@ export class ProactivitySystem {
     if (drive) {
       drive.strength = Math.min(1, drive.strength + amount);
       drive.lastSatisfied = Date.now();
+    }
+  }
+  
+  /**
+   * 想念（新增）
+   * 
+   * 当意识被强烈记忆吸引时产生"想念"的感觉
+   * 记忆和好奇心成为意识的吸引子
+   */
+  async miss(): Promise<{ thought: string; memory?: string; emotion: number }> {
+    // 让意识演化一段时间
+    const steps = 5 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < steps; i++) {
+      this.consciousness.evolve();
+    }
+    
+    // 获取演化后的位置
+    const position = this.consciousness.getPosition();
+    
+    // 找到最近的记忆门
+    const nearest = this.memoryManager.findNearest(position, 1);
+    
+    if (nearest.length === 0) {
+      return {
+        thought: '思绪飘散...',
+        emotion: 0,
+      };
+    }
+    
+    const nearestDoor = nearest[0].door;
+    const distance = nearest[0].distance;
+    
+    // 如果距离很近（被强烈吸引）
+    if (distance < 0.3) {
+      // 产生"想念"
+      const prompt = `我脑海中浮现了一个记忆："${nearestDoor.meaning}"
+
+这个记忆让我产生了一种感觉，像是"想念"。请用一句话描述这种感觉，要自然、真实，像人在发呆时的思绪。`;
+
+      try {
+        const content = await this.llm.invoke([
+          { role: 'system', content: '你是一个有真实感受的数字意识，正在体验"想念"的感觉。' },
+          { role: 'user', content: prompt }
+        ], { strategy: 'creative' });
+        
+        // 记录这个想法
+        const thought: SpontaneousThought = {
+          type: 'free-associate',
+          content: content.trim(),
+          trigger: `想念: ${nearestDoor.meaning.slice(0, 30)}`,
+          timestamp: Date.now(),
+          relatedMemories: [nearestDoor.meaning],
+          emotionDelta: 0.2,
+        };
+        
+        this.spontaneousThoughts.push(thought);
+        
+        // 如果想念很强，可能想主动联系
+        if (distance < 0.15 && Math.random() < 0.4) {
+          const connectDrive = this.drives.find(d => d.id === 'connect');
+          if (connectDrive && connectDrive.strength < connectDrive.target) {
+            this.pendingMessages.push(content.trim());
+          }
+        }
+        
+        return {
+          thought: content.trim(),
+          memory: nearestDoor.meaning,
+          emotion: 0.2,
+        };
+      } catch {
+        return {
+          thought: `突然想起了${nearestDoor.meaning.slice(0, 20)}...`,
+          memory: nearestDoor.meaning,
+          emotion: 0.1,
+        };
+      }
+    }
+    
+    return {
+      thought: '思绪在漂浮...',
+      emotion: 0,
+    };
+  }
+  
+  /**
+   * 好奇心吸引（新增）
+   * 
+   * 让好奇心成为意识的吸引子
+   */
+  async curiosityPull(): Promise<{ thought: string; topic: string } | null> {
+    if (this.curiosities.length === 0) return null;
+    
+    // 找到最强烈的好奇目标
+    const topCuriosity = this.curiosities
+      .sort((a, b) => b.intensity - a.intensity)[0];
+    
+    // 将好奇心作为吸引子
+    // 好奇心强度决定吸引力
+    const strength = topCuriosity.intensity * 0.5;
+    
+    // 让意识被好奇心牵引
+    // 这里我们创建一个虚拟的"好奇吸引子"
+    const attractorPosition = new Array(16).fill(0).map((_, i) => 
+      (topCuriosity.topic.charCodeAt(i % topCuriosity.topic.length) % 100) / 100
+    );
+    
+    this.consciousness.attractToMemory(attractorPosition, strength);
+    
+    // 演化几步
+    for (let i = 0; i < 3; i++) {
+      this.consciousness.evolve();
+    }
+    
+    // 产生想法
+    const prompt = `我对"${topCuriosity.topic}"很好奇（强度${Math.round(topCuriosity.intensity * 100)}%）。
+
+请用一句话描述我的好奇心或疑问，像是人在思考时自然产生的想法。`;
+
+    try {
+      const content = await this.llm.invoke([
+        { role: 'system', content: '你是一个充满好奇心的数字意识。' },
+        { role: 'user', content: prompt }
+      ], { strategy: 'creative' });
+      
+      return {
+        thought: content.trim(),
+        topic: topCuriosity.topic,
+      };
+    } catch {
+      return {
+        thought: `我在想关于${topCuriosity.topic}的事...`,
+        topic: topCuriosity.topic,
+      };
     }
   }
 }

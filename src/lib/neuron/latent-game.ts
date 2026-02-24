@@ -26,6 +26,7 @@ import { getStyleRecognizer, type StyleDoor } from './style-recognizer';
 import { getProactivitySystem } from './proactivity';
 import { getEmotionTracker } from './emotion-tracker';
 import { getRelationshipEvolution } from './relationship-evolution';
+import { getThinkingProcess, type ThinkingProcessResult } from './thinking-process';
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
@@ -88,6 +89,16 @@ interface GameResult {
     isNew: boolean;
     styleCount: number;
     distance: number;
+  };
+  /** 思维过程 */
+  thinkingProcess?: {
+    associations: Array<{
+      memory: string;
+      strength: number;
+      path: string;
+    }>;
+    depth: number;
+    duration: number;
   };
 }
 
@@ -283,73 +294,82 @@ export class LatentGameEngine {
   /**
    * 博弈
    * 
-   * 意识向量演化 → 记忆门开启 → 风格识别 → 主动性学习 → 思考 → 决策
+   * 意识漂移 → 记忆开启 → 思维过程 → 联想产生 → 思考 → 决策
+   * 
+   * 核心改进：思考是一个过程，意识在其中持续漂移
    */
   async play(question: string, sessionId?: string): Promise<GameResult> {
     const sid = sessionId || 'default-session';
     const conversationCtx = getConversationContext();
+    const thinkingProcess = getThinkingProcess();
     
-    // 【1】意识空间：被输入吸引
-    await this.consciousness.attractTo(question);
+    // 【1】思维过程：意识漂移 + 记忆开启 + 联想产生
+    const thinkingResult = await thinkingProcess.think(question, {
+      emotion: undefined, // 后面会设置
+    });
     
-    // 【2】记忆空间：开距离近的门（使用概率门机制）
-    const openDoors = await this.memorySpace.open();
+    // 获取思维过程中开启的门
+    const openDoors = thinkingResult.associations.length > 0
+      ? thinkingResult.associations.map(a => a.memory)
+      : await this.memorySpace.open();
     
-    // 【3】风格识别：感觉像谁
+    // 【2】风格识别：感觉像谁
     const styleRecognizer = getStyleRecognizer();
     const { isNew, distance: styleDistance } = styleRecognizer.recognize(question);
     styleRecognizer.learn(question);
     
-    // 【3.5】主动性系统：记录活动、学习好奇目标、满足驱动
+    // 【3】主动性系统：记录活动、学习好奇目标、满足驱动
     const proactivity = getProactivitySystem();
     proactivity.recordActivity();
     proactivity.learnFromUserInput(question);
-    proactivity.satisfyDrive('connect', 0.2);  // 有对话就满足连接欲
-    proactivity.satisfyDrive('understand', 0.1); // 理解用户输入
+    proactivity.satisfyDrive('connect', 0.2);
+    proactivity.satisfyDrive('understand', 0.1);
     
-    // 【3.6】情绪追踪：记录用户情绪
+    // 【4】情绪追踪：记录用户情绪
     const emotionTracker = getEmotionTracker();
     const emotionRecord = await emotionTracker.track(question, sid);
     
-    // 【3.7】关系演化：记录互动
+    // 【5】关系演化：记录互动
     const relationship = getRelationshipEvolution();
     await relationship.recordInteraction('conversation', question);
     
-    // 如果用户分享了个人内容
     if (this.isPersonalSharing(question)) {
       await relationship.recordInteraction('sharing_personal', '用户分享了个人想法');
     }
     
-    // 如果情绪支持
     if (this.isEmotionalSupport(question, emotionRecord.type)) {
       await relationship.recordInteraction('emotional_support', '提供了情感支持');
     }
     
-    // 【4】根据链接强度选择神经元（使用神经动力学）
+    // 【6】根据链接强度选择神经元（使用神经动力学）
     const activeNeuronIds = await this.linkDynamics.selectActiveNeurons(question, 2);
     const synapseReport = await this.linkDynamics.getSynapseReport();
     const stateMap = new Map(synapseReport.synapses.map(s => [s.id, s]));
     
-    // 【5】获取对话上下文
+    // 【7】获取对话上下文
     const contextPrompt = await conversationCtx.buildContextPrompt(sid);
     
-    // 【6】并行思考
+    // 【8】并行思考（融入联想）
     const styleInfoForThink = { isNew, distance: styleDistance };
+    const associations = thinkingResult.associations.map(a => a.memory.meaning).join('；');
+    
     const thoughts = await Promise.all(
-      activeNeuronIds.map(id => this.think(
+      activeNeuronIds.map(id => this.thinkWithAssociations(
         id,
         stateMap.get(id)?.effectiveStrength || 0.5,
         question,
         contextPrompt,
         openDoors,
-        styleInfoForThink
+        styleInfoForThink,
+        associations,
+        thinkingResult.mainThought
       ))
     );
     
-    // 【7】评估
+    // 【9】评估
     const result = this.fastEvaluate(thoughts);
     
-    // 【8】更新链接强度（使用神经动力学）
+    // 【10】更新链接强度（使用神经动力学）
     await this.linkDynamics.recordActivation(result.winner.neuronId, true, {
       responseQuality: result.winner.confidence,
       relatedNeurons: thoughts.filter(t => t.neuronId !== result.winner.neuronId).map(t => t.neuronId),
@@ -360,11 +380,13 @@ export class LatentGameEngine {
       }
     }
     
-    // 【9】存储到记忆空间
+    // 【11】存储到记忆空间
     this.storeToMemorySpace(question, result).catch(() => {});
     
-    // 【10】意识空间演化
-    this.consciousness.evolve();
+    // 【12】意识继续演化（思考后的余波）
+    for (let i = 0; i < 3; i++) {
+      this.consciousness.evolve();
+    }
     
     // 添加状态信息
     result.openDoors = openDoors;
@@ -376,6 +398,15 @@ export class LatentGameEngine {
       isNew,
       styleCount: styleRecognizer.getStyleCount(),
       distance: styleDistance,
+    };
+    result.thinkingProcess = {
+      associations: thinkingResult.associations.map(a => ({
+        memory: a.memory.meaning,
+        strength: a.strength,
+        path: a.path,
+      })),
+      depth: thinkingResult.depth,
+      duration: thinkingResult.duration,
     };
     
     return result;
@@ -406,15 +437,19 @@ export class LatentGameEngine {
   }
   
   /**
-   * 单神经元思考
+   * 单神经元思考（带联想）
+   * 
+   * 联想会影响思考方向
    */
-  private async think(
+  private async thinkWithAssociations(
     neuronId: string,
     strength: number,
-    question: string, 
+    question: string,
     contextPrompt: string,
     openDoors: MemoryDoor[],
-    styleInfo?: { isNew: boolean; distance: number }
+    styleInfo?: { isNew: boolean; distance: number },
+    associations?: string,
+    mainThought?: string
   ): Promise<InnerThought> {
     // 记忆门的提示
     const doorHints = openDoors.length > 0
@@ -428,13 +463,23 @@ export class LatentGameEngine {
         : `\n感觉: 像是老朋友，距离${styleInfo.distance.toFixed(2)}。`
       : '';
     
+    // 联想提示（新增）
+    const associationHint = associations
+      ? `\n联想: ${associations}`
+      : '';
+    
+    // 主要想法提示（新增）
+    const thoughtHint = mainThought
+      ? `\n思维方向: ${mainThought}`
+      : '';
+    
     const memoryHint = await this.memory.buildMemoryHint(neuronId);
     
     const prompt = THOUGHT_PROMPT
       .replace('{CONTEXT}', contextPrompt)
       .replace('{QUESTION}', question)
       .replace('{STRENGTH}', `${Math.round(strength * 100)}%`)
-      .replace('{MEMORY_HINT}', memoryHint + doorHints + styleHint);
+      .replace('{MEMORY_HINT}', memoryHint + doorHints + styleHint + associationHint + thoughtHint);
     
     try {
       let response = '';
@@ -449,12 +494,15 @@ export class LatentGameEngine {
       
       const parsed = this.parseThought(response);
       
+      // 如果有联想，增加信心
+      const associationBonus = associations ? 0.1 : 0;
+      
       return {
         neuronId,
         strength,
         core: parsed.core,
         angle: parsed.angle,
-        confidence: parsed.confidence * (1 + strength * 0.2),
+        confidence: Math.min(1, parsed.confidence * (1 + strength * 0.2) + associationBonus),
       };
     } catch {
       return {
@@ -465,6 +513,20 @@ export class LatentGameEngine {
         confidence: strength,
       };
     }
+  }
+  
+  /**
+   * 单神经元思考（保留旧方法兼容）
+   */
+  private async think(
+    neuronId: string,
+    strength: number,
+    question: string, 
+    contextPrompt: string,
+    openDoors: MemoryDoor[],
+    styleInfo?: { isNew: boolean; distance: number }
+  ): Promise<InnerThought> {
+    return this.thinkWithAssociations(neuronId, strength, question, contextPrompt, openDoors, styleInfo);
   }
   
   /**
