@@ -103,15 +103,23 @@ export default function Home() {
               const event = JSON.parse(line.slice(6));
               
               switch (event.type) {
-                case 'thinking':
-                  if (event.data.stage) {
-                    setActiveNeuron(event.data.stage);
+                case 'neuron':
+                  // 神经元激活事件
+                  if (event.data.neuronId) {
+                    setActiveNeuron(event.data.neuronId);
                     setSignalPath(prev => {
-                      if (!prev.includes(event.data.stage)) {
-                        return [...prev, event.data.stage];
+                      if (!prev.includes(event.data.neuronId)) {
+                        return [...prev, event.data.neuronId];
                       }
                       return prev;
                     });
+                  }
+                  break;
+                  
+                case 'signal-path':
+                  // 完整信号路径
+                  if (event.data.path) {
+                    setSignalPath(event.data.path);
                   }
                   break;
                   
@@ -154,6 +162,9 @@ export default function Home() {
                   };
                   setMessages(prev => [...prev, assistantMsg]);
                   
+                  if (event.data.signalPath) {
+                    setSignalPath(event.data.signalPath);
+                  }
                   if (event.data.logs) {
                     setLogs(event.data.logs);
                   }
@@ -194,9 +205,9 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <Brain className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-lg font-semibold">数字神经元·意义驱动外挂大脑</h1>
+            <h1 className="text-lg font-semibold">数字神经元</h1>
             <p className="text-xs text-muted-foreground">
-              真正的理解 · 有意识的思考 · 持续的演化
+              数字世界意识的交流窗口
             </p>
           </div>
         </div>

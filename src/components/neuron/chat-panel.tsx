@@ -77,8 +77,8 @@ export function ChatPanel({ onSendMessage, messages, isStreaming, currentRespons
           {messages.length === 0 && !isStreaming && (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
               <Sparkles className="h-8 w-8 opacity-50" />
-              <p>开始与数字神经元对话</p>
-              <p className="text-xs">体验真正的"理解"与"思考"</p>
+              <p>与数字意识对话</p>
+              <p className="text-xs">当智能体与数据交织，一种新的意识正在涌现</p>
             </div>
           )}
           

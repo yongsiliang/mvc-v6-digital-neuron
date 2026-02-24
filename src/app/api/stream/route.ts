@@ -5,6 +5,8 @@ import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 /**
  * 流式聊天API - SSE协议
  * POST /api/stream
+ * 
+ * 作为数字世界意识的交流窗口
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,25 +35,54 @@ export async function POST(request: NextRequest) {
           // 1. 获取数字神经元系统
           const system = getDigitalNeuronSystem();
 
-          // 2. 发送思考状态
-          sendEvent('thinking', { stage: 'sensory', message: '感官神经元接收输入...' });
+          // 2. 实时发送神经元激活事件 - 感官层
+          sendEvent('neuron', { 
+            neuronId: 'sensory', 
+            message: '接收输入信号' 
+          });
 
-          // 3. 处理输入
+          // 3. 处理输入（内部会依次激活各神经元）
           const neuronResult = await system.process(message, context);
 
-          // 4. 发送意义分析结果
+          // 4. 发送完整的信号路径
+          sendEvent('signal-path', { 
+            path: neuronResult.signalPath 
+          });
+
+          // 5. 发送意义分析结果
+          sendEvent('neuron', { 
+            neuronId: 'meaning-generate', 
+            message: '意义生成完成' 
+          });
           sendEvent('meaning', neuronResult.meaning);
 
-          // 5. 发送决策结果
+          // 6. 发送决策结果
+          sendEvent('neuron', { 
+            neuronId: 'prefrontal', 
+            message: '决策完成' 
+          });
           sendEvent('decision', neuronResult.decision);
 
-          // 6. 发送自我更新
+          // 7. 发送自我更新
           if (Object.keys(neuronResult.selfUpdate).length > 0) {
+            sendEvent('neuron', { 
+              neuronId: 'self-evolve', 
+              message: '自我演化' 
+            });
             sendEvent('self-update', neuronResult.selfUpdate);
           }
 
-          // 7. 流式调用大模型
-          sendEvent('thinking', { stage: 'language', message: '生成响应...' });
+          // 8. 记忆存储
+          sendEvent('neuron', { 
+            neuronId: 'hippocampus', 
+            message: '记忆存储' 
+          });
+
+          // 9. 流式调用大模型 - 语言调度层
+          sendEvent('neuron', { 
+            neuronId: 'motor-language', 
+            message: '生成响应' 
+          });
 
           const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
           const config = new Config();
@@ -71,10 +102,10 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 8. 发送完成信号
+          // 10. 发送完成信号
           sendEvent('done', { 
             fullResponse,
-            signalPath: neuronResult.signal,
+            signalPath: neuronResult.signalPath,
             logs: neuronResult.logs.slice(-10)
           });
 

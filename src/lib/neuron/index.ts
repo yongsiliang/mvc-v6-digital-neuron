@@ -59,6 +59,7 @@ export class DigitalNeuronSystem {
     promptMessages: Array<{ role: 'system' | 'user'; content: string }>;
     actionCommand: ReturnType<MotorActionNeuron['generateActionCommand']>;
     logs: LogEntry[];
+    signalPath: string[];
   }> {
     const startTime = Date.now();
     this.signalPath = [];
@@ -124,7 +125,8 @@ export class DigitalNeuronSystem {
       selfUpdate,
       promptMessages,
       actionCommand,
-      logs: allLogs
+      logs: allLogs,
+      signalPath: [...this.signalPath]
     };
   }
 
