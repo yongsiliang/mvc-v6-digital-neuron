@@ -28,6 +28,16 @@ export {
   type ExtractedMeaning,
   type ActivationResult
 } from './meaning-memory';
+// 导出记忆空间引擎
+export { 
+  MemorySpaceEngine, 
+  getMemorySpaceEngine,
+  type MemoryDoor,
+  type NeuralKey,
+  type UnlockResult,
+  type ForgeResult,
+  type MemorySpaceSnapshot
+} from './memory-space';
 
 /**
  * 数字神经元系统

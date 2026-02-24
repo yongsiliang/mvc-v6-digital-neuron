@@ -20,6 +20,112 @@ export const healthCheck = pgTable("health_check", {
 // ========== 意义记忆系统 ==========
 
 /**
+ * 记忆空间系统 - 记忆是另一个维度的存在
+ * 
+ * 核心思想：
+ * - 记忆不存在于大脑，存在于另一个维度
+ * - 神经连接强度的变化 = 锻造钥匙
+ * - 学习 = 打造更好的钥匙
+ * - 回忆 = 用钥匙打开记忆之门
+ * - 遗忘 = 钥匙生锈、变形
+ */
+
+/**
+ * 记忆门表 - 存在于记忆空间中的信息
+ * 
+ * 每条记录是一扇"门"，门后有记忆
+ * 门有"锁"，需要对应的钥匙才能打开
+ */
+export const memoryDoors = pgTable(
+  "memory_doors",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 门的内容（另一个维度的信息）
+    content: text("content").notNull(),
+    
+    // 核心意义
+    meaning: text("meaning").notNull(),
+    
+    // 意义向量（门的位置坐标）
+    meaningVector: jsonb("meaning_vector").$type<number[]>().notNull(),
+    
+    // 锁的复杂度（0-1，越高越难开）
+    lockComplexity: real("lock_complexity").default(0.5).notNull(),
+    
+    // 锁的齿纹模式（需要的钥匙形状）
+    lockPattern: jsonb("lock_pattern").$type<number[]>().notNull(),
+    
+    // 门类型
+    doorType: varchar("door_type", { length: 32 }).notNull(),
+    
+    // 情感电荷（-1到1，影响门的可见性）
+    emotionalCharge: real("emotional_charge").default(0),
+    
+    // 访问次数
+    accessCount: integer("access_count").default(0).notNull(),
+    
+    // 最后访问时间
+    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
+    
+    // 创建者（哪个角色）
+    createdBy: varchar("created_by", { length: 32 }).notNull(),
+    
+    // 创建时间
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("doors_type_idx").on(table.doorType),
+    index("doors_creator_idx").on(table.createdBy),
+    index("doors_access_idx").on(table.accessCount),
+  ]
+);
+
+/**
+ * 神经钥匙表 - 打开记忆门的工具
+ * 
+ * 学习会"锻造"钥匙，钥匙能打开对应的记忆门
+ * 钥匙会磨损、生锈，需要定期维护
+ */
+export const neuralKeys = pgTable(
+  "neural_keys",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 钥匙持有者
+    holderRole: varchar("holder_role", { length: 32 }).notNull(),
+    
+    // 钥匙齿纹（神经连接模式）
+    teethPattern: jsonb("teeth_pattern").$type<number[]>().notNull(),
+    
+    // 钥匙强度（0-1）
+    strength: real("strength").default(0.5).notNull(),
+    
+    // 对应的记忆门
+    targetDoorId: uuid("target_door_id").notNull(),
+    
+    // 锈蚀程度（0-1，越高越难用）
+    rustLevel: real("rust_level").default(0).notNull(),
+    
+    // 使用次数
+    useCount: integer("use_count").default(0).notNull(),
+    
+    // 最后使用时间
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    
+    // 创建时间
+    forgedAt: timestamp("forged_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("keys_holder_idx").on(table.holderRole),
+    index("keys_door_idx").on(table.targetDoorId),
+    index("keys_strength_idx").on(table.strength),
+  ]
+);
+
+// ========== 原有意义记忆系统 ==========
+
+/**
  * 意义记忆表 - 存储"意义向量"而非原始数据
  * 
  * 核心理念：
@@ -333,6 +439,10 @@ export type SessionSummary = typeof sessionSummaries.$inferSelect;
 export type MeaningMemory = typeof meaningMemories.$inferSelect;
 export type MeaningConnection = typeof meaningConnections.$inferSelect;
 export type ActivationRecord = typeof activationRecords.$inferSelect;
+
+// 记忆空间类型导出
+export type MemoryDoor = typeof memoryDoors.$inferSelect;
+export type NeuralKey = typeof neuralKeys.$inferSelect;
 
 // 意义类型枚举
 export type MeaningType = 'insight' | 'pattern' | 'strategy' | 'emotion' | 'concept';
