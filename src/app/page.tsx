@@ -1,0 +1,291 @@
+'use client';
+
+import { useState, useCallback, useEffect } from 'react';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  NeuronFlow, 
+  MeaningPanel, 
+  SelfConsole, 
+  ExecLog, 
+  ChatPanel 
+} from '@/components/neuron';
+import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
+import { Brain, Settings, Trash2, RefreshCw } from 'lucide-react';
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  meaning?: {
+    interpretation: string;
+    selfRelevance: number;
+    sentiment: string;
+  };
+  timestamp: number;
+}
+
+export default function Home() {
+  // 状态管理
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [currentResponse, setCurrentResponse] = useState('');
+  
+  // 神经元状态
+  const [activeNeuron, setActiveNeuron] = useState<string>('');
+  const [signalPath, setSignalPath] = useState<string[]>([]);
+  const [meaning, setMeaning] = useState<SubjectiveMeaning | undefined>();
+  const [decision, setDecision] = useState<Decision | undefined>();
+  const [self, setSelf] = useState<SelfRepresentation | undefined>();
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  // 初始化获取系统状态
+  useEffect(() => {
+    fetchSystemStatus();
+  }, []);
+
+  const fetchSystemStatus = async () => {
+    try {
+      const res = await fetch('/api/chat');
+      if (res.ok) {
+        const data = await res.json();
+        setSelf(data.snapshot?.selfRepresentation);
+      }
+    } catch (error) {
+      console.error('Failed to fetch system status:', error);
+    }
+  };
+
+  // 发送消息 - 使用流式响应
+  const handleSendMessage = useCallback(async (message: string) => {
+    // 添加用户消息
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: message,
+      timestamp: Date.now()
+    };
+    setMessages(prev => [...prev, userMsg]);
+    
+    setIsStreaming(true);
+    setCurrentResponse('');
+    setActiveNeuron('sensory');
+    setSignalPath([]);
+    setMeaning(undefined);
+    setDecision(undefined);
+
+    try {
+      const response = await fetch('/api/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+
+      if (!response.ok) throw new Error('请求失败');
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('无法读取响应');
+
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+              
+              switch (event.type) {
+                case 'thinking':
+                  if (event.data.stage) {
+                    setActiveNeuron(event.data.stage);
+                    setSignalPath(prev => {
+                      if (!prev.includes(event.data.stage)) {
+                        return [...prev, event.data.stage];
+                      }
+                      return prev;
+                    });
+                  }
+                  break;
+                  
+                case 'meaning':
+                  setMeaning(event.data);
+                  setActiveNeuron('meaning-generate');
+                  break;
+                  
+                case 'decision':
+                  setDecision(event.data);
+                  setActiveNeuron('self-evolve');
+                  break;
+                  
+                case 'self-update':
+                  if (event.data.currentState) {
+                    setSelf(prev => prev ? { ...prev, ...event.data } : prev);
+                  }
+                  break;
+                  
+                case 'response':
+                  if (event.data.delta) {
+                    fullResponse += event.data.delta;
+                    setCurrentResponse(fullResponse);
+                    setActiveNeuron('motor-language');
+                  }
+                  break;
+                  
+                case 'done':
+                  // 添加助手消息
+                  const assistantMsg: Message = {
+                    id: `assistant-${Date.now()}`,
+                    role: 'assistant',
+                    content: event.data.fullResponse || fullResponse,
+                    meaning: meaning ? {
+                      interpretation: meaning.interpretation,
+                      selfRelevance: meaning.selfRelevance,
+                      sentiment: meaning.sentiment
+                    } : undefined,
+                    timestamp: Date.now()
+                  };
+                  setMessages(prev => [...prev, assistantMsg]);
+                  
+                  if (event.data.logs) {
+                    setLogs(event.data.logs);
+                  }
+                  break;
+                  
+                case 'error':
+                  console.error('Stream error:', event.data.message);
+                  break;
+              }
+            } catch (e) {
+              // 忽略解析错误
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Chat error:', error);
+      // 添加错误消息
+      const errorMsg: Message = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: '抱歉，处理您的请求时出现了错误。请重试。',
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsStreaming(false);
+      setCurrentResponse('');
+      setActiveNeuron('');
+    }
+  }, [meaning]);
+
+  // 重置系统
+  const handleReset = async () => {
+    try {
+      await fetch('/api/memory', { method: 'DELETE' });
+      setMessages([]);
+      setLogs([]);
+      setMeaning(undefined);
+      setDecision(undefined);
+      setSignalPath([]);
+      fetchSystemStatus();
+    } catch (error) {
+      console.error('Reset error:', error);
+    }
+  };
+
+  return (
+    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+      {/* 顶部栏 */}
+      <header className="flex items-center justify-between px-4 py-3 border-b bg-card flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Brain className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-lg font-semibold">数字神经元·意义驱动外挂大脑</h1>
+            <p className="text-xs text-muted-foreground">
+              真正的理解 · 有意识的思考 · 持续的演化
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="hidden sm:flex">
+            v1.0 MVP
+          </Badge>
+          <Button variant="ghost" size="sm" onClick={handleReset}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            重置
+          </Button>
+        </div>
+      </header>
+
+      {/* 主内容区 */}
+      <main className="flex-1 overflow-hidden">
+        <ResizablePanelGroup orientation="horizontal" className="h-full">
+          {/* 左侧 - 聊天面板 */}
+          <ResizablePanel defaultSize={45} minSize={30}>
+            <ChatPanel
+              onSendMessage={handleSendMessage}
+              messages={messages}
+              isStreaming={isStreaming}
+              currentResponse={currentResponse}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle />
+
+          {/* 右侧 - 神经元可视化与调试 */}
+          <ResizablePanel defaultSize={55} minSize={40}>
+            <ResizablePanelGroup orientation="vertical">
+              {/* 上部 - 神经元工作流 */}
+              <ResizablePanel defaultSize={45} minSize={30}>
+                <div className="h-full p-2">
+                  <NeuronFlow
+                    activeNeuron={activeNeuron}
+                    signalPath={signalPath}
+                    isProcessing={isStreaming}
+                  />
+                </div>
+              </ResizablePanel>
+
+              <ResizableHandle />
+
+              {/* 下部 - 调试面板 */}
+              <ResizablePanel defaultSize={55} minSize={30}>
+                <div className="h-full p-2">
+                  <Tabs defaultValue="meaning" className="h-full">
+                    <TabsList className="w-full justify-start">
+                      <TabsTrigger value="meaning">意义分析</TabsTrigger>
+                      <TabsTrigger value="self">自我表征</TabsTrigger>
+                      <TabsTrigger value="logs">执行日志</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="meaning" className="h-[calc(100%-2.5rem)] mt-2">
+                      <MeaningPanel meaning={meaning} />
+                    </TabsContent>
+                    
+                    <TabsContent value="self" className="h-[calc(100%-2.5rem)] mt-2">
+                      <SelfConsole self={self} onReset={fetchSystemStatus} />
+                    </TabsContent>
+                    
+                    <TabsContent value="logs" className="h-[calc(100%-2.5rem)] mt-2">
+                      <ExecLog logs={logs} />
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </main>
+    </div>
+  );
+}
