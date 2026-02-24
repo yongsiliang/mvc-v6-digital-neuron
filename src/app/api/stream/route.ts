@@ -40,24 +40,47 @@ export async function POST(request: NextRequest) {
         try {
           const headers = HeaderUtils.extractForwardHeaders(request.headers);
           
-          // 1. 神经元处理
-          send('neuron', { neuronId: 'sensory', message: '接收输入' });
+          // ==================== 神经元工作流 ====================
+          
+          // 1. 感官层：接收输入
+          send('neuron', { neuronId: 'sensory', message: '接收输入信号' });
+          await new Promise(r => setTimeout(r, 150)); // 短暂延迟让前端能看到
           
           const system = getDigitalNeuronSystem();
+          
+          // 2. 意义核心层
+          send('neuron', { neuronId: 'meaning-anchor', message: '计算自我关联' });
+          await new Promise(r => setTimeout(r, 100));
+          
+          send('neuron', { neuronId: 'memory-associate', message: '检索相关记忆' });
+          await new Promise(r => setTimeout(r, 100));
+          
+          send('neuron', { neuronId: 'meaning-generate', message: '生成主观意义' });
+          
           const neuronResult = await system.process(message, context);
           
-          // 信号路径（不在前端显示）
-          // send('signal-path', { path: neuronResult.signalPath });
           send('meaning', neuronResult.meaning);
           send('decision', neuronResult.decision);
 
-          // 2. 快速博弈（带意义记忆）
+          // 3. 决策层
+          send('neuron', { neuronId: 'prefrontal', message: '思考与决策' });
+          await new Promise(r => setTimeout(r, 100));
+          
+          send('neuron', { neuronId: 'cingulate', message: '反思与纠错' });
+          await new Promise(r => setTimeout(r, 100));
+          
+          send('neuron', { neuronId: 'self-evolve', message: '动态更新自我' });
+
+          // 4. 记忆层
+          send('neuron', { neuronId: 'hippocampus', message: '记忆存储' });
+          
+          // 5. 高维博弈（带意义记忆）
           send('neuron', { neuronId: 'latent-game', message: '博弈思考中...' });
           
           const engine = new LatentGameEngine(headers);
           const gameResult = await engine.play(message, sid);
           
-          // 【新增】发送意义共鸣信息
+          // 发送意义共鸣信息
           if (gameResult.resonance && gameResult.resonance.activatedMemories.length > 0) {
             send('meaning-resonance', {
               activatedCount: gameResult.resonance.activatedMemories.length,
@@ -71,14 +94,19 @@ export async function POST(request: NextRequest) {
             });
           }
           
+          // 6. 发送链接强度报告
+          if (gameResult.strengthReport) {
+            send('strength-report', gameResult.strengthReport);
+          }
+          
           send('game-result', {
             winner: gameResult.winner.neuronId,
             confidence: gameResult.winner.confidence.toFixed(2),
             reason: gameResult.evaluationReason,
           });
 
-          // 3. 立即输出（带对话上下文）
-          send('neuron', { neuronId: 'motor-language', message: `神经元输出中` });
+          // 7. 输出层
+          send('neuron', { neuronId: 'motor-language', message: '生成响应' });
 
           let fullResponse = '';
           for await (const chunk of engine.streamAnswer(message, gameResult, sid)) {
