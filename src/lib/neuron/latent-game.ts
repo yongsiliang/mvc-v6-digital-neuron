@@ -1,18 +1,31 @@
 /**
- * 高维内在博弈系统（带持久化记忆和对话上下文）
+ * 高维内在博弈系统（带意义记忆）
  * 
- * 记忆架构（类脑分层）：
- * - 工作记忆：当前对话上下文（让模型知道之前聊了什么）
- * - 情景记忆：具体博弈事件
- * - 语义记忆：学到的知识
- * - 程序记忆：自动化的习惯
+ * 意义记忆架构：
+ * ┌─────────────────────────────────────────────────────────┐
+ * │   输入 ──→ 意义共鸣 ──→ 激活相关记忆                     │
+ * │              │                       │                  │
+ * │              ↓                       ↓                  │
+ * │         影响思考 ←── 记忆主动参与决策                     │
+ * │              │                                          │
+ * │              ↓                                          │
+ * │         博弈决策 ──→ 提取意义 ──→ 存储到记忆网络          │
+ * │                      │                                  │
+ * │                      └──→ 记忆持续演化                   │
+ * └─────────────────────────────────────────────────────────┘
  * 
- * 持久化：使用 Supabase 存储，刷新页面记忆不丢失
+ * 核心理念：记忆不是被动存储，而是主动参与认知
  */
 
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { getConversationContext } from './conversation-context';
+import { 
+  MeaningMemoryEngine, 
+  getMeaningMemoryEngine,
+  type ResonanceResult,
+  type DecisionInfluence 
+} from './meaning-memory';
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
@@ -33,6 +46,8 @@ interface InnerThought {
   core: string;
   angle: string;
   confidence: number;
+  // 意义记忆影响
+  meaningInfluence?: DecisionInfluence;
 }
 
 /**
@@ -42,6 +57,8 @@ interface GameResult {
   winner: InnerThought;
   allThoughts: InnerThought[];
   evaluationReason: string;
+  // 意义共鸣结果
+  resonance?: ResonanceResult;
 }
 
 /**
@@ -336,40 +353,59 @@ function getMemory(): PersistentMemory {
 }
 
 /**
- * 高维博弈引擎（持久化版）
+ * 高维博弈引擎（带意义记忆）
  */
 export class LatentGameEngine {
   private llmClient: LLMClient;
   private memory: PersistentMemory;
+  private meaningMemory: MeaningMemoryEngine;
   
   constructor(headers: Record<string, string>) {
     const config = new Config();
     this.llmClient = new LLMClient(config, headers);
     this.memory = getMemory();
+    this.meaningMemory = getMeaningMemoryEngine(headers);
   }
   
   /**
-   * 快速博弈（带对话上下文）
+   * 快速博弈（带意义记忆）
+   * 
+   * 流程：
+   * 1. 输入触发意义共鸣，激活相关记忆
+   * 2. 记忆影响各模型的思考
+   * 3. 博弈决策
+   * 4. 提取意义并存储
    */
   async play(question: string, sessionId?: string): Promise<GameResult> {
     const sid = sessionId || 'default-session';
     const conversationCtx = getConversationContext();
     
+    // 【核心改动1】意义共鸣：输入激活相关记忆
+    const resonances = await Promise.all(
+      PLAYERS.map(p => this.meaningMemory.resonate(question, p.role))
+    );
+    
     // 获取对话上下文
     const contextPrompt = await conversationCtx.buildContextPrompt(sid);
     
-    // 并行思考（带记忆提示和对话上下文）
+    // 【核心改动2】并行思考（带意义记忆影响）
     const thoughts = await Promise.all(
-      PLAYERS.map(p => this.think(p, question, contextPrompt))
+      PLAYERS.map((p, i) => this.think(p, question, contextPrompt, resonances[i]))
     );
     
     // 快速评估
     const result = this.fastEvaluate(thoughts);
     
+    // 【核心改动3】存储意义记忆（后台执行）
+    this.storeMeaningMemory(question, result).catch(() => {});
+    
     // 记录博弈结果
     for (const t of thoughts) {
       await this.memory.updateStats(t.role, t.role === result.winner.role);
     }
+    
+    // 添加共鸣结果
+    result.resonance = resonances[PLAYERS.findIndex(p => p.role === result.winner.role)];
     
     return result;
   }
@@ -409,10 +445,18 @@ export class LatentGameEngine {
   }
   
   /**
-   * 单模型思考（带记忆和对话上下文）
+   * 单模型思考（带意义记忆影响）
    */
-  private async think(player: typeof PLAYERS[0], question: string, contextPrompt: string): Promise<InnerThought> {
-    // 获取记忆提示
+  private async think(
+    player: typeof PLAYERS[0], 
+    question: string, 
+    contextPrompt: string,
+    resonance: ResonanceResult
+  ): Promise<InnerThought> {
+    // 【核心】获取意义记忆的影响
+    const meaningInfluence = this.meaningMemory.influenceDecision(resonance);
+    
+    // 获取传统记忆提示
     const [memoryHint, stats] = await Promise.all([
       this.memory.buildMemoryHint(player.role),
       this.memory.getStats(),
@@ -421,12 +465,15 @@ export class LatentGameEngine {
     const stat = stats.get(player.role);
     const wisdomBonus = stat?.wisdomBonus || 0;
     
+    // 【核心】构建意义提示
+    const meaningHint = this.buildMeaningHint(meaningInfluence);
+    
     const prompt = THOUGHT_PROMPT
       .replace('{CONTEXT}', contextPrompt)
       .replace('{QUESTION}', question)
       .replace('{ROLE}', player.role)
       .replace('{STRENGTH}', player.strength)
-      .replace('{MEMORY_HINT}', memoryHint);
+      .replace('{MEMORY_HINT}', memoryHint + meaningHint);
     
     try {
       let response = '';
@@ -440,12 +487,17 @@ export class LatentGameEngine {
       }
       
       const parsed = this.parseThought(response);
+      
+      // 【核心】意义加成：激活的记忆提供额外信心
+      const meaningBonus = meaningInfluence.confidence;
+      
       return {
         modelId: player.id,
         role: player.role,
         core: parsed.core,
         angle: parsed.angle,
-        confidence: Math.min(1, parsed.confidence + wisdomBonus),
+        confidence: Math.min(1, parsed.confidence + wisdomBonus + meaningBonus),
+        meaningInfluence,
       };
     } catch {
       return {
@@ -454,8 +506,30 @@ export class LatentGameEngine {
         core: '思考失败',
         angle: '',
         confidence: 0.3 + wisdomBonus,
+        meaningInfluence,
       };
     }
+  }
+  
+  /**
+   * 构建意义提示
+   */
+  private buildMeaningHint(influence: DecisionInfluence): string {
+    const parts: string[] = [];
+    
+    if (influence.hints.length > 0) {
+      parts.push(`相关记忆: ${influence.hints.join('；')}`);
+    }
+    
+    if (influence.patterns.length > 0) {
+      parts.push(`发现模式: ${influence.patterns.join('；')}`);
+    }
+    
+    if (influence.emotional !== 'neutral') {
+      parts.push(`情感倾向: ${influence.emotional === 'positive' ? '积极' : '谨慎'}`);
+    }
+    
+    return parts.length > 0 ? `\n${parts.join('\n')}` : '';
   }
   
   /**
@@ -621,7 +695,49 @@ ${hints || '无'}
    * 获取统计摘要
    */
   async getStatsSummary() {
-    return this.memory.getStatsSummary();
+    const [basicStats, meaningStats] = await Promise.all([
+      this.memory.getStatsSummary(),
+      Promise.all(PLAYERS.map(p => this.meaningMemory.getStats(p.role)))
+    ]);
+    
+    return basicStats.map((s, i) => ({
+      ...s,
+      meaningMemories: meaningStats[i].total,
+      meaningByType: meaningStats[i].byType,
+      avgActivation: meaningStats[i].avgActivation.toFixed(3),
+      totalResonance: meaningStats[i].totalResonance,
+    }));
+  }
+  
+  /**
+   * 存储意义记忆（后台执行）
+   */
+  private async storeMeaningMemory(question: string, result: GameResult): Promise<void> {
+    // 为每个模型的思考提取意义
+    for (const thought of result.allThoughts) {
+      try {
+        // 提取意义
+        const meaning = await this.meaningMemory.extractMeaning(
+          thought.core,
+          thought.role,
+          question
+        );
+        
+        // 存储意义记忆
+        await this.meaningMemory.storeMeaning(
+          meaning,
+          thought.role,
+          `问题: ${question}\n思考: ${thought.core}`
+        );
+      } catch {
+        // 提取失败，忽略
+      }
+    }
+    
+    // 定期演化记忆
+    for (const player of PLAYERS) {
+      await this.meaningMemory.evolve(player.role);
+    }
   }
 }
 

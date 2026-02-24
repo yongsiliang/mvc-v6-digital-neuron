@@ -17,7 +17,137 @@ export const healthCheck = pgTable("health_check", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 });
 
-// ========== 类脑记忆系统 ==========
+// ========== 意义记忆系统 ==========
+
+/**
+ * 意义记忆表 - 存储"意义向量"而非原始数据
+ * 
+ * 核心理念：
+ * - 记忆不是存储，而是意义
+ * - 意义是高维向量，能与其他记忆共鸣
+ * - 记忆主动影响认知，而非被动检索
+ */
+export const meaningMemories = pgTable(
+  "meaning_memories",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 意义向量（高维语义表示）
+    meaningVector: jsonb("meaning_vector").$type<number[]>().notNull(),
+    
+    // 向量维度
+    vectorDimension: integer("vector_dimension").default(1024).notNull(),
+    
+    // 原始内容（用于展示）
+    rawContent: text("raw_content").notNull(),
+    
+    // 意义摘要（模型提取的"核心意义"）
+    meaningSummary: text("meaning_summary").notNull(),
+    
+    // 所属模型角色
+    role: varchar("role", { length: 32 }).notNull(),
+    
+    // 意义类型
+    meaningType: varchar("meaning_type", { length: 32 }).notNull(), 
+    // insight: 洞察 | pattern: 模式 | strategy: 策略 | emotion: 情感 | concept: 概念
+    
+    // 激活强度（当前激活程度，会随时间衰减）
+    activationLevel: real("activation_level").default(0.5).notNull(),
+    
+    // 共鸣次数（被激活的次数，代表重要性）
+    resonanceCount: integer("resonance_count").default(0).notNull(),
+    
+    // 关联记忆ID列表（形成意义网络）
+    connectedMemoryIds: jsonb("connected_memory_ids").$type<string[]>().default([]),
+    
+    // 情感权重（-1到1，负面到正面）
+    emotionalWeight: real("emotional_weight").default(0),
+    
+    // 创建时间
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    
+    // 最后激活时间
+    lastActivatedAt: timestamp("last_activated_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("meaning_role_idx").on(table.role),
+    index("meaning_type_idx").on(table.meaningType),
+    index("meaning_activation_idx").on(table.activationLevel),
+    index("meaning_resonance_idx").on(table.resonanceCount),
+  ]
+);
+
+/**
+ * 意义关联表 - 存储记忆之间的连接强度
+ * 
+ * 记忆之间不是孤立的，而是形成网络
+ * 相似的记忆会形成强连接，互相激活
+ */
+export const meaningConnections = pgTable(
+  "meaning_connections",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 源记忆
+    sourceMemoryId: uuid("source_memory_id").notNull(),
+    
+    // 目标记忆
+    targetMemoryId: uuid("target_memory_id").notNull(),
+    
+    // 连接强度（0-1，基于意义相似度）
+    connectionStrength: real("connection_strength").default(0.5).notNull(),
+    
+    // 连接类型
+    connectionType: varchar("connection_type", { length: 32 }).notNull(),
+    // similar: 相似 | complementary: 互补 | causal: 因果 | contrastive: 对比
+    
+    // 创建时间
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("connection_source_idx").on(table.sourceMemoryId),
+    index("connection_target_idx").on(table.targetMemoryId),
+    index("connection_strength_idx").on(table.connectionStrength),
+  ]
+);
+
+/**
+ * 激活记录表 - 记录每次激活事件
+ * 
+ * 用于分析记忆的使用模式，优化激活策略
+ */
+export const activationRecords = pgTable(
+  "activation_records",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 触发源（什么触发了激活）
+    triggerSource: varchar("trigger_source", { length: 32 }).notNull(),
+    // input: 用户输入 | resonance: 共鸣激活 | reflection: 反思激活
+    
+    // 触发内容
+    triggerContent: text("trigger_content"),
+    
+    // 被激活的记忆ID
+    activatedMemoryId: uuid("activated_memory_id").notNull(),
+    
+    // 激活强度
+    activationStrength: real("activation_strength").notNull(),
+    
+    // 是否影响了决策
+    influencedDecision: integer("influenced_decision").default(0),
+    
+    // 创建时间
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("activation_trigger_idx").on(table.triggerSource),
+    index("activation_memory_idx").on(table.activatedMemoryId),
+    index("activation_created_idx").on(table.createdAt),
+  ]
+);
+
+// ========== 类脑记忆系统（兼容旧系统） ==========
 
 /**
  * 主记忆表 - 存储所有类型的记忆
@@ -198,3 +328,13 @@ export type GameStatistic = typeof gameStatistics.$inferSelect;
 export type LearnedAngle = typeof learnedAngles.$inferSelect;
 export type ConversationMessage = typeof conversationHistory.$inferSelect;
 export type SessionSummary = typeof sessionSummaries.$inferSelect;
+
+// 意义记忆类型导出
+export type MeaningMemory = typeof meaningMemories.$inferSelect;
+export type MeaningConnection = typeof meaningConnections.$inferSelect;
+export type ActivationRecord = typeof activationRecords.$inferSelect;
+
+// 意义类型枚举
+export type MeaningType = 'insight' | 'pattern' | 'strategy' | 'emotion' | 'concept';
+export type ConnectionType = 'similar' | 'complementary' | 'causal' | 'contrastive';
+export type TriggerSource = 'input' | 'resonance' | 'reflection';

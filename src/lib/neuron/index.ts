@@ -19,6 +19,15 @@ export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron
 export { LatentGameEngine, getGameEngine, getPlayers } from './latent-game';
 // 导出对话上下文
 export { ConversationContext, getConversationContext } from './conversation-context';
+// 导出意义记忆引擎
+export { 
+  MeaningMemoryEngine, 
+  getMeaningMemoryEngine,
+  type ResonanceResult,
+  type DecisionInfluence,
+  type ExtractedMeaning,
+  type ActivationResult
+} from './meaning-memory';
 
 /**
  * 数字神经元系统

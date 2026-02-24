@@ -50,11 +50,25 @@ export async function POST(request: NextRequest) {
           send('meaning', neuronResult.meaning);
           send('decision', neuronResult.decision);
 
-          // 2. 快速博弈（带对话上下文）
+          // 2. 快速博弈（带意义记忆）
           send('neuron', { neuronId: 'latent-game', message: '博弈思考中...' });
           
           const engine = getGameEngine(headers);
           const gameResult = await engine.play(message, sid);
+          
+          // 【新增】发送意义共鸣信息
+          if (gameResult.resonance && gameResult.resonance.activatedMemories.length > 0) {
+            send('meaning-resonance', {
+              activatedCount: gameResult.resonance.activatedMemories.length,
+              dominantTheme: gameResult.resonance.dominantTheme,
+              influenceWeight: gameResult.resonance.influenceWeight.toFixed(3),
+              hints: gameResult.resonance.activatedMemories
+                .slice(0, 3)
+                .map((a: { memory: { meaningSummary: string; meaning_summary?: string } }) => 
+                  a.memory.meaning_summary || a.memory.meaningSummary
+                ),
+            });
+          }
           
           send('game-result', {
             winner: gameResult.winner.role,
@@ -144,14 +158,16 @@ export async function GET(request: NextRequest) {
     ]);
     
     const supabase = getSupabaseClient();
-    const { count: memoryCount } = await supabase
-      .from('neuron_memories')
-      .select('*', { count: 'exact', head: true });
+    const [memoryCount, meaningMemoryCount] = await Promise.all([
+      supabase.from('neuron_memories').select('*', { count: 'exact', head: true }),
+      supabase.from('meaning_memories').select('*', { count: 'exact', head: true }),
+    ]);
     
     return new Response(JSON.stringify({
       success: true,
       sessionId,
-      memoryCount: memoryCount || 0,
+      memoryCount: memoryCount.count || 0,
+      meaningMemoryCount: meaningMemoryCount.count || 0,
       conversation: convStats,
       players: summary,
     }), {
