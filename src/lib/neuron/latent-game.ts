@@ -16,9 +16,8 @@ import { LLMClient, Config } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { getConversationContext } from './conversation-context';
 import {
-  NeuronLinkManager,
-  getNeuronLinkManager,
-  type NeuronLinkState
+  getNeuronLinkDynamics,
+  type SynapseState
 } from './neuron-link';
 import { getConsciousness } from './consciousness-space';
 import { getMemorySpace, type MemoryDoor } from './memory-space-new';
@@ -83,7 +82,7 @@ interface GameResult {
   openDoors?: MemoryDoor[];
   consciousnessState?: {
     position: number[];
-    trail: number[][];
+    trail: Array<{ position: number[]; timestamp: number }>;
   };
   styleInfo?: {
     isNew: boolean;
@@ -228,8 +227,8 @@ class PersistentMemory {
     strength: number;
     learned: number;
   }>> {
-    const linkManager = getNeuronLinkManager();
-    const report = await linkManager.getStrengthReport();
+    const linkDynamics = getNeuronLinkDynamics();
+    const report = await linkDynamics.getSynapseReport();
     
     const { data: angles } = await this.supabase
       .from('learned_angles')
@@ -243,11 +242,11 @@ class PersistentMemory {
       }
     }
     
-    return report.neurons.map(n => ({
-      neuronId: n.id,
-      activations: n.activations,
-      strength: n.strength,
-      learned: angleCounts.get(n.id) || 0,
+    return report.synapses.map(s => ({
+      neuronId: s.id,
+      activations: s.totalActivations,
+      strength: s.effectiveStrength,
+      learned: angleCounts.get(s.id) || 0,
     }));
   }
 }
@@ -271,7 +270,7 @@ function getMemory(): PersistentMemory {
 export class LatentGameEngine {
   private llmClient: LLMClient;
   private memory: PersistentMemory;
-  private linkManager: NeuronLinkManager;
+  private linkDynamics = getNeuronLinkDynamics();
   private consciousness = getConsciousness();
   private memorySpace = getMemorySpace();
   
@@ -279,7 +278,6 @@ export class LatentGameEngine {
     const config = new Config();
     this.llmClient = new LLMClient(config, headers);
     this.memory = getMemory();
-    this.linkManager = getNeuronLinkManager();
   }
   
   /**
@@ -294,8 +292,8 @@ export class LatentGameEngine {
     // 【1】意识空间：被输入吸引
     await this.consciousness.attractTo(question);
     
-    // 【2】记忆空间：开距离近的门
-    const openDoors = this.memorySpace.open();
+    // 【2】记忆空间：开距离近的门（使用概率门机制）
+    const openDoors = await this.memorySpace.open();
     
     // 【3】风格识别：感觉像谁
     const styleRecognizer = getStyleRecognizer();
@@ -327,10 +325,10 @@ export class LatentGameEngine {
       await relationship.recordInteraction('emotional_support', '提供了情感支持');
     }
     
-    // 【4】根据链接强度选择神经元
-    const activeNeuronIds = await this.linkManager.selectActiveNeurons();
-    const linkStates = await this.linkManager.getLinkStates();
-    const stateMap = new Map(linkStates.map(s => [s.neuronId, s]));
+    // 【4】根据链接强度选择神经元（使用神经动力学）
+    const activeNeuronIds = await this.linkDynamics.selectActiveNeurons(question, 2);
+    const synapseReport = await this.linkDynamics.getSynapseReport();
+    const stateMap = new Map(synapseReport.synapses.map(s => [s.id, s]));
     
     // 【5】获取对话上下文
     const contextPrompt = await conversationCtx.buildContextPrompt(sid);
@@ -340,7 +338,7 @@ export class LatentGameEngine {
     const thoughts = await Promise.all(
       activeNeuronIds.map(id => this.think(
         id,
-        stateMap.get(id)?.strength || 0.5,
+        stateMap.get(id)?.effectiveStrength || 0.5,
         question,
         contextPrompt,
         openDoors,
@@ -351,11 +349,14 @@ export class LatentGameEngine {
     // 【7】评估
     const result = this.fastEvaluate(thoughts);
     
-    // 【8】更新链接强度
-    await this.linkManager.recordActivation(result.winner.neuronId, true);
+    // 【8】更新链接强度（使用神经动力学）
+    await this.linkDynamics.recordActivation(result.winner.neuronId, true, {
+      responseQuality: result.winner.confidence,
+      relatedNeurons: thoughts.filter(t => t.neuronId !== result.winner.neuronId).map(t => t.neuronId),
+    });
     for (const t of thoughts) {
       if (t.neuronId !== result.winner.neuronId) {
-        await this.linkManager.recordActivation(t.neuronId, false);
+        await this.linkDynamics.recordActivation(t.neuronId, false);
       }
     }
     
@@ -530,8 +531,8 @@ export class LatentGameEngine {
    * 存储到记忆空间
    */
   private async storeToMemorySpace(question: string, result: GameResult): Promise<void> {
-    // 创建新门
-    await this.memorySpace.createDoor(
+    // 创建新门（使用凝聚机制，相似记忆会融合）
+    await this.memorySpace.consolidate(
       question,
       result.winner.core
     );
@@ -557,7 +558,36 @@ export class LatentGameEngine {
     }>;
     totalActivations: number;
   }> {
-    return this.linkManager.getStrengthReport();
+    const report = await this.linkDynamics.getSynapseReport();
+    
+    return {
+      neurons: report.synapses.map(s => ({
+        id: s.id,
+        strength: s.effectiveStrength,
+        activations: s.totalActivations,
+        daysSinceActive: 0,
+      })),
+      totalActivations: report.totalActivations,
+    };
+  }
+  
+  /**
+   * 获取统计摘要
+   */
+  async getStatsSummary(): Promise<Array<{
+    neuronId: string;
+    activations: number;
+    strength: number;
+    learned: number;
+  }>> {
+    const report = await this.linkDynamics.getSynapseReport();
+    
+    return report.synapses.map(s => ({
+      neuronId: s.id,
+      activations: s.totalActivations,
+      strength: s.effectiveStrength,
+      learned: 0,
+    }));
   }
   
   /**
@@ -659,18 +689,6 @@ ${contextPrompt}基于你的思考回答用户（自然、直接、有个性）�
       'help me', 'sad', 'upset', 'depressed',
     ];
     return supportIndicators.some(ind => text.toLowerCase().includes(ind));
-  }
-  
-  /**
-   * 获取统计摘要
-   */
-  async getStatsSummary(): Promise<Array<{
-    neuronId: string;
-    activations: number;
-    strength: number;
-    learned: number;
-  }>> {
-    return this.memory.getStatsSummary();
   }
 }
 

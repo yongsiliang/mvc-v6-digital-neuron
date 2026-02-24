@@ -24,7 +24,12 @@ export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron
 export { LatentGameEngine, type InnerThought, type GameResult } from './latent-game';
 
 // 导出链接强度管理器
-export { NeuronLinkManager, getNeuronLinkManager, type NeuronLinkState } from './neuron-link';
+export { 
+  NeuronLinkDynamics, 
+  getNeuronLinkDynamics, 
+  getNeuronLinkManager,
+  type SynapseState 
+} from './neuron-link';
 
 // 导出对话上下文
 export { ConversationContext, getConversationContext } from './conversation-context';
