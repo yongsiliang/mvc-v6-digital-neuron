@@ -15,6 +15,9 @@ export { Hippocampus, getHippocampus } from './memory';
 export { MeaningCore } from './meaning';
 export { DecisionCore } from './decision';
 export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron, getMotorLanguageNeuron, getMotorActionNeuron } from './sensory';
+// 导出竞争性模型池
+export { CompetitiveModelPool, getModelPool } from './model-pool';
+export type { ModelNeuron, InputFeatures } from './model-pool';
 
 /**
  * 数字神经元系统

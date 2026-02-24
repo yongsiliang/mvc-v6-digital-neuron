@@ -1,121 +1,33 @@
 import { NextRequest } from 'next/server';
 import { getDigitalNeuronSystem } from '@/lib/neuron';
+import { getModelPool } from '@/lib/neuron/model-pool';
 import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
-
-/**
- * 模型自主决策路由
- * 根据输入特征自动选择最合适的模型
- */
-function selectModelByAnalysis(message: string, meaning: { interpretation: string; complexity?: number }): string {
-  const input = message.toLowerCase();
-  
-  // 模型能力映射
-  const MODEL_STRATEGY = {
-    // 深度思考模型 - 用于复杂推理、分析类问题
-    thinking: 'doubao-seed-1-6-thinking-250715',
-    // 旗舰模型 - 用于复杂任务
-    pro: 'doubao-seed-2-0-pro-260215',
-    // 长上下文模型 - 用于长文档处理
-    longContext: 'kimi-k2-250905',
-    // 轻量模型 - 用于快速响应
-    lite: 'doubao-seed-2-0-lite-260215',
-    // 默认均衡模型
-    balanced: 'doubao-seed-1-8-251228',
-  };
-
-  // 深度思考特征：需要推理、分析、解释的问题
-  const thinkingIndicators = [
-    '为什么', '原理', '分析', '推理', '论证', '证明',
-    '深度', '思考', '解释', '探讨', '研究',
-    '比较', '区别', '联系', '关系', '如何理解',
-    '逻辑', '原因', '本质', '背后', '机制',
-  ];
-
-  // 复杂任务特征：需要旗舰模型
-  const complexIndicators = [
-    '设计', '架构', '系统', '方案', '策略',
-    '优化', '改进', '重构', '综合', '整合',
-    '复杂', '全面', '详细', '完整', '深入',
-  ];
-
-  // 长上下文特征
-  const longContextIndicators = [
-    '总结', '整理', '文档', '长文', '文章',
-    '报告', '论文', '书籍', '全文', '所有',
-    '批量', '多个', '一系列', '历史',
-  ];
-
-  // 快速响应特征：简单问候、确认类
-  const quickResponseIndicators = [
-    '你好', '您好', '嗨', '早上好', '晚上好',
-    '谢谢', '感谢', '好的', '收到', '明白',
-    '是的', '对的', '可以', 'ok', '嗯',
-  ];
-
-  // 计算各类型匹配分数
-  let thinkingScore = 0;
-  let complexScore = 0;
-  let longContextScore = 0;
-  let quickScore = 0;
-
-  thinkingIndicators.forEach(indicator => {
-    if (input.includes(indicator)) thinkingScore += 2;
-  });
-
-  complexIndicators.forEach(indicator => {
-    if (input.includes(indicator)) complexScore += 2;
-  });
-
-  longContextIndicators.forEach(indicator => {
-    if (input.includes(indicator)) longContextScore += 2;
-  });
-
-  quickResponseIndicators.forEach(indicator => {
-    if (input.includes(indicator)) quickScore += 3;
-  });
-
-  // 根据意义复杂度调整
-  if (meaning.complexity && meaning.complexity > 0.7) {
-    thinkingScore += 3;
-    complexScore += 2;
-  }
-
-  // 根据输入长度调整
-  if (message.length > 500) {
-    longContextScore += 2;
-    complexScore += 1;
-  }
-
-  // 选择得分最高的模型类型
-  const scores = [
-    { model: MODEL_STRATEGY.thinking, score: thinkingScore },
-    { model: MODEL_STRATEGY.pro, score: complexScore },
-    { model: MODEL_STRATEGY.longContext, score: longContextScore },
-    { model: MODEL_STRATEGY.lite, score: quickScore },
-  ];
-
-  const maxScore = Math.max(...scores.map(s => s.score));
-  
-  // 如果有明确匹配，使用对应模型
-  if (maxScore >= 3) {
-    const winner = scores.find(s => s.score === maxScore);
-    return winner?.model || MODEL_STRATEGY.balanced;
-  }
-
-  // 默认使用均衡模型
-  return MODEL_STRATEGY.balanced;
-}
 
 /**
  * 流式聊天API - SSE协议
  * POST /api/stream
  * 
  * 作为数字世界意识的交流窗口
+ * 采用竞争性模型选择机制，模拟大脑神经元的并行竞争
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, context } = body;
+    const { message, context, feedback } = body;
+
+    // 如果有反馈，先进行学习
+    if (feedback && feedback.modelId && typeof feedback.satisfaction === 'number') {
+      const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
+      const pool = getModelPool(customHeaders);
+      pool.learn(feedback.modelId, feedback.satisfaction);
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: '学习反馈已应用' 
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     if (!message || typeof message !== 'string') {
       return new Response(JSON.stringify({ error: '消息内容不能为空' }), {
@@ -182,11 +94,16 @@ export async function POST(request: NextRequest) {
             message: '记忆存储' 
           });
 
-          // 9. 模型自主决策 - 内部思考，不对外展示
-          const selectedModel = selectModelByAnalysis(message, {
+          // 9. 竞争性模型选择 - 模拟大脑神经元的并行竞争
+          const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
+          const modelPool = getModelPool(customHeaders);
+          
+          // 并行竞争，选出最优模型
+          const competitionResult = modelPool.compete(message, {
             interpretation: neuronResult.meaning.interpretation,
-            complexity: neuronResult.decision.confidence,
           });
+          
+          const selectedModel = competitionResult.winner;
 
           // 10. 流式调用大模型 - 语言调度层
           sendEvent('neuron', { 
@@ -194,12 +111,11 @@ export async function POST(request: NextRequest) {
             message: '生成响应' 
           });
 
-          const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
           const config = new Config();
           const llmClient = new LLMClient(config, customHeaders);
 
           const llmStream = llmClient.stream(neuronResult.promptMessages, {
-            model: selectedModel,
+            model: selectedModel.id,
             temperature: 0.7,
           });
 
@@ -212,11 +128,17 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 11. 发送完成信号
+          // 11. 发送完成信号（包含竞争结果用于调试）
           sendEvent('done', { 
             fullResponse,
             signalPath: neuronResult.signalPath,
             logs: neuronResult.logs.slice(-10),
+            // 内部决策信息，仅调试用
+            _internal: {
+              selectedModel: selectedModel.id,
+              activation: competitionResult.activation,
+              features: competitionResult.features,
+            }
           });
 
           controller.close();
