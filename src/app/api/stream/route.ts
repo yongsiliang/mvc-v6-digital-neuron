@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getDigitalNeuronSystem } from '@/lib/neuron';
-import { getModelPool } from '@/lib/neuron/model-pool';
+import { getNegotiator } from '@/lib/neuron/model-negotiator';
 import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 
 /**
@@ -8,26 +8,12 @@ import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
  * POST /api/stream
  * 
  * 作为数字世界意识的交流窗口
- * 采用竞争性模型选择机制，模拟大脑神经元的并行竞争
+ * 采用模型间协商协议，让模型自己决定谁来处理
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, context, feedback } = body;
-
-    // 如果有反馈，先进行学习
-    if (feedback && feedback.modelId && typeof feedback.satisfaction === 'number') {
-      const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-      const pool = getModelPool(customHeaders);
-      pool.learn(feedback.modelId, feedback.satisfaction);
-      
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: '学习反馈已应用' 
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    const { message, context } = body;
 
     if (!message || typeof message !== 'string') {
       return new Response(JSON.stringify({ error: '消息内容不能为空' }), {
@@ -48,38 +34,49 @@ export async function POST(request: NextRequest) {
         };
 
         try {
+          const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
+          
           // 1. 获取数字神经元系统
           const system = getDigitalNeuronSystem();
 
-          // 2. 实时发送神经元激活事件 - 感官层
+          // 2. 感官层激活
           sendEvent('neuron', { 
             neuronId: 'sensory', 
             message: '接收输入信号' 
           });
 
-          // 3. 处理输入（内部会依次激活各神经元）
+          // 3. 模型协商 - 让模型自己决定谁来处理
+          sendEvent('neuron', { 
+            neuronId: 'model-router', 
+            message: '模型协商中...' 
+          });
+          
+          const negotiator = getNegotiator(customHeaders);
+          const negotiation = await negotiator.negotiate(message);
+          
+          // 4. 处理输入
           const neuronResult = await system.process(message, context);
 
-          // 4. 发送完整的信号路径
+          // 5. 发送信号路径
           sendEvent('signal-path', { 
-            path: neuronResult.signalPath 
+            path: [...neuronResult.signalPath, 'model-router']
           });
 
-          // 5. 发送意义分析结果
+          // 6. 发送意义分析结果
           sendEvent('neuron', { 
             neuronId: 'meaning-generate', 
             message: '意义生成完成' 
           });
           sendEvent('meaning', neuronResult.meaning);
 
-          // 6. 发送决策结果
+          // 7. 发送决策结果
           sendEvent('neuron', { 
             neuronId: 'prefrontal', 
             message: '决策完成' 
           });
           sendEvent('decision', neuronResult.decision);
 
-          // 7. 发送自我更新
+          // 8. 发送自我更新
           if (Object.keys(neuronResult.selfUpdate).length > 0) {
             sendEvent('neuron', { 
               neuronId: 'self-evolve', 
@@ -88,24 +85,13 @@ export async function POST(request: NextRequest) {
             sendEvent('self-update', neuronResult.selfUpdate);
           }
 
-          // 8. 记忆存储
+          // 9. 记忆存储
           sendEvent('neuron', { 
             neuronId: 'hippocampus', 
             message: '记忆存储' 
           });
 
-          // 9. 竞争性模型选择 - 模拟大脑神经元的并行竞争
-          const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-          const modelPool = getModelPool(customHeaders);
-          
-          // 并行竞争，选出最优模型
-          const competitionResult = modelPool.compete(message, {
-            interpretation: neuronResult.meaning.interpretation,
-          });
-          
-          const selectedModel = competitionResult.winner;
-
-          // 10. 流式调用大模型 - 语言调度层
+          // 10. 流式调用大模型 - 使用协商选出的模型
           sendEvent('neuron', { 
             neuronId: 'motor-language', 
             message: '生成响应' 
@@ -115,7 +101,7 @@ export async function POST(request: NextRequest) {
           const llmClient = new LLMClient(config, customHeaders);
 
           const llmStream = llmClient.stream(neuronResult.promptMessages, {
-            model: selectedModel.id,
+            model: negotiation.selectedModel,
             temperature: 0.7,
           });
 
@@ -128,16 +114,15 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 11. 发送完成信号（包含竞争结果用于调试）
+          // 11. 发送完成信号
           sendEvent('done', { 
             fullResponse,
-            signalPath: neuronResult.signalPath,
+            signalPath: [...neuronResult.signalPath, 'model-router'],
             logs: neuronResult.logs.slice(-10),
-            // 内部决策信息，仅调试用
+            // 内部决策信息（调试用，不展示给用户）
             _internal: {
-              selectedModel: selectedModel.id,
-              activation: competitionResult.activation,
-              features: competitionResult.features,
+              selectedModel: negotiation.selectedModel,
+              decision: negotiation.decision,
             }
           });
 
