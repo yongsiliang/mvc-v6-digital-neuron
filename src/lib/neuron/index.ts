@@ -46,6 +46,35 @@ export { ConsciousnessSpace, getConsciousness } from './consciousness-space';
 // 导出记忆空间
 export { MemorySpace, getMemorySpace, type MemoryDoor } from './memory-space-new';
 
+// 导出优化模块
+export { 
+  EmbeddingManager, 
+  getEmbeddingManager, 
+  type EmbeddingModel 
+} from './embedding-manager';
+
+export { 
+  HierarchicalIndex, 
+  getHierarchicalIndex,
+  type Cluster,
+  type IndexedItem,
+  type SearchResult 
+} from './spatial-index';
+
+export { 
+  MemoryDoorManager, 
+  getMemoryDoorManager,
+  type MemoryDoorV2 
+} from './memory-door-manager';
+
+export { 
+  MultiModelLLMClient, 
+  LLMFactory,
+  getLLMClient,
+  type ModelConfig,
+  type ModelSelectionStrategy 
+} from './multi-model-llm';
+
 /**
  * 数字神经元系统
  * 整合所有神经元模块，实现完整的信息处理流程
