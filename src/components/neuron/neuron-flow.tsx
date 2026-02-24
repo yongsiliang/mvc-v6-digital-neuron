@@ -84,8 +84,8 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
 
       {/* 内容区域 */}
       <div className="flex-1 overflow-y-auto p-4">
-        {/* 信号路径 */}
-        {signalPath.length > 0 && (
+        {/* 信号路径 - 隐藏 */}
+        {/* {signalPath.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap text-xs bg-muted/50 p-2 rounded-lg mb-4">
             <span className="text-muted-foreground">信号路径:</span>
             {signalPath.map((path, index) => (
@@ -99,7 +99,7 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
               </span>
             ))}
           </div>
-        )}
+        )} */}
 
         {/* 神经元可视化 */}
         <div className="space-y-4">

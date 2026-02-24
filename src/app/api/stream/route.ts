@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
           const system = getDigitalNeuronSystem();
           const neuronResult = await system.process(message, context);
           
-          send('signal-path', { path: neuronResult.signalPath });
+          // 信号路径（不在前端显示）
+          // send('signal-path', { path: neuronResult.signalPath });
           send('meaning', neuronResult.meaning);
           send('decision', neuronResult.decision);
 
