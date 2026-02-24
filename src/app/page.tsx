@@ -39,6 +39,10 @@ export default function Home() {
   const [decision, setDecision] = useState<Decision | undefined>();
   const [self, setSelf] = useState<SelfRepresentation | undefined>();
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  
+  // 空间状态
+  const [consciousnessTrail, setConsciousnessTrail] = useState(0);
+  const [openDoors, setOpenDoors] = useState<string[]>([]);
 
   // 初始化获取系统状态
   useEffect(() => {
@@ -74,6 +78,8 @@ export default function Home() {
     setSignalPath([]);
     setMeaning(undefined);
     setDecision(undefined);
+    setConsciousnessTrail(0);
+    setOpenDoors([]);
 
     try {
       const response = await fetch('/api/stream', {
@@ -136,6 +142,18 @@ export default function Home() {
                 case 'self-update':
                   if (event.data.currentState) {
                     setSelf(prev => prev ? { ...prev, ...event.data } : prev);
+                  }
+                  break;
+                  
+                case 'consciousness':
+                  if (event.data.trail !== undefined) {
+                    setConsciousnessTrail(event.data.trail);
+                  }
+                  break;
+                  
+                case 'open-doors':
+                  if (event.data.meanings) {
+                    setOpenDoors(event.data.meanings);
                   }
                   break;
                   
@@ -252,12 +270,47 @@ export default function Home() {
               {/* 下部 - 调试面板 */}
               <ResizablePanel defaultSize={55} minSize={30}>
                 <div className="h-full p-2">
-                  <Tabs defaultValue="meaning" className="h-full">
+                  <Tabs defaultValue="space" className="h-full">
                     <TabsList className="w-full justify-start">
-                      <TabsTrigger value="meaning">意义分析</TabsTrigger>
-                      <TabsTrigger value="self">自我表征</TabsTrigger>
-                      <TabsTrigger value="logs">执行日志</TabsTrigger>
+                      <TabsTrigger value="space">空间</TabsTrigger>
+                      <TabsTrigger value="meaning">意义</TabsTrigger>
+                      <TabsTrigger value="self">自我</TabsTrigger>
+                      <TabsTrigger value="logs">日志</TabsTrigger>
                     </TabsList>
+                    
+                    <TabsContent value="space" className="h-[calc(100%-2.5rem)] mt-2 overflow-y-auto">
+                      <div className="space-y-4 p-2">
+                        {/* 意识空间 */}
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <div className="text-sm font-medium text-muted-foreground mb-2">意识空间</div>
+                          <div className="text-xs text-muted-foreground">
+                            轨迹长度: {consciousnessTrail}
+                          </div>
+                          <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
+                              style={{ width: `${Math.min(100, consciousnessTrail * 10)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* 打开的门 */}
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <div className="text-sm font-medium text-muted-foreground mb-2">打开的记忆门</div>
+                          {openDoors.length > 0 ? (
+                            <div className="space-y-1">
+                              {openDoors.map((door, i) => (
+                                <div key={i} className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded">
+                                  {door}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">暂无打开的门</div>
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
                     
                     <TabsContent value="meaning" className="h-[calc(100%-2.5rem)] mt-2">
                       <MeaningPanel meaning={meaning} />
