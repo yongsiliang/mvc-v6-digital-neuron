@@ -2,17 +2,15 @@ import { NextRequest } from 'next/server';
 import { getDigitalNeuronSystem } from '@/lib/neuron';
 import { getGameEngine, getPlayers } from '@/lib/neuron/latent-game';
 import { HeaderUtils } from 'coze-coding-dev-sdk';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 /**
  * 流式聊天API - SSE协议
  * 
- * 优化：异步学习，快速响应
- * 
- * 流程：
- * 1. 神经元处理
- * 2. 快速博弈（并行思考 + 快速评估）
- * 3. 立即输出结果
- * 4. [后台] 异步学习
+ * 特性：
+ * - 持久化记忆（刷新页面不丢失）
+ * - 异步学习（不阻塞响应）
+ * - 类脑分层记忆（情景/语义/程序）
  */
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +37,7 @@ export async function POST(request: NextRequest) {
         try {
           const headers = HeaderUtils.extractForwardHeaders(request.headers);
           
-          // 1. 神经元处理（快速）
+          // 1. 神经元处理
           send('neuron', { neuronId: 'sensory', message: '接收输入' });
           
           const system = getDigitalNeuronSystem();
@@ -49,7 +47,7 @@ export async function POST(request: NextRequest) {
           send('meaning', neuronResult.meaning);
           send('decision', neuronResult.decision);
 
-          // 2. 快速博弈
+          // 2. 快速博弈（带持久化记忆）
           send('neuron', { neuronId: 'latent-game', message: '博弈思考中...' });
           
           const engine = getGameEngine(headers);
@@ -61,7 +59,7 @@ export async function POST(request: NextRequest) {
             reason: gameResult.evaluationReason,
           });
 
-          // 3. 立即输出（不等学习）
+          // 3. 立即输出
           send('neuron', { neuronId: 'motor-language', message: `${gameResult.winner.role}输出中` });
 
           let fullResponse = '';
@@ -78,7 +76,7 @@ export async function POST(request: NextRequest) {
 
           controller.close();
 
-          // 5. [后台异步] 学习 - 不阻塞用户
+          // 5. 后台异步学习
           engine.learnAsync(message, gameResult.allThoughts, gameResult.winner);
 
         } catch (error) {
@@ -106,28 +104,31 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET - 获取博弈学习统计
+ * GET - 获取博弈学习统计（持久化）
  */
 export async function GET() {
   try {
     const engine = getGameEngine({});
-    const stats = engine.getStats();
+    const summary = await engine.getStatsSummary();
+    
+    // 获取记忆总数
+    const supabase = getSupabaseClient();
+    const { count: memoryCount } = await supabase
+      .from('neuron_memories')
+      .select('*', { count: 'exact', head: true });
     
     return new Response(JSON.stringify({
       success: true,
-      summary: Object.entries(stats).map(([role, m]) => ({
-        role,
-        games: m.totalGames,
-        wins: m.wins,
-        winRate: m.totalGames > 0 ? (m.wins / m.totalGames).toFixed(2) : '0',
-        wisdom: m.wisdomBonus.toFixed(3),
-        learned: m.learnedAngles.length,
-      }))
+      memoryCount: memoryCount || 0,
+      players: summary,
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
-  } catch {
-    return new Response(JSON.stringify({ error: '获取失败' }), {
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      error: '获取失败',
+      details: error instanceof Error ? error.message : '未知错误'
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
