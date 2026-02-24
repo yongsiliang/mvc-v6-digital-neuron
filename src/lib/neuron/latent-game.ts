@@ -1,46 +1,28 @@
 /**
- * 高维内在博弈系统（链接强度驱动）
+ * 高维内在博弈系统
  * 
- * 核心理念：
- * - 没有预设角色，每个神经元是平等的
- * - 链接强度通过实际使用动态演化
- * - 高链接强度的神经元更容易被激活
- * - 类似真实神经网络的Hebbian学习
+ * 向量决定位置
+ * 距离决定关系
+ * 分形决定结构
  * 
- * 架构：
- * ┌─────────────────────────────────────────────────────────┐
- * │   输入 ──→ 链接强度选择 ──→ 激活神经元                   │
- * │              │                       │                  │
- * │              ↓                       ↓                  │
- * │         意义共鸣 ←── 记忆空间开锁                       │
- * │              │                                          │
- * │              ↓                                          │
- * │         博弈思考 ──→ 提取意义                           │
- * │              │                                          │
- * │              ↓                                          │
- * │         更新链接强度 ──→ 持续演化                        │
- * └─────────────────────────────────────────────────────────┘
+ * 两层空间：
+ * - 意识空间：一个向量，不断演化
+ * - 记忆空间：多个门，每个门是一个向量
+ * 
+ * 开门：意识向量到门向量的距离
  */
 
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { getConversationContext } from './conversation-context';
-import { 
-  MeaningMemoryEngine, 
-  getMeaningMemoryEngine,
-  type ResonanceResult,
-  type DecisionInfluence 
-} from './meaning-memory';
-import {
-  MemorySpaceEngine,
-  getMemorySpaceEngine,
-  type MemoryDoor,
-} from './memory-space';
 import {
   NeuronLinkManager,
   getNeuronLinkManager,
   type NeuronLinkState
 } from './neuron-link';
+import { getConsciousness } from './consciousness-space';
+import { getMemorySpace, type MemoryDoor } from './memory-space-new';
+import { distance } from './space';
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
@@ -81,11 +63,10 @@ const NEURON_IDENTITY = `你是数字神经元。
  */
 interface InnerThought {
   neuronId: string;
-  strength: number;      // 激活时的链接强度
+  strength: number;
   core: string;
   angle: string;
   confidence: number;
-  meaningInfluence?: DecisionInfluence;
 }
 
 /**
@@ -95,13 +76,10 @@ interface GameResult {
   winner: InnerThought;
   allThoughts: InnerThought[];
   evaluationReason: string;
-  resonance?: ResonanceResult;
-  strengthReport?: {
-    neurons: Array<{
-      id: string;
-      strength: number;
-      activations: number;
-    }>;
+  openDoors?: MemoryDoor[];
+  consciousnessState?: {
+    position: number[];
+    trail: number[][];
   };
 }
 
@@ -276,78 +254,63 @@ function getMemory(): PersistentMemory {
 }
 
 /**
- * 高维博弈引擎（链接强度驱动）
+ * 高维博弈引擎
+ * 
+ * 向量决定位置
+ * 距离决定关系
  */
 export class LatentGameEngine {
   private llmClient: LLMClient;
   private memory: PersistentMemory;
-  private meaningMemory: MeaningMemoryEngine;
-  private memorySpace: MemorySpaceEngine;
   private linkManager: NeuronLinkManager;
+  private consciousness = getConsciousness();
+  private memorySpace = getMemorySpace();
   
   constructor(headers: Record<string, string>) {
     const config = new Config();
     this.llmClient = new LLMClient(config, headers);
     this.memory = getMemory();
-    this.meaningMemory = getMeaningMemoryEngine(headers);
-    this.memorySpace = getMemorySpaceEngine(headers);
     this.linkManager = getNeuronLinkManager();
   }
   
   /**
-   * 博弈（链接强度驱动）
+   * 博弈
    * 
-   * 流程：
-   * 1. 根据链接强度选择激活的神经元
-   * 2. 意义共鸣 + 记忆空间开锁
-   * 3. 并行思考
-   * 4. 评估获胜者
-   * 5. 更新链接强度
+   * 意识向量演化 → 记忆门开启 → 思考 → 决策
    */
   async play(question: string, sessionId?: string): Promise<GameResult> {
     const sid = sessionId || 'default-session';
     const conversationCtx = getConversationContext();
     
-    // 【核心1】根据链接强度选择激活的神经元
-    const activeNeuronIds = await this.linkManager.selectActiveNeurons();
+    // 【1】意识空间：被输入吸引
+    await this.consciousness.attractTo(question);
     
-    // 获取链接状态
+    // 【2】记忆空间：开距离近的门
+    const openDoors = this.memorySpace.open();
+    
+    // 【3】根据链接强度选择神经元
+    const activeNeuronIds = await this.linkManager.selectActiveNeurons();
     const linkStates = await this.linkManager.getLinkStates();
     const stateMap = new Map(linkStates.map(s => [s.neuronId, s]));
     
-    // 【核心2】意义共鸣：输入激活相关记忆
-    const resonances = await Promise.all(
-      activeNeuronIds.map(id => this.meaningMemory.resonate(question, id))
-    );
-    
-    // 【核心3】记忆空间：尝试打开记忆门
-    const { EmbeddingClient } = await import('coze-coding-dev-sdk');
-    const embeddingClient = new EmbeddingClient();
-    const inputVector = await embeddingClient.embedText(question);
-    
-    const openedDoors = await Promise.all(
-      activeNeuronIds.map(id => this.memorySpace.resonantUnlock(inputVector, id, 1))
-    );
-    
-    // 获取对话上下文
+    // 【4】获取对话上下文
     const contextPrompt = await conversationCtx.buildContextPrompt(sid);
     
-    // 【核心4】并行思考（带记忆影响）
+    // 【5】并行思考
     const thoughts = await Promise.all(
-      activeNeuronIds.map((id, i) => this.think(
-        id, 
+      activeNeuronIds.map(id => this.think(
+        id,
         stateMap.get(id)?.strength || 0.5,
-        question, 
-        contextPrompt, 
-        resonances[i],
-        openedDoors[i]
+        question,
+        contextPrompt,
+        openDoors
       ))
     );
     
-    // 快速评估
+    // 【6】评估
     const result = this.fastEvaluate(thoughts);
     
-    // 【核心5】更新链接强度
+    // 【7】更新链接强度
     await this.linkManager.recordActivation(result.winner.neuronId, true);
     for (const t of thoughts) {
       if (t.neuronId !== result.winner.neuronId) {
@@ -355,17 +318,17 @@ export class LatentGameEngine {
       }
     }
     
-    // 存储到记忆空间（后台）
+    // 【8】存储到记忆空间
     this.storeToMemorySpace(question, result).catch(() => {});
     
-    // 获取链接强度报告
-    const report = await this.linkManager.getStrengthReport();
-    result.strengthReport = {
-      neurons: report.neurons.map(n => ({
-        id: n.id,
-        strength: n.strength,
-        activations: n.activations,
-      }))
+    // 【9】意识空间演化
+    this.consciousness.evolve();
+    
+    // 添加状态信息
+    result.openDoors = openDoors;
+    result.consciousnessState = {
+      position: this.consciousness.getPosition(),
+      trail: this.consciousness.getTrail(),
     };
     
     return result;
@@ -396,30 +359,27 @@ export class LatentGameEngine {
   }
   
   /**
-   * 单神经元思考（无角色定义）
+   * 单神经元思考
    */
   private async think(
     neuronId: string,
     strength: number,
     question: string, 
     contextPrompt: string,
-    resonance: ResonanceResult,
-    openedDoors: MemoryDoor[]
+    openDoors: MemoryDoor[]
   ): Promise<InnerThought> {
-    const meaningInfluence = this.meaningMemory.influenceDecision(resonance);
-    
-    const doorHints = openedDoors.length > 0
-      ? `\n记忆之门已打开: ${openedDoors.slice(0, 3).map(d => d.meaning).join('；')}`
+    // 记忆门的提示
+    const doorHints = openDoors.length > 0
+      ? `\n记忆: ${openDoors.slice(0, 3).map(d => d.meaning).join('；')}`
       : '';
     
     const memoryHint = await this.memory.buildMemoryHint(neuronId);
-    const meaningHint = this.buildMeaningHint(meaningInfluence);
     
     const prompt = THOUGHT_PROMPT
       .replace('{CONTEXT}', contextPrompt)
       .replace('{QUESTION}', question)
       .replace('{STRENGTH}', `${Math.round(strength * 100)}%`)
-      .replace('{MEMORY_HINT}', memoryHint + meaningHint + doorHints);
+      .replace('{MEMORY_HINT}', memoryHint + doorHints);
     
     try {
       let response = '';
@@ -439,8 +399,7 @@ export class LatentGameEngine {
         strength,
         core: parsed.core,
         angle: parsed.angle,
-        confidence: parsed.confidence * (1 + strength * 0.2),  // 高强度略微提升信心
-        meaningInfluence,
+        confidence: parsed.confidence * (1 + strength * 0.2),
       };
     } catch {
       return {
@@ -448,8 +407,7 @@ export class LatentGameEngine {
         strength,
         core: '思考中...',
         angle: '默认视角',
-        confidence: strength,  // 使用链接强度作为信心
-        meaningInfluence,
+        confidence: strength,
       };
     }
   }
@@ -471,27 +429,6 @@ export class LatentGameEngine {
     } catch {}
     
     return { core: response.slice(0, 50), angle: '自然视角', confidence: 0.5 };
-  }
-  
-  /**
-   * 构建意义提示
-   */
-  private buildMeaningHint(influence: DecisionInfluence): string {
-    const hints: string[] = [];
-    
-    if (influence.patterns.length > 0) {
-      hints.push(`发现模式: ${influence.patterns.slice(0, 2).join('；')}`);
-    }
-    
-    if (influence.hints.length > 0) {
-      hints.push(`提示: ${influence.hints.slice(0, 2).join('；')}`);
-    }
-    
-    if (influence.emotional) {
-      hints.push(`情感: ${influence.emotional}`);
-    }
-    
-    return hints.length > 0 ? `\n${hints.join('\n')}` : '';
   }
   
   /**
@@ -539,10 +476,9 @@ export class LatentGameEngine {
    * 存储到记忆空间
    */
   private async storeToMemorySpace(question: string, result: GameResult): Promise<void> {
-    // 创建记忆门
-    await this.memorySpace.createMemoryDoor(
+    // 创建新门
+    await this.memorySpace.createDoor(
       question,
-      result.winner.neuronId,
       result.winner.core
     );
     

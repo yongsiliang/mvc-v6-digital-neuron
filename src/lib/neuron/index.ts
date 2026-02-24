@@ -1,6 +1,10 @@
 /**
  * 数字神经元系统 - 主入口
  * Digital Neuron System - Main Entry
+ * 
+ * 向量决定位置
+ * 距离决定关系
+ * 分形决定结构
  */
 
 import { NeuralSignal, SubjectiveMeaning, Decision, SelfRepresentation, LogEntry, SystemSnapshot } from './types';
@@ -15,31 +19,32 @@ export { Hippocampus, getHippocampus } from './memory';
 export { MeaningCore } from './meaning';
 export { DecisionCore } from './decision';
 export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron, getMotorLanguageNeuron, getMotorActionNeuron } from './sensory';
-// 导出高维博弈引擎
+
+// 导出博弈引擎
 export { LatentGameEngine, type InnerThought, type GameResult } from './latent-game';
+
 // 导出链接强度管理器
 export { NeuronLinkManager, getNeuronLinkManager, type NeuronLinkState } from './neuron-link';
+
 // 导出对话上下文
 export { ConversationContext, getConversationContext } from './conversation-context';
-// 导出意义记忆引擎
+
+// 导出空间基础结构
 export { 
-  MeaningMemoryEngine, 
-  getMeaningMemoryEngine,
-  type ResonanceResult,
-  type DecisionInfluence,
-  type ExtractedMeaning,
-  type ActivationResult
-} from './meaning-memory';
-// 导出记忆空间引擎
-export { 
-  MemorySpaceEngine, 
-  getMemorySpaceEngine,
-  type MemoryDoor,
-  type NeuralKey,
-  type UnlockResult,
-  type ForgeResult,
-  type MemorySpaceSnapshot
-} from './memory-space';
+  type Space, 
+  distance, 
+  move, 
+  wander, 
+  nearest, 
+  within, 
+  createSpace 
+} from './space';
+
+// 导出意识空间
+export { ConsciousnessSpace, getConsciousness } from './consciousness-space';
+
+// 导出记忆空间
+export { MemorySpace, getMemorySpace, type MemoryDoor } from './memory-space-new';
 
 /**
  * 数字神经元系统

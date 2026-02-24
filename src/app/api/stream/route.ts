@@ -74,29 +74,25 @@ export async function POST(request: NextRequest) {
           // 4. 记忆层
           send('neuron', { neuronId: 'hippocampus', message: '记忆存储' });
           
-          // 5. 高维博弈（带意义记忆）
+          // 5. 高维博弈
           send('neuron', { neuronId: 'latent-game', message: '博弈思考中...' });
           
           const engine = new LatentGameEngine(headers);
           const gameResult = await engine.play(message, sid);
           
-          // 发送意义共鸣信息
-          if (gameResult.resonance && gameResult.resonance.activatedMemories.length > 0) {
-            send('meaning-resonance', {
-              activatedCount: gameResult.resonance.activatedMemories.length,
-              dominantTheme: gameResult.resonance.dominantTheme,
-              influenceWeight: gameResult.resonance.influenceWeight.toFixed(3),
-              hints: gameResult.resonance.activatedMemories
-                .slice(0, 3)
-                .map((a: { memory: { meaningSummary: string; meaning_summary?: string } }) => 
-                  a.memory.meaning_summary || a.memory.meaningSummary
-                ),
+          // 发送意识空间状态
+          if (gameResult.consciousnessState) {
+            send('consciousness', {
+              trail: gameResult.consciousnessState.trail.length,
             });
           }
           
-          // 6. 发送链接强度报告
-          if (gameResult.strengthReport) {
-            send('strength-report', gameResult.strengthReport);
+          // 发送打开的记忆门
+          if (gameResult.openDoors && gameResult.openDoors.length > 0) {
+            send('open-doors', {
+              count: gameResult.openDoors.length,
+              meanings: gameResult.openDoors.slice(0, 3).map(d => d.meaning),
+            });
           }
           
           send('game-result', {
@@ -114,7 +110,7 @@ export async function POST(request: NextRequest) {
             send('response', { delta: chunk });
           }
 
-          // 4. 完成
+          // 8. 完成
           send('done', { 
             fullResponse,
             winner: gameResult.winner.neuronId,
@@ -123,7 +119,7 @@ export async function POST(request: NextRequest) {
 
           controller.close();
 
-          // 5. 后台异步：保存对话 + 学习
+          // 9. 后台异步：保存对话 + 学习
           engine.saveConversation(
             sid,
             message,
