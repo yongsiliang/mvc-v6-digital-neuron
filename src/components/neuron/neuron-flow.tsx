@@ -33,7 +33,7 @@ const neurons = [
   { id: 'motor-language', name: '语言调度', icon: MessageSquare, description: '生成响应', layer: 'output' },
 ];
 
-const layerColors = {
+const layerColors: Record<string, string> = {
   sensory: 'from-blue-500/20 to-blue-600/20 border-blue-500/30',
   meaning: 'from-purple-500/20 to-purple-600/20 border-purple-500/30',
   decision: 'from-amber-500/20 to-amber-600/20 border-amber-500/30',
@@ -41,7 +41,7 @@ const layerColors = {
   output: 'from-pink-500/20 to-pink-600/20 border-pink-500/30',
 };
 
-const layerNames = {
+const layerNames: Record<string, string> = {
   sensory: '感官层',
   meaning: '意义核心层',
   decision: '决策层',
@@ -59,7 +59,7 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
   };
 
   // 按层分组
-  const layers = {
+  const layers: Record<string, typeof neurons> = {
     sensory: neurons.filter(n => n.layer === 'sensory'),
     meaning: neurons.filter(n => n.layer === 'meaning'),
     decision: neurons.filter(n => n.layer === 'decision'),
@@ -68,22 +68,25 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
   };
 
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Brain className="h-5 w-5" />
-          神经元工作流
-          {isProcessing && (
-            <Badge variant="outline" className="ml-auto animate-pulse bg-green-500/10">
-              处理中
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="h-full flex flex-col bg-card rounded-lg border overflow-hidden">
+      {/* 头部 */}
+      <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Brain className="h-5 w-5 text-primary" />
+          <span className="text-lg font-semibold">神经元工作流</span>
+        </div>
+        {isProcessing && (
+          <Badge variant="outline" className="animate-pulse bg-green-500/10">
+            处理中
+          </Badge>
+        )}
+      </div>
+
+      {/* 内容区域 */}
+      <div className="flex-1 overflow-y-auto p-4">
         {/* 信号路径 */}
         {signalPath.length > 0 && (
-          <div className="flex items-center gap-1 flex-wrap text-xs bg-muted/50 p-2 rounded-lg">
+          <div className="flex items-center gap-1 flex-wrap text-xs bg-muted/50 p-2 rounded-lg mb-4">
             <span className="text-muted-foreground">信号路径:</span>
             {signalPath.map((path, index) => (
               <span key={index} className="flex items-center gap-1">
@@ -99,8 +102,8 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
         )}
 
         {/* 神经元可视化 */}
-        <div className="space-y-3">
-          {(Object.keys(layers) as Array<keyof typeof layers>).map((layerKey) => (
+        <div className="space-y-4">
+          {Object.keys(layers).map((layerKey) => (
             <div key={layerKey} className="space-y-2">
               <div className="text-xs font-medium text-muted-foreground">
                 {layerNames[layerKey]}
@@ -114,18 +117,19 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
                   return (
                     <div
                       key={neuron.id}
+                      title={neuron.description}
                       className={cn(
-                        'relative p-2 rounded-lg border transition-all duration-300',
+                        'relative p-2.5 rounded-lg border transition-all duration-300 cursor-default',
                         `bg-gradient-to-br ${layerColors[layerKey]}`,
                         active && 'ring-2 ring-primary shadow-lg',
                         current && 'ring-2 ring-yellow-500 animate-pulse',
-                        !active && !current && 'opacity-50'
+                        !active && !current && 'opacity-60 hover:opacity-80'
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <div className={cn(
-                          'p-1.5 rounded-md',
-                          active ? 'bg-primary/20' : 'bg-muted'
+                          'p-1.5 rounded-md flex-shrink-0',
+                          active ? 'bg-primary/20' : 'bg-muted/50'
                         )}>
                           <Icon className={cn(
                             'h-4 w-4',
@@ -154,7 +158,7 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
             </div>
           ))}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
