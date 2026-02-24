@@ -43,6 +43,7 @@ export default function Home() {
   // 空间状态
   const [consciousnessTrail, setConsciousnessTrail] = useState(0);
   const [openDoors, setOpenDoors] = useState<string[]>([]);
+  const [styleInfo, setStyleInfo] = useState<{ isNew: boolean; styleCount: number; distance: number } | undefined>();
 
   // 初始化获取系统状态
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function Home() {
     setDecision(undefined);
     setConsciousnessTrail(0);
     setOpenDoors([]);
+    setStyleInfo(undefined);
 
     try {
       const response = await fetch('/api/stream', {
@@ -185,6 +187,9 @@ export default function Home() {
                   }
                   if (event.data.logs) {
                     setLogs(event.data.logs);
+                  }
+                  if (event.data.styleInfo) {
+                    setStyleInfo(event.data.styleInfo);
                   }
                   break;
                   
@@ -307,6 +312,32 @@ export default function Home() {
                             </div>
                           ) : (
                             <div className="text-xs text-muted-foreground">暂无打开的门</div>
+                          )}
+                        </div>
+                        
+                        {/* 风格识别 */}
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <div className="text-sm font-medium text-muted-foreground mb-2">风格识别</div>
+                          {styleInfo ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs">
+                                  {styleInfo.isNew ? (
+                                    <span className="text-amber-500">新朋友</span>
+                                  ) : (
+                                    <span className="text-green-500">老朋友</span>
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  距离: {styleInfo.distance.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                已学习风格: {styleInfo.styleCount}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">暂无数据</div>
                           )}
                         </div>
                       </div>

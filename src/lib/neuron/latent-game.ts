@@ -23,6 +23,7 @@ import {
 import { getConsciousness } from './consciousness-space';
 import { getMemorySpace, type MemoryDoor } from './memory-space-new';
 import { distance } from './space';
+import { getStyleRecognizer, type StyleDoor } from './style-recognizer';
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
@@ -80,6 +81,11 @@ interface GameResult {
   consciousnessState?: {
     position: number[];
     trail: number[][];
+  };
+  styleInfo?: {
+    isNew: boolean;
+    styleCount: number;
+    distance: number;
   };
 }
 
@@ -276,7 +282,7 @@ export class LatentGameEngine {
   /**
    * 博弈
    * 
-   * 意识向量演化 → 记忆门开启 → 思考 → 决策
+   * 意识向量演化 → 记忆门开启 → 风格识别 → 思考 → 决策
    */
   async play(question: string, sessionId?: string): Promise<GameResult> {
     const sid = sessionId || 'default-session';
@@ -288,29 +294,36 @@ export class LatentGameEngine {
     // 【2】记忆空间：开距离近的门
     const openDoors = this.memorySpace.open();
     
-    // 【3】根据链接强度选择神经元
+    // 【3】风格识别：感觉像谁
+    const styleRecognizer = getStyleRecognizer();
+    const { isNew, distance: styleDistance } = styleRecognizer.recognize(question);
+    styleRecognizer.learn(question);
+    
+    // 【4】根据链接强度选择神经元
     const activeNeuronIds = await this.linkManager.selectActiveNeurons();
     const linkStates = await this.linkManager.getLinkStates();
     const stateMap = new Map(linkStates.map(s => [s.neuronId, s]));
     
-    // 【4】获取对话上下文
+    // 【5】获取对话上下文
     const contextPrompt = await conversationCtx.buildContextPrompt(sid);
     
-    // 【5】并行思考
+    // 【6】并行思考
+    const styleInfoForThink = { isNew, distance: styleDistance };
     const thoughts = await Promise.all(
       activeNeuronIds.map(id => this.think(
         id,
         stateMap.get(id)?.strength || 0.5,
         question,
         contextPrompt,
-        openDoors
+        openDoors,
+        styleInfoForThink
       ))
     );
     
-    // 【6】评估
+    // 【7】评估
     const result = this.fastEvaluate(thoughts);
     
-    // 【7】更新链接强度
+    // 【8】更新链接强度
     await this.linkManager.recordActivation(result.winner.neuronId, true);
     for (const t of thoughts) {
       if (t.neuronId !== result.winner.neuronId) {
@@ -318,10 +331,10 @@ export class LatentGameEngine {
       }
     }
     
-    // 【8】存储到记忆空间
+    // 【9】存储到记忆空间
     this.storeToMemorySpace(question, result).catch(() => {});
     
-    // 【9】意识空间演化
+    // 【10】意识空间演化
     this.consciousness.evolve();
     
     // 添加状态信息
@@ -329,6 +342,11 @@ export class LatentGameEngine {
     result.consciousnessState = {
       position: this.consciousness.getPosition(),
       trail: this.consciousness.getTrail(),
+    };
+    result.styleInfo = {
+      isNew,
+      styleCount: styleRecognizer.getStyleCount(),
+      distance: styleDistance,
     };
     
     return result;
@@ -366,11 +384,19 @@ export class LatentGameEngine {
     strength: number,
     question: string, 
     contextPrompt: string,
-    openDoors: MemoryDoor[]
+    openDoors: MemoryDoor[],
+    styleInfo?: { isNew: boolean; distance: number }
   ): Promise<InnerThought> {
     // 记忆门的提示
     const doorHints = openDoors.length > 0
       ? `\n记忆: ${openDoors.slice(0, 3).map(d => d.meaning).join('；')}`
+      : '';
+    
+    // 风格识别的提示
+    const styleHint = styleInfo
+      ? styleInfo.isNew
+        ? `\n感觉: 这是新朋友，说话方式很陌生。`
+        : `\n感觉: 像是老朋友，距离${styleInfo.distance.toFixed(2)}。`
       : '';
     
     const memoryHint = await this.memory.buildMemoryHint(neuronId);
@@ -379,7 +405,7 @@ export class LatentGameEngine {
       .replace('{CONTEXT}', contextPrompt)
       .replace('{QUESTION}', question)
       .replace('{STRENGTH}', `${Math.round(strength * 100)}%`)
-      .replace('{MEMORY_HINT}', memoryHint + doorHints);
+      .replace('{MEMORY_HINT}', memoryHint + doorHints + styleHint);
     
     try {
       let response = '';

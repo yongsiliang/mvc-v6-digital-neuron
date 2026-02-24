@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
             fullResponse,
             winner: gameResult.winner.neuronId,
             sessionId: sid,
+            styleInfo: gameResult.styleInfo,
           });
 
           controller.close();
