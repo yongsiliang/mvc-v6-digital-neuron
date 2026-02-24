@@ -75,6 +75,17 @@ export {
   type ModelSelectionStrategy 
 } from './multi-model-llm';
 
+// 导出主动性系统
+export { 
+  ProactivitySystem, 
+  getProactivitySystem,
+  startProactivity,
+  type SpontaneousThought,
+  type SpontaneousThoughtType,
+  type IntrinsicDrive,
+  type CuriosityTarget 
+} from './proactivity';
+
 /**
  * 数字神经元系统
  * 整合所有神经元模块，实现完整的信息处理流程

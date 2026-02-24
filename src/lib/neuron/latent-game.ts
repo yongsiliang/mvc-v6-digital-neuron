@@ -24,6 +24,7 @@ import { getConsciousness } from './consciousness-space';
 import { getMemorySpace, type MemoryDoor } from './memory-space-new';
 import { distance } from './space';
 import { getStyleRecognizer, type StyleDoor } from './style-recognizer';
+import { getProactivitySystem } from './proactivity';
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
@@ -282,7 +283,7 @@ export class LatentGameEngine {
   /**
    * 博弈
    * 
-   * 意识向量演化 → 记忆门开启 → 风格识别 → 思考 → 决策
+   * 意识向量演化 → 记忆门开启 → 风格识别 → 主动性学习 → 思考 → 决策
    */
   async play(question: string, sessionId?: string): Promise<GameResult> {
     const sid = sessionId || 'default-session';
@@ -298,6 +299,13 @@ export class LatentGameEngine {
     const styleRecognizer = getStyleRecognizer();
     const { isNew, distance: styleDistance } = styleRecognizer.recognize(question);
     styleRecognizer.learn(question);
+    
+    // 【3.5】主动性系统：记录活动、学习好奇目标、满足驱动
+    const proactivity = getProactivitySystem();
+    proactivity.recordActivity();
+    proactivity.learnFromUserInput(question);
+    proactivity.satisfyDrive('connect', 0.2);  // 有对话就满足连接欲
+    proactivity.satisfyDrive('understand', 0.1); // 理解用户输入
     
     // 【4】根据链接强度选择神经元
     const activeNeuronIds = await this.linkManager.selectActiveNeurons();

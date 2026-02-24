@@ -52,7 +52,8 @@ export type ModelSelectionStrategy =
   | 'smartest'     // 最聪明的
   | 'cheapest'     // 最便宜的
   | 'balanced'     // 平衡
-  | 'fallback';    // 故障转移
+  | 'fallback'     // 故障转移
+  | 'creative';    // 创意型
 
 /**
  * 多模型客户端配置
@@ -213,6 +214,11 @@ export class MultiModelLLMClient {
         
       case 'smartest':
         return candidates.find(m => m.capabilities.includes('smart')) || candidates[0];
+        
+      case 'creative':
+        return candidates.find(m => m.capabilities.includes('creative')) || 
+               candidates.find(m => m.capabilities.includes('smart')) || 
+               candidates[0];
         
       case 'cheapest':
         return candidates.sort((a, b) => a.costLevel - b.costLevel)[0];
