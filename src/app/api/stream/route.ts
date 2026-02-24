@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getDigitalNeuronSystem } from '@/lib/neuron';
 import { getGameEngine, getPlayers } from '@/lib/neuron/latent-game';
+import { getConversationContext } from '@/lib/neuron/conversation-context';
 import { HeaderUtils } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
@@ -9,13 +10,14 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
  * 
  * 特性：
  * - 持久化记忆（刷新页面不丢失）
+ * - 对话上下文（模型知道之前聊了什么）
  * - 异步学习（不阻塞响应）
- * - 类脑分层记忆（情景/语义/程序）
+ * - 类脑分层记忆
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, context } = body;
+    const { message, context, sessionId } = body;
 
     if (!message || typeof message !== 'string') {
       return new Response(JSON.stringify({ error: '消息内容不能为空' }), {
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const sid = sessionId || 'default-session';
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
@@ -47,11 +50,11 @@ export async function POST(request: NextRequest) {
           send('meaning', neuronResult.meaning);
           send('decision', neuronResult.decision);
 
-          // 2. 快速博弈（带持久化记忆）
+          // 2. 快速博弈（带对话上下文）
           send('neuron', { neuronId: 'latent-game', message: '博弈思考中...' });
           
           const engine = getGameEngine(headers);
-          const gameResult = await engine.play(message);
+          const gameResult = await engine.play(message, sid);
           
           send('game-result', {
             winner: gameResult.winner.role,
@@ -59,11 +62,11 @@ export async function POST(request: NextRequest) {
             reason: gameResult.evaluationReason,
           });
 
-          // 3. 立即输出
+          // 3. 立即输出（带对话上下文）
           send('neuron', { neuronId: 'motor-language', message: `${gameResult.winner.role}输出中` });
 
           let fullResponse = '';
-          for await (const chunk of engine.streamAnswer(message, gameResult)) {
+          for await (const chunk of engine.streamAnswer(message, gameResult, sid)) {
             fullResponse += chunk;
             send('response', { delta: chunk });
           }
@@ -72,11 +75,20 @@ export async function POST(request: NextRequest) {
           send('done', { 
             fullResponse,
             winner: gameResult.winner.role,
+            sessionId: sid,
           });
 
           controller.close();
 
-          // 5. 后台异步学习
+          // 5. 后台异步：保存对话 + 学习
+          engine.saveConversation(
+            sid,
+            message,
+            fullResponse,
+            gameResult.winner.role,
+            gameResult.allThoughts
+          ).catch(() => {});
+          
           engine.learnAsync(message, gameResult.allThoughts, gameResult.winner);
 
         } catch (error) {
@@ -104,14 +116,33 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET - 获取博弈学习统计（持久化）
+ * GET - 获取博弈学习统计和对话统计
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const engine = getGameEngine({});
-    const summary = await engine.getStatsSummary();
+    const url = new URL(request.url);
+    const sessionId = url.searchParams.get('sessionId') || 'default-session';
+    const action = url.searchParams.get('action');
     
-    // 获取记忆总数
+    const engine = getGameEngine({});
+    const conversationCtx = getConversationContext();
+    
+    // 清除会话历史
+    if (action === 'clear') {
+      await conversationCtx.clearSession(sessionId);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: '对话历史已清除' 
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const [summary, convStats] = await Promise.all([
+      engine.getStatsSummary(),
+      conversationCtx.getStats(sessionId),
+    ]);
+    
     const supabase = getSupabaseClient();
     const { count: memoryCount } = await supabase
       .from('neuron_memories')
@@ -119,7 +150,9 @@ export async function GET() {
     
     return new Response(JSON.stringify({
       success: true,
+      sessionId,
       memoryCount: memoryCount || 0,
+      conversation: convStats,
       players: summary,
     }), {
       headers: { 'Content-Type': 'application/json' }

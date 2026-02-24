@@ -128,7 +128,73 @@ export const learnedAngles = pgTable(
   ]
 );
 
+/**
+ * 对话历史表 - 工作记忆（当前对话上下文）
+ * 
+ * 存储用户和AI的对话历史，让模型能够理解上下文
+ */
+export const conversationHistory = pgTable(
+  "conversation_history",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 会话ID（用于区分不同对话）
+    sessionId: varchar("session_id", { length: 36 }).notNull(),
+    
+    // 消息角色
+    role: varchar("role", { length: 20 }).notNull(), // user | assistant
+    
+    // 消息内容
+    content: text("content").notNull(),
+    
+    // 获胜模型角色（仅assistant消息有）
+    winnerRole: varchar("winner_role", { length: 32 }),
+    
+    // 所有模型的思考（JSON格式，供回顾）
+    thoughts: jsonb("thoughts").$type<Array<{ role: string; core: string; confidence: number }>>(),
+    
+    // 创建时间
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("history_session_idx").on(table.sessionId),
+    index("history_created_idx").on(table.createdAt),
+  ]
+);
+
+/**
+ * 会话摘要表 - 长期记忆（压缩的历史）
+ * 
+ * 当对话太长时，压缩成摘要存储
+ */
+export const sessionSummaries = pgTable(
+  "session_summaries",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 会话ID
+    sessionId: varchar("session_id", { length: 36 }).notNull(),
+    
+    // 摘要内容
+    summary: text("summary").notNull(),
+    
+    // 涵盖的消息范围
+    messageCount: integer("message_count").default(0).notNull(),
+    
+    // 关键主题
+    topics: jsonb("topics").$type<string[]>(),
+    
+    // 创建时间
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("summaries_session_idx").on(table.sessionId),
+  ]
+);
+
 // 类型导出
 export type NeuronMemory = typeof neuronMemories.$inferSelect;
 export type GameStatistic = typeof gameStatistics.$inferSelect;
 export type LearnedAngle = typeof learnedAngles.$inferSelect;
+export type ConversationMessage = typeof conversationHistory.$inferSelect;
+export type SessionSummary = typeof sessionSummaries.$inferSelect;

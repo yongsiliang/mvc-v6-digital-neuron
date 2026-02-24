@@ -1,17 +1,19 @@
 /**
- * 高维内在博弈系统（带持久化记忆）
+ * 高维内在博弈系统（带持久化记忆和对话上下文）
  * 
  * 记忆架构（类脑分层）：
- * - 情景记忆：具体博弈事件（"上次输了因为..."）
- * - 语义记忆：学到的知识（"这类问题应该..."）
- * - 程序记忆：自动化的习惯（遇到某类问题自动触发）
+ * - 工作记忆：当前对话上下文（让模型知道之前聊了什么）
+ * - 情景记忆：具体博弈事件
+ * - 语义记忆：学到的知识
+ * - 程序记忆：自动化的习惯
  * 
  * 持久化：使用 Supabase 存储，刷新页面记忆不丢失
  */
 
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import type { NeuronMemory, GameStatistic, LearnedAngle } from '@/storage/database/shared/schema';
+import { getConversationContext } from './conversation-context';
+import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
  * 参与博弈的模型
@@ -43,9 +45,9 @@ interface GameResult {
 }
 
 /**
- * 思考提示词
+ * 思考提示词（带对话上下文）
  */
-const THOUGHT_PROMPT = `分析这个问题，输出内在思考（不超过50字）：
+const THOUGHT_PROMPT = `{CONTEXT}分析这个问题，输出内在思考（不超过50字）：
 问题：{QUESTION}
 你的角色：{ROLE}，擅长：{STRENGTH}
 {MEMORY_HINT}
@@ -347,12 +349,18 @@ export class LatentGameEngine {
   }
   
   /**
-   * 快速博弈
+   * 快速博弈（带对话上下文）
    */
-  async play(question: string): Promise<GameResult> {
-    // 并行思考（带记忆提示）
+  async play(question: string, sessionId?: string): Promise<GameResult> {
+    const sid = sessionId || 'default-session';
+    const conversationCtx = getConversationContext();
+    
+    // 获取对话上下文
+    const contextPrompt = await conversationCtx.buildContextPrompt(sid);
+    
+    // 并行思考（带记忆提示和对话上下文）
     const thoughts = await Promise.all(
-      PLAYERS.map(p => this.think(p, question))
+      PLAYERS.map(p => this.think(p, question, contextPrompt))
     );
     
     // 快速评估
@@ -367,6 +375,33 @@ export class LatentGameEngine {
   }
   
   /**
+   * 保存对话（用户消息和AI回复）
+   */
+  async saveConversation(
+    sessionId: string,
+    userMessage: string,
+    assistantMessage: string,
+    winnerRole: string,
+    thoughts: InnerThought[]
+  ): Promise<void> {
+    const conversationCtx = getConversationContext();
+    
+    // 保存用户消息
+    await conversationCtx.addUserMessage(sessionId, userMessage);
+    
+    // 保存AI回复
+    await conversationCtx.addAssistantMessage(
+      sessionId,
+      assistantMessage,
+      winnerRole,
+      thoughts.map(t => ({ role: t.role, core: t.core, confidence: t.confidence }))
+    );
+    
+    // 检查是否需要压缩历史
+    await conversationCtx.compressIfNeeded(sessionId, 20);
+  }
+  
+  /**
    * 异步学习
    */
   async learnAsync(question: string, thoughts: InnerThought[], winner: InnerThought): Promise<void> {
@@ -374,9 +409,9 @@ export class LatentGameEngine {
   }
   
   /**
-   * 单模型思考（带记忆）
+   * 单模型思考（带记忆和对话上下文）
    */
-  private async think(player: typeof PLAYERS[0], question: string): Promise<InnerThought> {
+  private async think(player: typeof PLAYERS[0], question: string, contextPrompt: string): Promise<InnerThought> {
     // 获取记忆提示
     const [memoryHint, stats] = await Promise.all([
       this.memory.buildMemoryHint(player.role),
@@ -387,6 +422,7 @@ export class LatentGameEngine {
     const wisdomBonus = stat?.wisdomBonus || 0;
     
     const prompt = THOUGHT_PROMPT
+      .replace('{CONTEXT}', contextPrompt)
       .replace('{QUESTION}', question)
       .replace('{ROLE}', player.role)
       .replace('{STRENGTH}', player.strength)
@@ -538,16 +574,35 @@ export class LatentGameEngine {
   }
   
   /**
-   * 流式输出最终回答
+   * 流式输出最终回答（带对话上下文）
    */
-  async *streamAnswer(question: string, result: GameResult): AsyncGenerator<string> {
+  async *streamAnswer(
+    question: string, 
+    result: GameResult, 
+    sessionId?: string
+  ): AsyncGenerator<string> {
+    const sid = sessionId || 'default-session';
+    const conversationCtx = getConversationContext();
+    
+    // 获取对话历史
+    const contextPrompt = await conversationCtx.buildContextPrompt(sid);
+    
+    // 其他模型的视角
     const hints = result.allThoughts
       .filter(t => t.role !== result.winner.role)
       .map(t => `${t.role}认为: ${t.core}`)
       .join('\n');
     
+    // 构建完整提示
+    const fullPrompt = `${contextPrompt}当前问题：${question}
+
+参考其他模型的视角：
+${hints || '无'}
+
+请回答用户的问题，保持与之前对话的连贯性。`;
+    
     const messages = [
-      { role: 'user' as const, content: `${question}\n\n参考其他视角：\n${hints || '无'}` }
+      { role: 'user' as const, content: fullPrompt }
     ];
     
     const stream = this.llmClient.stream(messages, {

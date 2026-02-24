@@ -17,6 +17,8 @@ export { DecisionCore } from './decision';
 export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron, getMotorLanguageNeuron, getMotorActionNeuron } from './sensory';
 // 导出高维博弈引擎
 export { LatentGameEngine, getGameEngine, getPlayers } from './latent-game';
+// 导出对话上下文
+export { ConversationContext, getConversationContext } from './conversation-context';
 
 /**
  * 数字神经元系统
