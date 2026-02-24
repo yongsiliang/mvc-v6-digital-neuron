@@ -11,6 +11,7 @@ import {
   ExecLog, 
   ChatPanel 
 } from '@/components/neuron';
+import { ProactivityPanel } from '@/components/neuron/proactivity-panel';
 import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
 import { Brain } from 'lucide-react';
 
@@ -278,6 +279,7 @@ export default function Home() {
                   <Tabs defaultValue="space" className="h-full">
                     <TabsList className="w-full justify-start">
                       <TabsTrigger value="space">空间</TabsTrigger>
+                      <TabsTrigger value="proactivity">主动性</TabsTrigger>
                       <TabsTrigger value="meaning">意义</TabsTrigger>
                       <TabsTrigger value="self">自我</TabsTrigger>
                       <TabsTrigger value="logs">日志</TabsTrigger>
@@ -345,6 +347,12 @@ export default function Home() {
                     
                     <TabsContent value="meaning" className="h-[calc(100%-2.5rem)] mt-2">
                       <MeaningPanel meaning={meaning} />
+                    </TabsContent>
+                    
+                    <TabsContent value="proactivity" className="h-[calc(100%-2.5rem)] mt-2 overflow-y-auto">
+                      <div className="p-2">
+                        <ProactivityPanel />
+                      </div>
                     </TabsContent>
                     
                     <TabsContent value="self" className="h-[calc(100%-2.5rem)] mt-2">

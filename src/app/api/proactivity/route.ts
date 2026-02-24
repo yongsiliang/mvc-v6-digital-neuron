@@ -23,6 +23,7 @@ export async function GET() {
     curiosities: system.getCuriosities(),
     recentThoughts: system.getSpontaneousThoughts(10),
     pendingMessages: system.getPendingMessages(),
+    userProfile: system.getUserProfile(),
   });
 }
 

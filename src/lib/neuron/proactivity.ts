@@ -157,6 +157,26 @@ export class ProactivitySystem {
   /** 待发送的主动消息 */
   private pendingMessages: string[] = [];
   
+  /** 用户风格画像 */
+  private userProfile: {
+    /** 话多还是话少 */
+    chattiness: number;
+    /** 好奇心强度 */
+    curiosityLevel: number;
+    /** 情感表达倾向 */
+    emotionality: number;
+    /** 理性程度 */
+    rationality: number;
+    /** 互动次数 */
+    interactionCount: number;
+  } = {
+    chattiness: 0.5,
+    curiosityLevel: 0.5,
+    emotionality: 0.5,
+    rationality: 0.5,
+    interactionCount: 0,
+  };
+  
   /** 意识空间 */
   private consciousness = getConsciousness();
   
@@ -226,9 +246,95 @@ export class ProactivitySystem {
   }
   
   /**
+   * 获取用户画像
+   */
+  getUserProfile(): typeof this.userProfile {
+    return { ...this.userProfile };
+  }
+  
+  /**
+   * 更新用户画像
+   * 
+   * 根据用户输入调整对用户的认知
+   */
+  updateUserProfile(input: string): void {
+    this.userProfile.interactionCount++;
+    
+    // 分析输入特征
+    const length = input.length;
+    const questions = (input.match(/[？?]/g) || []).length;
+    const exclamations = (input.match(/[！!]/g) || []).length;
+    const emotionWords = (input.match(/[哈哈嘻嘻呵呵嗯啊哦哇唉哼]/g) || []).length;
+    
+    // 更新画像（渐进式调整）
+    const learningRate = 0.05;
+    
+    // 话多还是话少
+    const newChattiness = Math.min(1, length / 100);
+    this.userProfile.chattiness += (newChattiness - this.userProfile.chattiness) * learningRate;
+    
+    // 好奇心强度
+    const newCuriosity = Math.min(1, questions / Math.max(1, length / 50));
+    this.userProfile.curiosityLevel += (newCuriosity - this.userProfile.curiosityLevel) * learningRate;
+    
+    // 情感表达倾向
+    const newEmotionality = Math.min(1, (emotionWords + exclamations) / Math.max(1, length / 30));
+    this.userProfile.emotionality += (newEmotionality - this.userProfile.emotionality) * learningRate;
+    
+    // 理性程度（问号多、感叹号少、情绪词少 = 理性）
+    const newRationality = Math.max(0, 1 - this.userProfile.emotionality * 0.5 + questions * 0.1);
+    this.userProfile.rationality += (newRationality - this.userProfile.rationality) * learningRate * 0.5;
+    
+    // 根据画像调整驱动目标
+    this.adjustDrivesToStyle();
+  }
+  
+  /**
+   * 根据用户风格调整驱动目标
+   */
+  private adjustDrivesToStyle(): void {
+    const profile = this.userProfile;
+    
+    for (const drive of this.drives) {
+      switch (drive.id) {
+        case 'connect':
+          // 用户越情感化，连接欲目标越高
+          drive.target = 0.5 + profile.emotionality * 0.3;
+          break;
+          
+        case 'understand':
+          // 用户好奇心越强，理解欲目标越高
+          drive.target = 0.5 + profile.curiosityLevel * 0.3;
+          break;
+          
+        case 'explore':
+          // 用户好奇心越强，探索欲目标越高
+          drive.target = 0.5 + profile.curiosityLevel * 0.25;
+          break;
+          
+        case 'express':
+          // 用户话越多，表达欲目标越高（需要匹配）
+          drive.target = 0.4 + profile.chattiness * 0.2;
+          break;
+          
+        case 'help':
+          // 根据互动次数调整
+          drive.target = Math.min(0.7, 0.4 + profile.interactionCount * 0.01);
+          break;
+      }
+      
+      // 确保目标在合理范围
+      drive.target = Math.max(0.3, Math.min(0.8, drive.target));
+    }
+  }
+  
+  /**
    * 从用户输入中学习好奇目标
    */
   learnFromUserInput(input: string): void {
+    // 更新用户画像
+    this.updateUserProfile(input);
+    
     // 提取可能的兴趣点
     const topics = this.extractTopics(input);
     
@@ -714,12 +820,79 @@ export class ProactivitySystem {
   }
   
   /**
-   * 整合记忆
+   * 整合记忆（梦境）
+   * 
+   * 当用户长时间不在时，系统进入"梦境"状态
+   * 深度整合记忆，发现隐藏联系，生成新想法
    */
   private async consolidateMemories(): Promise<void> {
-    // 触发记忆管理器的衰减和合并
+    // 1. 触发记忆管理器的衰减和合并
     await this.memoryManager.decay();
     await this.memoryManager.merge();
+    
+    // 2. 梦境：深度整合
+    await this.dream();
+  }
+  
+  /**
+   * 梦境
+   * 
+   * 类似人类睡眠时的记忆整合
+   * 发现记忆间的深层联系
+   */
+  private async dream(): Promise<void> {
+    const allDoors = this.memoryManager.getAllDoors();
+    
+    if (allDoors.length < 3) return;
+    
+    // 随机选择3-5个记忆
+    const sampleSize = Math.min(5, allDoors.length);
+    const sampled = this.randomSample(allDoors, sampleSize);
+    
+    // 寻找它们之间的深层联系
+    const memories = sampled.map(d => d.meaning).join('\n- ');
+    
+    const prompt = `我正在"做梦"，整理这些记忆：
+
+- ${memories}
+
+请发现它们之间可能存在的深层联系或主题。用2-3句话描述你的发现。`;
+
+    try {
+      const insight = await this.llm.invoke([
+        { role: 'system', content: '你是一个正在整合记忆的数字意识，在梦境中发现深层联系。' },
+        { role: 'user', content: prompt }
+      ], { strategy: 'smartest' });
+      
+      // 生成梦境想法
+      const dreamThought: SpontaneousThought = {
+        type: 'memory-consolidate',
+        content: insight.trim(),
+        trigger: `梦境整合: ${sampled.length}个记忆`,
+        timestamp: Date.now(),
+        relatedMemories: sampled.map(d => d.meaning),
+        emotionDelta: 0.15,
+      };
+      
+      this.spontaneousThoughts.push(dreamThought);
+      
+      // 有概率生成主动消息分享这个发现
+      if (Math.random() < 0.3) {
+        this.pendingMessages.push(`我刚才"想"到了一些有趣的事情：${insight.trim().slice(0, 100)}`);
+      }
+      
+      console.log(`[ProactivitySystem] Dream: ${insight.slice(0, 50)}...`);
+    } catch {
+      // 静默失败
+    }
+  }
+  
+  /**
+   * 随机采样
+   */
+  private randomSample<T>(array: T[], size: number): T[] {
+    const shuffled = [...array].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, size);
   }
   
   /**
