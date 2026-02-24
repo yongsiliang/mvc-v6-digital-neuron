@@ -16,7 +16,9 @@ export { MeaningCore } from './meaning';
 export { DecisionCore } from './decision';
 export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron, getMotorLanguageNeuron, getMotorActionNeuron } from './sensory';
 // 导出高维博弈引擎
-export { LatentGameEngine, getGameEngine, getPlayers } from './latent-game';
+export { LatentGameEngine, type InnerThought, type GameResult } from './latent-game';
+// 导出链接强度管理器
+export { NeuronLinkManager, getNeuronLinkManager, type NeuronLinkState } from './neuron-link';
 // 导出对话上下文
 export { ConversationContext, getConversationContext } from './conversation-context';
 // 导出意义记忆引擎

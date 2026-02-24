@@ -86,9 +86,48 @@ CREATE INDEX IF NOT EXISTS keys_holder_idx ON neural_keys(holder_role);
 CREATE INDEX IF NOT EXISTS keys_door_idx ON neural_keys(target_door_id);
 CREATE INDEX IF NOT EXISTS keys_strength_idx ON neural_keys(strength);
 
--- 3. 添加注释
+-- 3. 神经元链接强度表
+CREATE TABLE IF NOT EXISTS neuron_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  -- 神经元ID（模型ID）
+  neuron_id TEXT UNIQUE NOT NULL,
+  
+  -- 链接强度（0-1，动态演化）
+  strength REAL DEFAULT 0.5 NOT NULL,
+  
+  -- 累计激活次数
+  activations INTEGER DEFAULT 0 NOT NULL,
+  
+  -- 最后激活时间
+  last_activated TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  
+  -- 衰减因子
+  decay_factor REAL DEFAULT 1.0 NOT NULL,
+  
+  -- 创建时间
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  
+  -- 更新时间
+  updated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 索引
+CREATE INDEX IF NOT EXISTS neuron_links_strength_idx ON neuron_links(strength);
+CREATE INDEX IF NOT EXISTS neuron_links_last_activated_idx ON neuron_links(last_activated);
+
+-- 4. 初始化默认神经元
+INSERT INTO neuron_links (neuron_id, strength, activations)
+VALUES 
+  ('doubao-seed-1-8-251228', 0.5, 0),
+  ('deepseek-v3-2-251201', 0.5, 0),
+  ('doubao-seed-2-0-lite-260215', 0.5, 0)
+ON CONFLICT (neuron_id) DO NOTHING;
+
+-- 5. 添加注释
 COMMENT ON TABLE memory_doors IS '记忆门 - 存在于记忆空间中的信息，每扇门后有记忆';
 COMMENT ON TABLE neural_keys IS '神经钥匙 - 打开记忆门的工具，学习就是锻造钥匙';
+COMMENT ON TABLE neuron_links IS '神经元链接强度 - 动态演化，无预设角色';
 `;
 
 export async function POST(request: NextRequest) {
@@ -153,6 +192,13 @@ export async function GET() {
     .limit(1);
   tables.neural_keys = !keysError;
   
+  // 检查 neuron_links 表
+  const { error: linksError } = await supabase
+    .from('neuron_links')
+    .select('id')
+    .limit(1);
+  tables.neuron_links = !linksError;
+  
   // 检查现有表
   const { count: neuronMemoriesCount } = await supabase
     .from('neuron_memories')
@@ -169,6 +215,6 @@ export async function GET() {
       neuron_memories: neuronMemoriesCount || 0,
       game_statistics: gameStatsCount || 0,
     },
-    allMigrated: tables.memory_doors && tables.neural_keys
+    allMigrated: tables.memory_doors && tables.neural_keys && tables.neuron_links
   });
 }

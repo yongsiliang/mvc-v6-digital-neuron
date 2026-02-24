@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getDigitalNeuronSystem } from '@/lib/neuron';
-import { getGameEngine, getPlayers } from '@/lib/neuron/latent-game';
+import { LatentGameEngine } from '@/lib/neuron/latent-game';
 import { getConversationContext } from '@/lib/neuron/conversation-context';
 import { HeaderUtils } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
           // 2. 快速博弈（带意义记忆）
           send('neuron', { neuronId: 'latent-game', message: '博弈思考中...' });
           
-          const engine = getGameEngine(headers);
+          const engine = new LatentGameEngine(headers);
           const gameResult = await engine.play(message, sid);
           
           // 【新增】发送意义共鸣信息
@@ -72,13 +72,13 @@ export async function POST(request: NextRequest) {
           }
           
           send('game-result', {
-            winner: gameResult.winner.role,
+            winner: gameResult.winner.neuronId,
             confidence: gameResult.winner.confidence.toFixed(2),
             reason: gameResult.evaluationReason,
           });
 
           // 3. 立即输出（带对话上下文）
-          send('neuron', { neuronId: 'motor-language', message: `${gameResult.winner.role}输出中` });
+          send('neuron', { neuronId: 'motor-language', message: `神经元输出中` });
 
           let fullResponse = '';
           for await (const chunk of engine.streamAnswer(message, gameResult, sid)) {
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
           // 4. 完成
           send('done', { 
             fullResponse,
-            winner: gameResult.winner.role,
+            winner: gameResult.winner.neuronId,
             sessionId: sid,
           });
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
             sid,
             message,
             fullResponse,
-            gameResult.winner.role,
+            gameResult.winner.neuronId,
             gameResult.allThoughts
           ).catch(() => {});
           
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
     const sessionId = url.searchParams.get('sessionId') || 'default-session';
     const action = url.searchParams.get('action');
     
-    const engine = getGameEngine({});
+    const engine = new LatentGameEngine({});
     const conversationCtx = getConversationContext();
     
     // 清除会话历史

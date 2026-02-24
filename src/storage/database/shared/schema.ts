@@ -428,6 +428,46 @@ export const sessionSummaries = pgTable(
   ]
 );
 
+/**
+ * 神经元链接强度表 - 动态演化，无预设角色
+ * 
+ * 核心理念：
+ * - 每个神经元没有预设角色
+ * - 链接强度通过实际使用动态演化
+ * - 高链接强度的神经元更容易被激活
+ */
+export const neuronLinks = pgTable(
+  "neuron_links",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    
+    // 神经元ID（模型ID）
+    neuronId: text("neuron_id").notNull().unique(),
+    
+    // 链接强度 0-1
+    strength: real("strength").default(0.5).notNull(),
+    
+    // 累计激活次数
+    activations: integer("activations").default(0).notNull(),
+    
+    // 最后激活时间
+    lastActivated: timestamp("last_activated", { withTimezone: true }).defaultNow().notNull(),
+    
+    // 衰减因子
+    decayFactor: real("decay_factor").default(1.0).notNull(),
+    
+    // 创建时间
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    
+    // 更新时间
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("neuron_links_strength_idx").on(table.strength),
+    index("neuron_links_last_activated_idx").on(table.lastActivated),
+  ]
+);
+
 // 类型导出
 export type NeuronMemory = typeof neuronMemories.$inferSelect;
 export type GameStatistic = typeof gameStatistics.$inferSelect;
@@ -443,6 +483,9 @@ export type ActivationRecord = typeof activationRecords.$inferSelect;
 // 记忆空间类型导出
 export type MemoryDoor = typeof memoryDoors.$inferSelect;
 export type NeuralKey = typeof neuralKeys.$inferSelect;
+
+// 神经元链接类型导出
+export type NeuronLink = typeof neuronLinks.$inferSelect;
 
 // 意义类型枚举
 export type MeaningType = 'insight' | 'pattern' | 'strategy' | 'emotion' | 'concept';

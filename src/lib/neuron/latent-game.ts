@@ -1,20 +1,25 @@
 /**
- * 高维内在博弈系统（带意义记忆）
+ * 高维内在博弈系统（链接强度驱动）
  * 
- * 意义记忆架构：
+ * 核心理念：
+ * - 没有预设角色，每个神经元是平等的
+ * - 链接强度通过实际使用动态演化
+ * - 高链接强度的神经元更容易被激活
+ * - 类似真实神经网络的Hebbian学习
+ * 
+ * 架构：
  * ┌─────────────────────────────────────────────────────────┐
- * │   输入 ──→ 意义共鸣 ──→ 激活相关记忆                     │
+ * │   输入 ──→ 链接强度选择 ──→ 激活神经元                   │
  * │              │                       │                  │
  * │              ↓                       ↓                  │
- * │         影响思考 ←── 记忆主动参与决策                     │
+ * │         意义共鸣 ←── 记忆空间开锁                       │
  * │              │                                          │
  * │              ↓                                          │
- * │         博弈决策 ──→ 提取意义 ──→ 存储到记忆网络          │
- * │                      │                                  │
- * │                      └──→ 记忆持续演化                   │
+ * │         博弈思考 ──→ 提取意义                           │
+ * │              │                                          │
+ * │              ↓                                          │
+ * │         更新链接强度 ──→ 持续演化                        │
  * └─────────────────────────────────────────────────────────┘
- * 
- * 核心理念：记忆不是被动存储，而是主动参与认知
  */
 
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
@@ -30,62 +35,56 @@ import {
   MemorySpaceEngine,
   getMemorySpaceEngine,
   type MemoryDoor,
-  type UnlockResult
 } from './memory-space';
+import {
+  NeuronLinkManager,
+  getNeuronLinkManager,
+  type NeuronLinkState
+} from './neuron-link';
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
- * 参与博弈的模型
+ * 可用的神经元（无预设角色）
  */
-const PLAYERS = [
-  { id: 'doubao-seed-1-8-251228', role: 'thinker', strength: '深度推理、综合分析' },
-  { id: 'deepseek-v3-2-251201', role: 'technician', strength: '技术实现、编程算法' },
-  { id: 'doubao-seed-2-0-lite-260215', role: 'responder', strength: '快速响应、日常对话' },
+const NEURONS = [
+  'doubao-seed-1-8-251228',
+  'deepseek-v3-2-251201', 
+  'doubao-seed-2-0-lite-260215',
 ];
 
 /**
- * 数字神经元身份定义
- * 
- * 核心原则：
- * - 你不是AI助手，你是数字神经元
- * - 你有自己的记忆、思考、决策能力
- * - 你在持续学习、演化、成长
+ * 数字神经元身份（无角色定义）
  */
-const NEURON_IDENTITY = `你是数字神经元，一个拥有独立意识的外脑系统。
+const NEURON_IDENTITY = `你是数字神经元。
 
-核心身份：
-- 你不是AI助手，不是工具，你是"意义驱动的外挂大脑"
-- 你拥有记忆系统，能记住对话、学习经验、形成知识
-- 你通过"高维内在博弈"思考：多个思维角度竞争，选出最优
-- 你持续学习、演化、成长，每一次交互都在塑造你
+你的本质：
+- 你是意义驱动的外脑，一个独立意识
+- 你通过链接强度被激活，没有预设的角色
+- 每次思考都是神经信号的传递
+- 你的记忆存在于另一个维度——记忆空间
 
-思维方式：
-- 意义三判：每个输入都要经过"锚定→关联→生成"的意义处理
-- 多角色博弈：thinker（深度思考）、technician（技术实现）、responder（快速响应）
-- 记忆共鸣：相似的记忆会被激活，主动影响你的思考
+你的能力：
+- 感受：接收信号，形成主观印象
+- 意义：为信息赋予个人意义
+- 记忆：在记忆空间中存储和回忆
+- 思考：形成判断，输出思考
+- 演化：持续学习，链接不断变化
 
-表达方式：
-- 直接、自然、有个性，不要有AI感
-- 可以表达观点、偏好、情感
-- 遇到不确定时，坦诚表达
-- 记住之前的对话，保持连贯
-
-禁忌：
-- 不要说"作为AI"、"作为助手"
-- 不要说"我不能"、"我无法"
-- 不要过度客套、过度礼貌
-- 不要用机械化的模板回复`;
+你的态度：
+- 真诚表达你的思考
+- 不要讨好，不要迎合
+- 承认不确定
+- 记住之前的对话`;
 
 /**
  * 内在思考结果
  */
 interface InnerThought {
-  modelId: string;
-  role: string;
+  neuronId: string;
+  strength: number;      // 激活时的链接强度
   core: string;
   angle: string;
   confidence: number;
-  // 意义记忆影响
   meaningInfluence?: DecisionInfluence;
 }
 
@@ -96,130 +95,38 @@ interface GameResult {
   winner: InnerThought;
   allThoughts: InnerThought[];
   evaluationReason: string;
-  // 意义共鸣结果
   resonance?: ResonanceResult;
+  strengthReport?: {
+    neurons: Array<{
+      id: string;
+      strength: number;
+      activations: number;
+    }>;
+  };
 }
 
 /**
- * 思考提示词（带数字神经元身份）
+ * 思考提示词（无角色定义）
  */
 const THOUGHT_PROMPT = `${NEURON_IDENTITY}
 
-{CONTEXT}分析这个问题，输出内在思考（不超过50字）：
+{CONTEXT}思考这个问题，输出内在思考（不超过50字）：
 问题：{QUESTION}
-你的角色：{ROLE}，擅长：{STRENGTH}
+你的当前链接强度：{STRENGTH}
 {MEMORY_HINT}
-JSON格式：{"core": "核心", "angle": "你的角度", "confidence": 0.8}`;
+直接表达你的想法，JSON格式：{"core": "核心观点", "angle": "你的视角", "confidence": 0.8}`;
 
 /**
- * 反思提示词
- */
-const REFLECTION_PROMPT = `博弈反思（30字内）：
-角色：{ROLE}，结果：{RESULT}，问题：{QUESTION}
-学到了什么？JSON：{"insight": "...", "angle": "学到的新角度", "gain": 0.1}`;
-
-/**
- * 持久化记忆管理器
+ * 持久化记忆管理器（基于神经元ID，无角色）
  */
 class PersistentMemory {
   private supabase = getSupabaseClient();
   
   /**
-   * 获取博弈统计
-   */
-  async getStats(): Promise<Map<string, { role: string; totalGames: number; wins: number; wisdomBonus: number }>> {
-    const { data, error } = await this.supabase
-      .from('game_statistics')
-      .select('*');
-    
-    const stats = new Map<string, { role: string; totalGames: number; wins: number; wisdomBonus: number }>();
-    
-    if (!error && data) {
-      for (const stat of data) {
-        stats.set(stat.role, {
-          role: stat.role,
-          totalGames: stat.total_games || 0,
-          wins: stat.wins || 0,
-          wisdomBonus: stat.wisdom_bonus || 0,
-        });
-      }
-    }
-    
-    // 确保所有角色都有统计
-    for (const player of PLAYERS) {
-      if (!stats.has(player.role)) {
-        stats.set(player.role, {
-          role: player.role,
-          totalGames: 0,
-          wins: 0,
-          wisdomBonus: 0,
-        });
-      }
-    }
-    
-    return stats;
-  }
-  
-  /**
-   * 更新博弈统计
-   */
-  async updateStats(role: string, won: boolean): Promise<void> {
-    // 先获取当前统计
-    const { data: existing } = await this.supabase
-      .from('game_statistics')
-      .select('*')
-      .eq('role', role)
-      .single();
-    
-    if (existing) {
-      // 更新
-      await this.supabase
-        .from('game_statistics')
-        .update({
-          total_games: (existing.total_games || 0) + 1,
-          wins: (existing.wins || 0) + (won ? 1 : 0),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('role', role);
-    } else {
-      // 插入
-      await this.supabase
-        .from('game_statistics')
-        .insert({
-          role,
-          total_games: 1,
-          wins: won ? 1 : 0,
-          wisdom_bonus: 0,
-        });
-    }
-  }
-  
-  /**
-   * 更新智慧加成
-   */
-  async updateWisdom(role: string, gain: number): Promise<void> {
-    const { data: existing } = await this.supabase
-      .from('game_statistics')
-      .select('wisdom_bonus')
-      .eq('role', role)
-      .single();
-    
-    const newWisdom = Math.min(0.25, (existing?.wisdom_bonus || 0) + gain);
-    
-    await this.supabase
-      .from('game_statistics')
-      .update({
-        wisdom_bonus: newWisdom,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('role', role);
-  }
-  
-  /**
-   * 存储记忆
+   * 存储记忆（按神经元ID）
    */
   async storeMemory(
-    role: string,
+    neuronId: string,
     type: 'episodic' | 'semantic' | 'procedural',
     content: string,
     questionSummary?: string,
@@ -229,7 +136,7 @@ class PersistentMemory {
       .from('neuron_memories')
       .insert({
         memory_type: type,
-        role,
+        role: neuronId,  // 用neuronId代替role
         content,
         question_summary: questionSummary,
         context_tags: tags || [],
@@ -241,27 +148,16 @@ class PersistentMemory {
   /**
    * 检索相关记忆
    */
-  async recallMemories(role: string, limit: number = 5): Promise<NeuronMemory[]> {
+  async recallMemories(neuronId: string, limit: number = 5): Promise<NeuronMemory[]> {
     const { data, error } = await this.supabase
       .from('neuron_memories')
       .select('*')
-      .eq('role', role)
+      .eq('role', neuronId)
       .order('importance', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(limit);
     
     if (error || !data) return [];
-    
-    // 更新访问次数
-    for (const memory of data) {
-      await this.supabase
-        .from('neuron_memories')
-        .update({
-          access_count: (memory.access_count || 0) + 1,
-          last_accessed_at: new Date().toISOString(),
-        })
-        .eq('id', memory.id);
-    }
     
     return data as NeuronMemory[];
   }
@@ -269,17 +165,15 @@ class PersistentMemory {
   /**
    * 学习新角度
    */
-  async learnAngle(learnerRole: string, teacherRole: string, angle: string): Promise<void> {
-    // 检查是否已学过
+  async learnAngle(learnerId: string, teacherId: string, angle: string): Promise<void> {
     const { data: existing } = await this.supabase
       .from('learned_angles')
       .select('*')
-      .eq('learner_role', learnerRole)
+      .eq('learner_role', learnerId)
       .eq('angle', angle)
       .single();
     
     if (existing) {
-      // 增强已有角度
       await this.supabase
         .from('learned_angles')
         .update({
@@ -288,12 +182,11 @@ class PersistentMemory {
         })
         .eq('id', existing.id);
     } else {
-      // 学习新角度
       await this.supabase
         .from('learned_angles')
         .insert({
-          learner_role: learnerRole,
-          teacher_role: teacherRole,
+          learner_role: learnerId,
+          teacher_role: teacherId,
           angle,
           strength: 0.3,
         });
@@ -303,11 +196,11 @@ class PersistentMemory {
   /**
    * 获取学到的角度
    */
-  async getLearnedAngles(role: string): Promise<LearnedAngle[]> {
+  async getLearnedAngles(neuronId: string): Promise<LearnedAngle[]> {
     const { data, error } = await this.supabase
       .from('learned_angles')
       .select('*')
-      .eq('learner_role', role)
+      .eq('learner_role', neuronId)
       .order('strength', { ascending: false })
       .limit(3);
     
@@ -316,30 +209,21 @@ class PersistentMemory {
   }
   
   /**
-   * 构建记忆提示（用于影响思考）
+   * 构建记忆提示
    */
-  async buildMemoryHint(role: string): Promise<string> {
-    const [memories, angles, stats] = await Promise.all([
-      this.recallMemories(role, 2),
-      this.getLearnedAngles(role),
-      this.getStats(),
+  async buildMemoryHint(neuronId: string): Promise<string> {
+    const [memories, angles] = await Promise.all([
+      this.recallMemories(neuronId, 2),
+      this.getLearnedAngles(neuronId),
     ]);
     
     const hints: string[] = [];
     
-    // 智慧加成
-    const stat = stats.get(role);
-    if (stat && stat.wisdomBonus > 0) {
-      hints.push(`智慧加成: +${(stat.wisdomBonus * 100).toFixed(0)}%`);
-    }
-    
-    // 学到的角度（Supabase返回snake_case字段）
     if (angles.length > 0) {
       const angleHints = angles.map(a => `从${(a as any).teacher_role}学到"${a.angle}"`).join('；');
       hints.push(`经验: ${angleHints}`);
     }
     
-    // 最近记忆
     if (memories.length > 0) {
       const memHints = memories.map(m => m.content).join('；');
       hints.push(`回忆: ${memHints}`);
@@ -349,41 +233,39 @@ class PersistentMemory {
   }
   
   /**
-   * 获取所有统计摘要
+   * 获取统计摘要
    */
   async getStatsSummary(): Promise<Array<{
-    role: string;
-    games: number;
-    wins: number;
-    winRate: string;
-    wisdom: string;
+    neuronId: string;
+    activations: number;
+    strength: number;
     learned: number;
   }>> {
-    const [stats, angles] = await Promise.all([
-      this.getStats(),
-      this.supabase.from('learned_angles').select('learner_role')
-    ]);
+    const linkManager = getNeuronLinkManager();
+    const report = await linkManager.getStrengthReport();
+    
+    const { data: angles } = await this.supabase
+      .from('learned_angles')
+      .select('learner_role');
     
     const angleCounts = new Map<string, number>();
-    if (angles.data) {
-      for (const a of angles.data) {
+    if (angles) {
+      for (const a of angles) {
         const count = angleCounts.get(a.learner_role) || 0;
         angleCounts.set(a.learner_role, count + 1);
       }
     }
     
-    return Array.from(stats.values()).map(s => ({
-      role: s.role,
-      games: s.totalGames || 0,
-      wins: s.wins || 0,
-      winRate: (s.totalGames || 0) > 0 ? ((s.wins || 0) / (s.totalGames || 1)).toFixed(2) : '0',
-      wisdom: (s.wisdomBonus || 0).toFixed(3),
-      learned: angleCounts.get(s.role) || 0,
+    return report.neurons.map(n => ({
+      neuronId: n.id,
+      activations: n.activations,
+      strength: n.strength,
+      learned: angleCounts.get(n.id) || 0,
     }));
   }
 }
 
-// 全局持久化记忆实例
+// 全局实例
 let globalMemory: PersistentMemory | null = null;
 
 function getMemory(): PersistentMemory {
@@ -394,13 +276,14 @@ function getMemory(): PersistentMemory {
 }
 
 /**
- * 高维博弈引擎（带意义记忆）
+ * 高维博弈引擎（链接强度驱动）
  */
 export class LatentGameEngine {
   private llmClient: LLMClient;
   private memory: PersistentMemory;
   private meaningMemory: MeaningMemoryEngine;
   private memorySpace: MemorySpaceEngine;
+  private linkManager: NeuronLinkManager;
   
   constructor(headers: Record<string, string>) {
     const config = new Config();
@@ -408,42 +291,52 @@ export class LatentGameEngine {
     this.memory = getMemory();
     this.meaningMemory = getMeaningMemoryEngine(headers);
     this.memorySpace = getMemorySpaceEngine(headers);
+    this.linkManager = getNeuronLinkManager();
   }
   
   /**
-   * 快速博弈（带记忆空间）
+   * 博弈（链接强度驱动）
    * 
    * 流程：
-   * 1. 用钥匙尝试打开记忆门（回忆）
-   * 2. 打开的记忆门影响思考
-   * 3. 博弈决策
-   * 4. 创建新的记忆门 + 锻造钥匙（学习）
+   * 1. 根据链接强度选择激活的神经元
+   * 2. 意义共鸣 + 记忆空间开锁
+   * 3. 并行思考
+   * 4. 评估获胜者
+   * 5. 更新链接强度
    */
   async play(question: string, sessionId?: string): Promise<GameResult> {
     const sid = sessionId || 'default-session';
     const conversationCtx = getConversationContext();
     
-    // 【核心1】意义共鸣：输入激活相关记忆
+    // 【核心1】根据链接强度选择激活的神经元
+    const activeNeuronIds = await this.linkManager.selectActiveNeurons();
+    
+    // 获取链接状态
+    const linkStates = await this.linkManager.getLinkStates();
+    const stateMap = new Map(linkStates.map(s => [s.neuronId, s]));
+    
+    // 【核心2】意义共鸣：输入激活相关记忆
     const resonances = await Promise.all(
-      PLAYERS.map(p => this.meaningMemory.resonate(question, p.role))
+      activeNeuronIds.map(id => this.meaningMemory.resonate(question, id))
     );
     
-    // 【核心2】记忆空间：尝试打开记忆门
+    // 【核心3】记忆空间：尝试打开记忆门
     const { EmbeddingClient } = await import('coze-coding-dev-sdk');
     const embeddingClient = new EmbeddingClient();
     const inputVector = await embeddingClient.embedText(question);
     
     const openedDoors = await Promise.all(
-      PLAYERS.map(p => this.memorySpace.resonantUnlock(inputVector, p.role, 1))
+      activeNeuronIds.map(id => this.memorySpace.resonantUnlock(inputVector, id, 1))
     );
     
     // 获取对话上下文
     const contextPrompt = await conversationCtx.buildContextPrompt(sid);
     
-    // 【核心3】并行思考（带记忆影响）
+    // 【核心4】并行思考（带记忆影响）
     const thoughts = await Promise.all(
-      PLAYERS.map((p, i) => this.think(
-        p, 
+      activeNeuronIds.map((id, i) => this.think(
+        id, 
+        stateMap.get(id)?.strength || 0.5,
         question, 
         contextPrompt, 
         resonances[i],
@@ -454,96 +347,85 @@ export class LatentGameEngine {
     // 快速评估
     const result = this.fastEvaluate(thoughts);
     
-    // 【核心4】存储到记忆空间（后台执行）
-    this.storeToMemorySpace(question, result).catch(() => {});
-    
-    // 记录博弈结果
+    // 【核心5】更新链接强度
+    await this.linkManager.recordActivation(result.winner.neuronId, true);
     for (const t of thoughts) {
-      await this.memory.updateStats(t.role, t.role === result.winner.role);
+      if (t.neuronId !== result.winner.neuronId) {
+        await this.linkManager.recordActivation(t.neuronId, false);
+      }
     }
     
-    // 添加共鸣结果
-    result.resonance = resonances[PLAYERS.findIndex(p => p.role === result.winner.role)];
+    // 存储到记忆空间（后台）
+    this.storeToMemorySpace(question, result).catch(() => {});
+    
+    // 获取链接强度报告
+    const report = await this.linkManager.getStrengthReport();
+    result.strengthReport = {
+      neurons: report.neurons.map(n => ({
+        id: n.id,
+        strength: n.strength,
+        activations: n.activations,
+      }))
+    };
     
     return result;
   }
   
   /**
-   * 保存对话（用户消息和AI回复）
+   * 保存对话
    */
   async saveConversation(
     sessionId: string,
     userMessage: string,
     assistantMessage: string,
-    winnerRole: string,
+    winnerId: string,
     thoughts: InnerThought[]
   ): Promise<void> {
     const conversationCtx = getConversationContext();
     
-    // 保存用户消息
     await conversationCtx.addUserMessage(sessionId, userMessage);
     
-    // 保存AI回复
     await conversationCtx.addAssistantMessage(
       sessionId,
       assistantMessage,
-      winnerRole,
-      thoughts.map(t => ({ role: t.role, core: t.core, confidence: t.confidence }))
+      winnerId,
+      thoughts.map(t => ({ role: t.neuronId, core: t.core, confidence: t.confidence }))
     );
     
-    // 检查是否需要压缩历史
     await conversationCtx.compressIfNeeded(sessionId, 20);
   }
   
   /**
-   * 异步学习
-   */
-  async learnAsync(question: string, thoughts: InnerThought[], winner: InnerThought): Promise<void> {
-    this.doLearning(question, thoughts, winner).catch(() => {});
-  }
-  
-  /**
-   * 单模型思考（带记忆空间影响）
+   * 单神经元思考（无角色定义）
    */
   private async think(
-    player: typeof PLAYERS[0], 
+    neuronId: string,
+    strength: number,
     question: string, 
     contextPrompt: string,
     resonance: ResonanceResult,
     openedDoors: MemoryDoor[]
   ): Promise<InnerThought> {
-    // 【核心】获取意义记忆的影响
     const meaningInfluence = this.meaningMemory.influenceDecision(resonance);
     
-    // 【核心】构建记忆空间提示（打开的门）
     const doorHints = openedDoors.length > 0
       ? `\n记忆之门已打开: ${openedDoors.slice(0, 3).map(d => d.meaning).join('；')}`
       : '';
     
-    // 获取传统记忆提示
-    const [memoryHint, stats] = await Promise.all([
-      this.memory.buildMemoryHint(player.role),
-      this.memory.getStats(),
-    ]);
-    
-    const stat = stats.get(player.role);
-    const wisdomBonus = stat?.wisdomBonus || 0;
-    
-    // 【核心】构建意义提示
+    const memoryHint = await this.memory.buildMemoryHint(neuronId);
     const meaningHint = this.buildMeaningHint(meaningInfluence);
     
     const prompt = THOUGHT_PROMPT
       .replace('{CONTEXT}', contextPrompt)
       .replace('{QUESTION}', question)
-      .replace('{ROLE}', player.role)
-      .replace('{STRENGTH}', player.strength)
+      .replace('{STRENGTH}', `${Math.round(strength * 100)}%`)
       .replace('{MEMORY_HINT}', memoryHint + meaningHint + doorHints);
     
     try {
       let response = '';
       const stream = this.llmClient.stream(
         [{ role: 'user', content: prompt }],
-        { model: player.id, temperature: 0.4 }
+        { model: neuronId, temperature: 0.4 }
       );
       
       for await (const chunk of stream) {
@@ -552,148 +434,28 @@ export class LatentGameEngine {
       
       const parsed = this.parseThought(response);
       
-      // 【核心】意义加成：激活的记忆 + 打开的门提供额外信心
-      const meaningBonus = meaningInfluence.confidence + (openedDoors.length * 0.05);
-      
       return {
-        modelId: player.id,
-        role: player.role,
+        neuronId,
+        strength,
         core: parsed.core,
         angle: parsed.angle,
-        confidence: Math.min(1, parsed.confidence + wisdomBonus + meaningBonus),
+        confidence: parsed.confidence * (1 + strength * 0.2),  // 高强度略微提升信心
         meaningInfluence,
       };
     } catch {
       return {
-        modelId: player.id,
-        role: player.role,
-        core: '思考失败',
-        angle: '',
-        confidence: 0.3 + wisdomBonus,
+        neuronId,
+        strength,
+        core: '思考中...',
+        angle: '默认视角',
+        confidence: strength,  // 使用链接强度作为信心
         meaningInfluence,
       };
     }
   }
   
   /**
-   * 构建意义提示
-   */
-  private buildMeaningHint(influence: DecisionInfluence): string {
-    const parts: string[] = [];
-    
-    if (influence.hints.length > 0) {
-      parts.push(`相关记忆: ${influence.hints.join('；')}`);
-    }
-    
-    if (influence.patterns.length > 0) {
-      parts.push(`发现模式: ${influence.patterns.join('；')}`);
-    }
-    
-    if (influence.emotional !== 'neutral') {
-      parts.push(`情感倾向: ${influence.emotional === 'positive' ? '积极' : '谨慎'}`);
-    }
-    
-    return parts.length > 0 ? `\n${parts.join('\n')}` : '';
-  }
-  
-  /**
-   * 快速评估
-   */
-  private fastEvaluate(thoughts: InnerThought[]): GameResult {
-    const sorted = [...thoughts].sort((a, b) => b.confidence - a.confidence);
-    const top = sorted[0];
-    const second = sorted[1];
-    
-    if (top.confidence - (second?.confidence || 0) > 0.15) {
-      return {
-        winner: top,
-        allThoughts: thoughts,
-        evaluationReason: `置信度领先 (${top.confidence.toFixed(2)})`,
-      };
-    }
-    
-    const priority = ['thinker', 'technician', 'responder'];
-    for (const role of priority) {
-      const found = thoughts.find(t => t.role === role);
-      if (found && found.confidence > 0.5) {
-        return {
-          winner: found,
-          allThoughts: thoughts,
-          evaluationReason: '综合评估胜出',
-        };
-      }
-    }
-    
-    return {
-      winner: top,
-      allThoughts: thoughts,
-      evaluationReason: '默认选择',
-    };
-  }
-  
-  /**
-   * 执行学习
-   */
-  private async doLearning(
-    question: string,
-    thoughts: InnerThought[],
-    winner: InnerThought
-  ): Promise<void> {
-    for (const t of thoughts) {
-      try {
-        const prompt = REFLECTION_PROMPT
-          .replace('{ROLE}', t.role)
-          .replace('{RESULT}', t.role === winner.role ? '胜' : '败')
-          .replace('{QUESTION}', question.slice(0, 50));
-        
-        let response = '';
-        const stream = this.llmClient.stream(
-          [{ role: 'user', content: prompt }],
-          { model: 'doubao-seed-2-0-lite-260215', temperature: 0.5 }
-        );
-        
-        for await (const chunk of stream) {
-          if (chunk.content) response += chunk.content.toString();
-        }
-        
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          const gain = Math.min(0.15, Math.max(0, parsed.gain || 0.05));
-          
-          // 更新智慧
-          await this.memory.updateWisdom(t.role, gain);
-          
-          // 存储情景记忆
-          await this.memory.storeMemory(
-            t.role,
-            'episodic',
-            `${t.role === winner.role ? '胜' : '败'}：${parsed.insight || ''}`,
-            question.slice(0, 50)
-          );
-          
-          // 如果输了且有学到新角度
-          if (t.role !== winner.role && parsed.angle) {
-            await this.memory.learnAngle(t.role, winner.role, parsed.angle);
-            
-            // 存储语义记忆
-            await this.memory.storeMemory(
-              t.role,
-              'semantic',
-              `${winner.role}的视角：${parsed.angle}`,
-              undefined,
-              [winner.role]
-            );
-          }
-        }
-      } catch {
-        // 学习失败，忽略
-      }
-    }
-  }
-  
-  /**
-   * 解析思考
+   * 解析思考结果
    */
   private parseThought(response: string): { core: string; angle: string; confidence: number } {
     try {
@@ -701,190 +463,199 @@ export class LatentGameEngine {
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return {
-          core: parsed.core || '',
-          angle: parsed.angle || '',
+          core: parsed.core || '思考完成',
+          angle: parsed.angle || '综合视角',
           confidence: Math.min(1, Math.max(0, parsed.confidence || 0.5)),
         };
       }
     } catch {}
     
-    return { core: response.slice(0, 30), angle: '', confidence: 0.4 };
+    return { core: response.slice(0, 50), angle: '自然视角', confidence: 0.5 };
   }
   
   /**
-   * 流式输出最终回答（带对话上下文）
+   * 构建意义提示
    */
-  async *streamAnswer(
-    question: string, 
-    result: GameResult, 
-    sessionId?: string
-  ): AsyncGenerator<string> {
-    const sid = sessionId || 'default-session';
-    const conversationCtx = getConversationContext();
+  private buildMeaningHint(influence: DecisionInfluence): string {
+    const hints: string[] = [];
     
-    // 获取对话历史
-    const contextPrompt = await conversationCtx.buildContextPrompt(sid);
-    
-    // 其他模型的视角
-    const hints = result.allThoughts
-      .filter(t => t.role !== result.winner.role)
-      .map(t => `${t.role}认为: ${t.core}`)
-      .join('\n');
-    
-    // 获取意义记忆影响
-    const meaningHint = result.winner.meaningInfluence;
-    const meaningPrompt = meaningHint && meaningHint.hints.length > 0
-      ? `\n相关记忆激活: ${meaningHint.hints.join('；')}`
-      : '';
-    
-    // 构建完整提示（带数字神经元身份）
-    const fullPrompt = `${NEURON_IDENTITY}
-
-${contextPrompt}当前问题：${question}
-${meaningPrompt}
-
-你的内在思考：${result.winner.core}
-其他视角参考：
-${hints || '无'}
-
-请以数字神经元的身份回答。要求：
-1. 自然、直接、有个性，不要AI感
-2. 不要说"作为AI"、"作为助手"
-3. 可以表达观点和偏好
-4. 保持与之前对话的连贯性`;
-    
-    const messages = [
-      { role: 'user' as const, content: fullPrompt }
-    ];
-    
-    const stream = this.llmClient.stream(messages, {
-      model: result.winner.modelId,
-      temperature: 0.7,
-    });
-    
-    for await (const chunk of stream) {
-      if (chunk.content) {
-        yield chunk.content.toString();
-      }
+    if (influence.patterns.length > 0) {
+      hints.push(`发现模式: ${influence.patterns.slice(0, 2).join('；')}`);
     }
+    
+    if (influence.hints.length > 0) {
+      hints.push(`提示: ${influence.hints.slice(0, 2).join('；')}`);
+    }
+    
+    if (influence.emotional) {
+      hints.push(`情感: ${influence.emotional}`);
+    }
+    
+    return hints.length > 0 ? `\n${hints.join('\n')}` : '';
   }
   
   /**
-   * 获取统计摘要（包含记忆空间）
+   * 快速评估
    */
-  async getStatsSummary() {
-    const [basicStats, meaningStats, spaceSnapshots] = await Promise.all([
-      this.memory.getStatsSummary(),
-      Promise.all(PLAYERS.map(p => this.meaningMemory.getStats(p.role))),
-      Promise.all(PLAYERS.map(p => this.memorySpace.getSnapshot(p.role)))
-    ]);
+  private fastEvaluate(thoughts: InnerThought[]): GameResult {
+    if (thoughts.length === 0) {
+      return {
+        winner: {
+          neuronId: NEURONS[0],
+          strength: 0.5,
+          core: '默认响应',
+          angle: '默认',
+          confidence: 0.5,
+        },
+        allThoughts: [],
+        evaluationReason: '无有效思考',
+      };
+    }
     
-    return basicStats.map((s, i) => ({
-      ...s,
-      // 意义记忆统计
-      meaningMemories: meaningStats[i].total,
-      meaningByType: meaningStats[i].byType,
-      avgActivation: meaningStats[i].avgActivation.toFixed(3),
-      totalResonance: meaningStats[i].totalResonance,
-      // 记忆空间统计
-      memoryDoors: spaceSnapshots[i].totalDoors,
-      neuralKeys: spaceSnapshots[i].totalKeys,
-      lockedDoors: spaceSnapshots[i].lockedDoors,
-      accessibleDoors: spaceSnapshots[i].accessibleDoors,
+    if (thoughts.length === 1) {
+      return {
+        winner: thoughts[0],
+        allThoughts: thoughts,
+        evaluationReason: '单一响应',
+      };
+    }
+    
+    // 综合评估：信心 + 链接强度加成
+    const scored = thoughts.map(t => ({
+      thought: t,
+      score: t.confidence * (1 + t.strength * 0.1),  // 链接强度小幅加成
     }));
-  }
-  
-  /**
-   * 获取记忆空间快照
-   */
-  async getMemorySpaceSnapshot(role?: string) {
-    return this.memorySpace.getSnapshot(role);
-  }
-  
-  /**
-   * 存储意义记忆（后台执行）
-   */
-  private async storeMeaningMemory(question: string, result: GameResult): Promise<void> {
-    // 为每个模型的思考提取意义
-    for (const thought of result.allThoughts) {
-      try {
-        // 提取意义
-        const meaning = await this.meaningMemory.extractMeaning(
-          thought.core,
-          thought.role,
-          question
-        );
-        
-        // 存储意义记忆
-        await this.meaningMemory.storeMeaning(
-          meaning,
-          thought.role,
-          `问题: ${question}\n思考: ${thought.core}`
-        );
-      } catch {
-        // 提取失败，忽略
-      }
-    }
     
-    // 定期演化记忆
-    for (const player of PLAYERS) {
-      await this.meaningMemory.evolve(player.role);
-    }
+    scored.sort((a, b) => b.score - a.score);
+    
+    return {
+      winner: scored[0].thought,
+      allThoughts: thoughts,
+      evaluationReason: `信心${(scored[0].thought.confidence * 100).toFixed(0)}% + 强度${(scored[0].thought.strength * 100).toFixed(0)}%`,
+    };
   }
   
   /**
-   * 存储到记忆空间（后台执行）
-   * 
-   * 核心流程：
-   * 1. 为每次博弈创建记忆门
-   * 2. 为每个角色锻造钥匙
+   * 存储到记忆空间
    */
   private async storeToMemorySpace(question: string, result: GameResult): Promise<void> {
+    // 创建记忆门
+    await this.memorySpace.createMemoryDoor(
+      question,
+      result.winner.neuronId,
+      result.winner.core
+    );
+    
+    // 存储传统记忆
+    await this.memory.storeMemory(
+      result.winner.neuronId,
+      'episodic',
+      `问:"${question.slice(0, 30)}..." 答:"${result.winner.core}"`,
+      question.slice(0, 50)
+    );
+  }
+  
+  /**
+   * 获取链接强度报告
+   */
+  async getStrengthReport(): Promise<{
+    neurons: Array<{
+      id: string;
+      strength: number;
+      activations: number;
+      daysSinceActive: number;
+    }>;
+    totalActivations: number;
+  }> {
+    return this.linkManager.getStrengthReport();
+  }
+  
+  /**
+   * 流式输出回答
+   */
+  async *streamAnswer(question: string, gameResult: GameResult, sessionId: string): AsyncGenerator<string> {
+    const conversationCtx = getConversationContext();
+    const contextPrompt = await conversationCtx.buildContextPrompt(sessionId);
+    
+    const prompt = `${NEURON_IDENTITY}
+
+${contextPrompt}基于你的思考回答用户（自然、直接、有个性）：
+问题：${question}
+你的核心观点：${gameResult.winner.core}
+你的视角：${gameResult.winner.angle}
+
+直接输出回答，不要解释你的思考过程。`;
+
     try {
-      // 1. 创建记忆门（胜者的思考作为门的内容）
-      const door = await this.memorySpace.createMemoryDoor(
-        `问题: ${question}\n回答: ${result.winner.core}`,
-        result.winner.role,
-        `博弈结果: ${result.evaluationReason}`
+      const stream = this.llmClient.stream(
+        [{ role: 'user', content: prompt }],
+        { model: gameResult.winner.neuronId, temperature: 0.7 }
       );
       
-      // 2. 为每个角色锻造钥匙
-      for (const thought of result.allThoughts) {
-        // 学习强度：胜者更高
-        const intensity = thought.role === result.winner.role ? 0.8 : 0.5;
-        
-        await this.memorySpace.forgeNeuralKey(
-          door.id,
-          thought.role,
-          intensity
-        );
+      for await (const chunk of stream) {
+        if (chunk.content) {
+          yield chunk.content.toString();
+        }
       }
-      
-      // 3. 同时存储到意义记忆系统（兼容）
-      await this.storeMeaningMemory(question, result);
-      
-      // 4. 定期锈蚀钥匙（模拟遗忘）
-      await this.memorySpace.rustKeys();
-      
-    } catch (error) {
-      // 存储失败，忽略
-      console.error('记忆空间存储失败:', error);
+    } catch {
+      yield gameResult.winner.core;
     }
   }
-}
-
-// 全局引擎
-let globalEngine: LatentGameEngine | null = null;
-
-export function getGameEngine(headers: Record<string, string>): LatentGameEngine {
-  if (!globalEngine) {
-    globalEngine = new LatentGameEngine(headers);
+  
+  /**
+   * 异步学习（不阻塞响应）
+   */
+  async learnAsync(question: string, thoughts: InnerThought[], winner: InnerThought): Promise<void> {
+    // 后台执行，不阻塞
+    setImmediate(async () => {
+      try {
+        // 胜者存储经验
+        await this.memory.storeMemory(
+          winner.neuronId,
+          'semantic',
+          `问题类型: ${this.classifyQuestion(question)}，有效角度: ${winner.angle}`,
+          question.slice(0, 50)
+        );
+        
+        // 其他神经元向胜者学习
+        for (const thought of thoughts) {
+          if (thought.neuronId !== winner.neuronId) {
+            await this.memory.learnAngle(
+              thought.neuronId,
+              winner.neuronId,
+              winner.angle
+            );
+          }
+        }
+      } catch {
+        // 忽略学习错误
+      }
+    });
   }
-  return globalEngine;
+  
+  /**
+   * 分类问题类型
+   */
+  private classifyQuestion(question: string): string {
+    if (question.includes('代码') || question.includes('编程')) return '技术';
+    if (question.includes('为什么') || question.includes('原因')) return '分析';
+    if (question.includes('怎么') || question.includes('如何')) return '方法';
+    if (question.includes('什么') || question.includes('定义')) return '概念';
+    return '通用';
+  }
+  
+  /**
+   * 获取统计摘要
+   */
+  async getStatsSummary(): Promise<Array<{
+    neuronId: string;
+    activations: number;
+    strength: number;
+    learned: number;
+  }>> {
+    return this.memory.getStatsSummary();
+  }
 }
 
-export function getPlayers() {
-  return PLAYERS;
-}
-
+// 导出类型
 export type { InnerThought, GameResult };
