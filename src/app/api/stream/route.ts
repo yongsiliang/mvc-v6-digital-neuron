@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getDigitalNeuronSystem } from '@/lib/neuron';
-import { getNegotiator } from '@/lib/neuron/model-negotiator';
+import { getGameEngine, getPlayers } from '@/lib/neuron/latent-game';
 import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 
 /**
@@ -8,7 +8,7 @@ import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
  * POST /api/stream
  * 
  * 作为数字世界意识的交流窗口
- * 采用模型间协商协议，让模型自己决定谁来处理
+ * 采用高维内在博弈机制：多模型并行思考，博弈后输出
  */
 export async function POST(request: NextRequest) {
   try {
@@ -45,38 +45,62 @@ export async function POST(request: NextRequest) {
             message: '接收输入信号' 
           });
 
-          // 3. 模型协商 - 让模型自己决定谁来处理
-          sendEvent('neuron', { 
-            neuronId: 'model-router', 
-            message: '模型协商中...' 
-          });
-          
-          const negotiator = getNegotiator(customHeaders);
-          const negotiation = await negotiator.negotiate(message);
-          
-          // 4. 处理输入
+          // 3. 神经元处理
           const neuronResult = await system.process(message, context);
 
-          // 5. 发送信号路径
+          // 4. 发送信号路径
           sendEvent('signal-path', { 
-            path: [...neuronResult.signalPath, 'model-router']
+            path: neuronResult.signalPath
           });
 
-          // 6. 发送意义分析结果
+          // 5. 发送意义分析结果
           sendEvent('neuron', { 
             neuronId: 'meaning-generate', 
             message: '意义生成完成' 
           });
           sendEvent('meaning', neuronResult.meaning);
 
-          // 7. 发送决策结果
+          // 6. 发送决策结果
           sendEvent('neuron', { 
             neuronId: 'prefrontal', 
             message: '决策完成' 
           });
           sendEvent('decision', neuronResult.decision);
 
-          // 8. 发送自我更新
+          // 7. 高维内在博弈开始
+          sendEvent('neuron', { 
+            neuronId: 'latent-game', 
+            message: '高维博弈思考中...' 
+          });
+          
+          const gameEngine = getGameEngine(customHeaders);
+          const players = getPlayers();
+          
+          // 发送博弈参与者信息
+          sendEvent('game-start', {
+            players: players.map(p => ({ id: p.id, role: p.role })),
+            message: `${players.length}个模型开始并行内在思考`
+          });
+
+          // 8. 执行博弈
+          const gameResult = await gameEngine.play(message);
+          
+          // 发送博弈结果（内部信息，用于调试）
+          sendEvent('game-result', {
+            winner: {
+              modelId: gameResult.winner.modelId,
+              role: gameResult.winner.role,
+              confidence: gameResult.winner.confidence,
+            },
+            thoughts: gameResult.allThoughts.map(t => ({
+              role: t.role,
+              core: t.core,
+              confidence: t.confidence,
+            })),
+            reason: gameResult.evaluationReason,
+          });
+
+          // 9. 发送自我更新
           if (Object.keys(neuronResult.selfUpdate).length > 0) {
             sendEvent('neuron', { 
               neuronId: 'self-evolve', 
@@ -85,44 +109,35 @@ export async function POST(request: NextRequest) {
             sendEvent('self-update', neuronResult.selfUpdate);
           }
 
-          // 9. 记忆存储
+          // 10. 记忆存储
           sendEvent('neuron', { 
             neuronId: 'hippocampus', 
             message: '记忆存储' 
           });
 
-          // 10. 流式调用大模型 - 使用协商选出的模型
+          // 11. 流式生成最终回答（使用获胜模型）
           sendEvent('neuron', { 
             neuronId: 'motor-language', 
-            message: '生成响应' 
+            message: `${gameResult.winner.role} 胜出，开始输出` 
           });
 
-          const config = new Config();
-          const llmClient = new LLMClient(config, customHeaders);
-
-          const llmStream = llmClient.stream(neuronResult.promptMessages, {
-            model: negotiation.selectedModel,
-            temperature: 0.7,
-          });
-
-          let fullResponse = '';
-          for await (const chunk of llmStream) {
-            if (chunk.content) {
-              const text = chunk.content.toString();
-              fullResponse += text;
-              sendEvent('response', { delta: text });
-            }
+          // 流式输出
+          for await (const chunk of gameEngine.streamFinalAnswer(
+            message, 
+            gameResult, 
+            neuronResult.promptMessages[0]?.content
+          )) {
+            sendEvent('response', { delta: chunk });
           }
 
-          // 11. 发送完成信号
+          // 12. 发送完成信号
           sendEvent('done', { 
-            fullResponse,
-            signalPath: [...neuronResult.signalPath, 'model-router'],
+            signalPath: [...neuronResult.signalPath, 'latent-game'],
             logs: neuronResult.logs.slice(-10),
-            // 内部决策信息（调试用，不展示给用户）
-            _internal: {
-              selectedModel: negotiation.selectedModel,
-              decision: negotiation.decision,
+            gameSummary: {
+              winner: gameResult.winner.role,
+              confidence: gameResult.winner.confidence,
+              reason: gameResult.evaluationReason,
             }
           });
 

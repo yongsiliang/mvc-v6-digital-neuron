@@ -15,8 +15,8 @@ export { Hippocampus, getHippocampus } from './memory';
 export { MeaningCore } from './meaning';
 export { DecisionCore } from './decision';
 export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron, getMotorLanguageNeuron, getMotorActionNeuron } from './sensory';
-// 导出模型协商器
-export { ModelNegotiator, getNegotiator } from './model-negotiator';
+// 导出高维博弈引擎
+export { LatentGameEngine, getGameEngine, getPlayers } from './latent-game';
 
 /**
  * 数字神经元系统
