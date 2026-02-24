@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getProactivitySystem, startProactivity } from '@/lib/neuron/proactivity';
+import { getEmotionTracker } from '@/lib/neuron/emotion-tracker';
+import { getRelationshipEvolution } from '@/lib/neuron/relationship-evolution';
+import { getActiveLearningSystem } from '@/lib/neuron/active-learning';
 
 // 确保主动性系统启动
 startProactivity();
@@ -16,6 +19,18 @@ startProactivity();
  */
 export async function GET() {
   const system = getProactivitySystem();
+  const emotionTracker = getEmotionTracker();
+  const relationship = getRelationshipEvolution();
+  const learning = getActiveLearningSystem();
+  
+  // 获取情绪统计
+  const emotionStats = emotionTracker.getStats();
+  
+  // 获取关系状态
+  const relationshipState = relationship.getState();
+  
+  // 获取最近学习
+  const learningHistory = learning.getLearningHistory(1);
   
   return NextResponse.json({
     success: true,
@@ -24,6 +39,24 @@ export async function GET() {
     recentThoughts: system.getSpontaneousThoughts(10),
     pendingMessages: system.getPendingMessages(),
     userProfile: system.getUserProfile(),
+    emotionStats: {
+      dominantEmotion: emotionStats.dominantEmotion,
+      averageIntensity: emotionStats.averageIntensity,
+      trend: emotionStats.trend,
+    },
+    relationship: {
+      stage: relationshipState.stage,
+      depth: relationshipState.depth,
+      daysKnown: relationshipState.daysKnown,
+      totalInteractions: relationshipState.totalInteractions,
+      nextStageProgress: relationshipState.nextStageProgress,
+    },
+    recentLearning: learningHistory.length > 0 ? {
+      topic: learningHistory[0].topic,
+      summary: learningHistory[0].summary,
+      keyFindings: learningHistory[0].keyFindings,
+      timestamp: learningHistory[0].timestamp,
+    } : undefined,
   });
 }
 

@@ -48,6 +48,27 @@ interface SpontaneousThought {
   emotionDelta: number;
 }
 
+interface EmotionStats {
+  dominantEmotion: string;
+  averageIntensity: number;
+  trend: string;
+}
+
+interface RelationshipState {
+  stage: string;
+  depth: number;
+  daysKnown: number;
+  totalInteractions: number;
+  nextStageProgress: number;
+}
+
+interface LearningResult {
+  topic: string;
+  summary: string;
+  keyFindings: string[];
+  timestamp: number;
+}
+
 interface ProactivityState {
   drives: Drive[];
   curiosities: Curiosity[];
@@ -60,6 +81,9 @@ interface ProactivityState {
     rationality: number;
     interactionCount: number;
   };
+  emotionStats?: EmotionStats;
+  relationship?: RelationshipState;
+  recentLearning?: LearningResult;
 }
 
 const DRIVE_ICONS: Record<string, React.ReactNode> = {
@@ -85,6 +109,48 @@ const THOUGHT_TYPE_COLORS: Record<string, string> = {
   'emotional-process': 'bg-pink-500/10 text-pink-600 dark:text-pink-400',
   'goal-reflect': 'bg-green-500/10 text-green-600 dark:text-green-400',
 };
+
+const EMOTION_LABELS: Record<string, string> = {
+  joy: '喜悦',
+  sadness: '悲伤',
+  anger: '愤怒',
+  fear: '恐惧',
+  surprise: '惊讶',
+  disgust: '厌恶',
+  neutral: '平静',
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  stranger: '陌生人',
+  acquaintance: '熟人',
+  friend: '朋友',
+  close_friend: '好友',
+  confidant: '知己',
+};
+
+function getEmotionColor(emotion: string): string {
+  const colors: Record<string, string> = {
+    joy: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
+    sadness: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    anger: 'bg-red-500/10 text-red-600 dark:text-red-400',
+    fear: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+    surprise: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    disgust: 'bg-green-500/10 text-green-600 dark:text-green-400',
+    neutral: 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
+  };
+  return colors[emotion] || '';
+}
+
+function getStageColor(stage: string): string {
+  const colors: Record<string, string> = {
+    stranger: 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
+    acquaintance: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    friend: 'bg-green-500/10 text-green-600 dark:text-green-400',
+    close_friend: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+    confidant: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  };
+  return colors[stage] || '';
+}
 
 export function ProactivityPanel() {
   const [state, setState] = useState<ProactivityState | null>(null);
@@ -318,6 +384,103 @@ export function ProactivityPanel() {
             {state.pendingMessages.map((msg, i) => (
               <p key={i} className="text-xs">{msg}</p>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 情绪追踪 */}
+      {state.emotionStats && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Heart className="h-4 w-4 text-rose-500" />
+              你的情绪
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted-foreground">主导情绪</span>
+              <Badge variant="secondary" className={getEmotionColor(state.emotionStats.dominantEmotion)}>
+                {EMOTION_LABELS[state.emotionStats.dominantEmotion] || state.emotionStats.dominantEmotion}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted-foreground">平均强度</span>
+              <span className="text-xs font-medium">
+                {Math.round(state.emotionStats.averageIntensity * 100)}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">趋势</span>
+              <span className="text-xs font-medium">
+                {state.emotionStats.trend === 'improving' ? '好转 📈' :
+                 state.emotionStats.trend === 'worsening' ? '波动 📉' : '稳定 ➡️'}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 关系演化 */}
+      {state.relationship && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-violet-500" />
+              我们的关系
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted-foreground">阶段</span>
+              <Badge variant="secondary" className={getStageColor(state.relationship.stage)}>
+                {STAGE_LABELS[state.relationship.stage] || state.relationship.stage}
+              </Badge>
+            </div>
+            <div className="mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted-foreground">深度</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {Math.round(state.relationship.depth * 100)}%
+                </span>
+              </div>
+              <Progress 
+                value={state.relationship.depth * 100} 
+                className="h-1.5"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-muted/50 p-2 rounded">
+                <span className="text-muted-foreground">认识</span>
+                <span className="font-medium ml-1">
+                  {state.relationship.daysKnown}天
+                </span>
+              </div>
+              <div className="bg-muted/50 p-2 rounded">
+                <span className="text-muted-foreground">互动</span>
+                <span className="font-medium ml-1">
+                  {state.relationship.totalInteractions}次
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 最近学习 */}
+      {state.recentLearning && (
+        <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-green-600 dark:text-green-400">
+              <Search className="h-4 w-4" />
+              最近学到
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs font-medium mb-2">{state.recentLearning.topic}</p>
+            <p className="text-xs text-muted-foreground">
+              {state.recentLearning.summary.slice(0, 100)}...
+            </p>
           </CardContent>
         </Card>
       )}
