@@ -11,7 +11,7 @@ import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, context } = body;
+    const { message, context, model } = body;
 
     if (!message || typeof message !== 'string') {
       return new Response(JSON.stringify({ error: '消息内容不能为空' }), {
@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    // 默认模型
+    const selectedModel = model || 'doubao-seed-1-8-251228';
 
     // 创建可读流
     const stream = new ReadableStream({
@@ -81,7 +84,7 @@ export async function POST(request: NextRequest) {
           // 9. 流式调用大模型 - 语言调度层
           sendEvent('neuron', { 
             neuronId: 'motor-language', 
-            message: '生成响应' 
+            message: `生成响应 (使用 ${selectedModel})` 
           });
 
           const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
@@ -89,7 +92,7 @@ export async function POST(request: NextRequest) {
           const llmClient = new LLMClient(config, customHeaders);
 
           const llmStream = llmClient.stream(neuronResult.promptMessages, {
-            model: 'doubao-seed-1-8-251228',
+            model: selectedModel,
             temperature: 0.7,
           });
 
@@ -106,7 +109,8 @@ export async function POST(request: NextRequest) {
           sendEvent('done', { 
             fullResponse,
             signalPath: neuronResult.signalPath,
-            logs: neuronResult.logs.slice(-10)
+            logs: neuronResult.logs.slice(-10),
+            model: selectedModel
           });
 
           controller.close();

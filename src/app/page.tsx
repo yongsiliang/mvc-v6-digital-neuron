@@ -4,6 +4,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   NeuronFlow, 
   MeaningPanel, 
@@ -12,7 +19,20 @@ import {
   ChatPanel 
 } from '@/components/neuron';
 import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
-import { Brain } from 'lucide-react';
+import { Brain, Sparkles } from 'lucide-react';
+
+// 可用模型列表
+const AVAILABLE_MODELS = [
+  { id: 'doubao-seed-1-8-251228', name: 'Doubao Seed 1.8', desc: '默认模型，均衡性能' },
+  { id: 'doubao-seed-2-0-pro-260215', name: 'Doubao Seed 2.0 Pro', desc: '旗舰模型，复杂推理' },
+  { id: 'doubao-seed-2-0-lite-260215', name: 'Doubao Seed 2.0 Lite', desc: '轻量模型，快速响应' },
+  { id: 'doubao-seed-1-6-thinking-250715', name: 'Doubao Thinking', desc: '深度思考模型' },
+  { id: 'doubao-seed-1-6-vision-250815', name: 'Doubao Vision', desc: '多模态视觉模型' },
+  { id: 'deepseek-v3-2-251201', name: 'DeepSeek V3.2', desc: 'DeepSeek高级推理' },
+  { id: 'deepseek-r1-250528', name: 'DeepSeek R1', desc: 'DeepSeek研究模型' },
+  { id: 'kimi-k2-250905', name: 'Kimi K2', desc: 'Kimi长上下文模型' },
+  { id: 'glm-4-7-251222', name: 'GLM-4-7', desc: '智谱通用模型' },
+];
 
 interface Message {
   id: string;
@@ -31,6 +51,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
+  const [selectedModel, setSelectedModel] = useState('doubao-seed-1-8-251228');
   
   // 神经元状态
   const [activeNeuron, setActiveNeuron] = useState<string>('');
@@ -79,7 +100,7 @@ export default function Home() {
       const response = await fetch('/api/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message, model: selectedModel })
       });
 
       if (!response.ok) throw new Error('请求失败');
@@ -211,10 +232,27 @@ export default function Home() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Badge variant="outline" className="hidden sm:flex">
             v1.0 MVP
           </Badge>
+          {/* 模型选择器 */}
+          <Select value={selectedModel} onValueChange={setSelectedModel}>
+            <SelectTrigger className="w-[180px] h-8 text-xs">
+              <Sparkles className="h-3.5 w-3.5 mr-1" />
+              <SelectValue placeholder="选择模型" />
+            </SelectTrigger>
+            <SelectContent>
+              {AVAILABLE_MODELS.map((model) => (
+                <SelectItem key={model.id} value={model.id} className="text-xs">
+                  <div className="flex flex-col">
+                    <span>{model.name}</span>
+                    <span className="text-xs text-muted-foreground">{model.desc}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </header>
 
