@@ -160,19 +160,53 @@ export function SelfConsole({ self }: SelfConsoleProps) {
             <Users className="h-4 w-4 text-indigo-500" />
             关系网络
           </div>
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="bg-muted/50 p-1.5 rounded text-center">
-              <div className="text-lg font-bold">{self.relationships.users.length}</div>
-              <div className="text-muted-foreground">用户</div>
+          
+          {/* 用户 */}
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              用户 ({self.relationships.users.length})
             </div>
-            <div className="bg-muted/50 p-1.5 rounded text-center">
-              <div className="text-lg font-bold">{self.relationships.entities.length}</div>
-              <div className="text-muted-foreground">实体</div>
+            {self.relationships.users.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {self.relationships.users.map((user, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">{user}</Badge>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground/50">暂无</div>
+            )}
+          </div>
+          
+          {/* 实体 */}
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              实体 ({self.relationships.entities.length})
             </div>
-            <div className="bg-muted/50 p-1.5 rounded text-center">
-              <div className="text-lg font-bold">{self.relationships.contexts.length}</div>
-              <div className="text-muted-foreground">话题</div>
+            {self.relationships.entities.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {self.relationships.entities.map((entity, i) => (
+                  <Badge key={i} variant="outline" className="text-xs">{entity}</Badge>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground/50">暂无</div>
+            )}
+          </div>
+          
+          {/* 话题 */}
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">
+              话题 ({self.relationships.contexts.length})
             </div>
+            {self.relationships.contexts.length > 0 ? (
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                {self.relationships.contexts.map((context, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">{context}</Badge>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground/50">暂无</div>
+            )}
           </div>
         </div>
       </CardContent>
