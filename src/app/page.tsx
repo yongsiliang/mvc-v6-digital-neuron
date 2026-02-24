@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   NeuronFlow, 
@@ -13,7 +12,7 @@ import {
   ChatPanel 
 } from '@/components/neuron';
 import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
-import { Brain, Settings, Trash2, RefreshCw } from 'lucide-react';
+import { Brain } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -188,21 +187,6 @@ export default function Home() {
     }
   }, [meaning]);
 
-  // 重置系统
-  const handleReset = async () => {
-    try {
-      await fetch('/api/memory', { method: 'DELETE' });
-      setMessages([]);
-      setLogs([]);
-      setMeaning(undefined);
-      setDecision(undefined);
-      setSignalPath([]);
-      fetchSystemStatus();
-    } catch (error) {
-      console.error('Reset error:', error);
-    }
-  };
-
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* 顶部栏 */}
@@ -220,10 +204,6 @@ export default function Home() {
           <Badge variant="outline" className="hidden sm:flex">
             v1.0 MVP
           </Badge>
-          <Button variant="ghost" size="sm" onClick={handleReset}>
-            <RefreshCw className="h-4 w-4 mr-1" />
-            重置
-          </Button>
         </div>
       </header>
 
@@ -273,7 +253,7 @@ export default function Home() {
                     </TabsContent>
                     
                     <TabsContent value="self" className="h-[calc(100%-2.5rem)] mt-2">
-                      <SelfConsole self={self} onReset={fetchSystemStatus} />
+                      <SelfConsole self={self} />
                     </TabsContent>
                     
                     <TabsContent value="logs" className="h-[calc(100%-2.5rem)] mt-2">

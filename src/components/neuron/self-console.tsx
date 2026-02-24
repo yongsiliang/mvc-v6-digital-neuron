@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
 import { SelfRepresentation } from '@/lib/neuron';
 import { 
   Cog, 
@@ -13,16 +12,14 @@ import {
   Lightbulb,
   Users,
   History,
-  Activity,
-  RefreshCw
+  Activity
 } from 'lucide-react';
 
 interface SelfConsoleProps {
   self?: SelfRepresentation;
-  onReset?: () => void;
 }
 
-export function SelfConsole({ self, onReset }: SelfConsoleProps) {
+export function SelfConsole({ self }: SelfConsoleProps) {
   if (!self) {
     return (
       <Card className="h-full">
@@ -40,24 +37,17 @@ export function SelfConsole({ self, onReset }: SelfConsoleProps) {
   }
 
   return (
-    <Card className="h-full">
+    <Card className="h-full overflow-hidden">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Cog className="h-5 w-5" />
             自我演化控制台
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">v{self.evolution.version.toFixed(2)}</Badge>
-            {onReset && (
-              <Button variant="ghost" size="sm" onClick={onReset}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          <Badge variant="outline">v{self.evolution.version.toFixed(2)}</Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 text-sm">
+      <CardContent className="space-y-4 text-sm overflow-y-auto max-h-[calc(100%-3.5rem)]">
         {/* 核心身份 */}
         <div className="space-y-2">
           <div className="font-medium flex items-center gap-2">
