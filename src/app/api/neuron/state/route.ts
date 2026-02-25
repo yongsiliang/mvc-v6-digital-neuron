@@ -6,18 +6,46 @@
  * GET /api/neuron/state
  * 
  * 返回用户的完整神经元网络状态
+ * 如果数据库表不存在，返回初始空状态
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getOrCreateUser, 
-  loadNeurons, 
-  loadConnections, 
-  loadMemories,
-  loadSelfModel,
-} from '@/lib/neuron-v2/db-operations';
 import { isValidUserId } from '@/lib/neuron-v2/auth';
+
+// 延迟加载数据库操作，避免在数据库未配置时出错
+async function getDbOperations() {
+  try {
+    const { getOrCreateUser, loadNeurons, loadConnections, loadMemories, loadSelfModel } = 
+      await import('@/lib/neuron-v2/db-operations');
+    return { getOrCreateUser, loadNeurons, loadConnections, loadMemories, loadSelfModel };
+  } catch (error) {
+    console.error('Failed to load db operations:', error);
+    return null;
+  }
+}
+
+/**
+ * 返回初始空状态
+ */
+function getEmptyState(userId: string) {
+  return {
+    success: true,
+    data: {
+      neurons: [],
+      connections: [],
+      memories: [],
+      selfModel: null,
+      stats: {
+        neuronCount: 0,
+        connectionCount: 0,
+        memoryCount: 0,
+      },
+      userId,
+      isNewUser: true,
+    },
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,21 +54,49 @@ export async function GET(request: NextRequest) {
     
     if (!userId || !isValidUserId(userId)) {
       return NextResponse.json(
-        { error: 'Invalid or missing user ID' },
+        { error: 'Invalid or missing user ID. Please provide a valid UUID.' },
         { status: 401 }
       );
     }
 
-    // 确保用户存在
-    const internalUserId = await getOrCreateUser(userId);
+    // 尝试获取数据库操作
+    const dbOps = await getDbOperations();
+    
+    // 如果数据库操作不可用，返回空状态
+    if (!dbOps) {
+      console.log('Database not available, returning empty state');
+      return NextResponse.json(getEmptyState(userId));
+    }
+
+    const { getOrCreateUser, loadNeurons, loadConnections, loadMemories, loadSelfModel } = dbOps;
+
+    // 尝试确保用户存在并加载数据
+    let internalUserId: string;
+    try {
+      internalUserId = await getOrCreateUser(userId);
+    } catch (dbError) {
+      console.error('Database error when creating/getting user:', dbError);
+      // 数据库表可能不存在，返回空状态
+      return NextResponse.json(getEmptyState(userId));
+    }
 
     // 并行加载所有数据
-    const [neurons, connections, memories, selfModel] = await Promise.all([
-      loadNeurons(internalUserId),
-      loadConnections(internalUserId),
-      loadMemories(internalUserId),
-      loadSelfModel(internalUserId),
-    ]);
+    let neurons: any[] = [];
+    let connections: any[] = [];
+    let memories: any[] = [];
+    let selfModel: any = null;
+
+    try {
+      [neurons, connections, memories, selfModel] = await Promise.all([
+        loadNeurons(internalUserId).catch(() => []),
+        loadConnections(internalUserId).catch(() => []),
+        loadMemories(internalUserId).catch(() => []),
+        loadSelfModel(internalUserId).catch(() => null),
+      ]);
+    } catch (loadError) {
+      console.error('Error loading data:', loadError);
+      // 即使加载失败，也返回空状态而不是错误
+    }
 
     // 返回完整状态
     return NextResponse.json({
@@ -51,7 +107,6 @@ export async function GET(request: NextRequest) {
           label: n.label,
           functionalRole: n.functionalRole,
           activation: n.activation,
-          connectionCount: 0, // 需要从连接计算
         })),
         connections: connections.map(c => ({
           id: c.id,
@@ -77,6 +132,8 @@ export async function GET(request: NextRequest) {
           connectionCount: connections.length,
           memoryCount: memories.length,
         },
+        userId: internalUserId,
+        isNewUser: neurons.length === 0,
       },
     });
   } catch (error) {
