@@ -23,4 +23,12 @@ export {
   generateSamplePlanningData,
   generateSampleExecutiveData 
 } from './planning-panel';
-export { BlackBoxPanel } from './black-box-panel';
+export { 
+  IntuitionPanel,
+  generateSampleIntuition,
+  generateSampleReadiness,
+  generateSampleBackgroundStats,
+  type IntuitionData,
+  type ReadinessData,
+  type BackgroundStatsData,
+} from './intuition-panel';

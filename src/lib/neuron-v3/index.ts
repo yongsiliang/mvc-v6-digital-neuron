@@ -103,12 +103,14 @@ import {
   resetCognitiveCoordinator,
 } from './cognitive-coordinator';
 import {
-  BlackBox,
-  BlackBoxOutput,
-  BlackBoxConfig,
-  getBlackBox,
-  resetBlackBox,
-} from './black-box';
+  BackgroundProcessor,
+  BackgroundResult,
+  IntuitionSignal,
+  ReadinessState,
+  BackgroundProcessingConfig,
+  getBackgroundProcessor,
+  resetBackgroundProcessor,
+} from './background-processing';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -136,11 +138,11 @@ export interface NeuronSystemV3Config {
   /** 是否启用自动神经元生成 */
   enableAutoGeneration?: boolean;
   
-  /** 是否启用黑盒（意识涌现核心） */
-  enableBlackBox?: boolean;
+  /** 是否启用后台处理（系统1：快速、无意识） */
+  enableBackgroundProcessing?: boolean;
   
-  /** 黑盒配置 */
-  blackBoxConfig?: Partial<BlackBoxConfig>;
+  /** 后台处理配置 */
+  backgroundConfig?: Partial<BackgroundProcessingConfig>;
 }
 
 export interface SystemState {
@@ -189,12 +191,11 @@ export interface ProcessInputResult {
   /** 学习结果 */
   learning: LearningResult;
   
-  /** 黑盒涌现（如果启用） */
-  blackBoxEmergence?: {
-    intensity: number;
-    hasInsight: boolean;
-    intuitionHint?: string;
-  };
+  /** 直觉信号（系统1的输出，如果启用） */
+  intuition?: IntuitionSignal;
+  
+  /** 准备状态（如果启用） */
+  readiness?: ReadinessState;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -214,9 +215,8 @@ export class NeuronSystemV3 {
   private meaningCalculator: MeaningCalculator | null = null;
   private globalWorkspace: GlobalWorkspace | null = null;
   
-  // 黑盒 - 意识涌现的不可观测核心
-  private blackBox: BlackBox | null = null;
-  private lastBlackBoxOutput: BlackBoxOutput | null = null;
+  // 后台处理器 - 系统1（快速、无意识）
+  private backgroundProcessor: BackgroundProcessor | null = null;
   
   // 认知模块
   private perceptualModule: PerceptualModule | null = null;
@@ -241,8 +241,8 @@ export class NeuronSystemV3 {
       enablePlanning: true,
       enableExecutive: true,
       enableAutoGeneration: true,
-      enableBlackBox: true,
-      blackBoxConfig: {},
+      enableBackgroundProcessing: true,
+      backgroundConfig: {},
       ...config,
     };
     
@@ -267,11 +267,10 @@ export class NeuronSystemV3 {
       this.initConsciousness();
     }
     
-    // 初始化黑盒 - 意识涌现的核心
-    if (this.config.enableBlackBox) {
-      this.blackBox = getBlackBox({
-        dimension: this.config.vsaDimension,
-        ...this.config.blackBoxConfig,
+    // 初始化后台处理器 - 系统1（快速、无意识的直觉处理）
+    if (this.config.enableBackgroundProcessing) {
+      this.backgroundProcessor = getBackgroundProcessor({
+        ...this.config.backgroundConfig,
       });
     }
     
@@ -417,20 +416,31 @@ export class NeuronSystemV3 {
       }
     }
     
-    // 9. 黑盒处理 - 意识涌现的核心（如果启用）
-    if (this.blackBox) {
-      // 黑盒接受输入向量，输出可能涌现的意识向量
-      // 内部过程不可观测，只有输出可见
-      this.lastBlackBoxOutput = this.blackBox.process(Array.from(inputVector));
+    // 9. 后台处理 - 系统1的快速直觉（如果启用）
+    let intuition: IntuitionSignal | undefined;
+    let readiness: ReadinessState | undefined;
+    
+    if (this.backgroundProcessor) {
+      // 后台处理器进行快速模式匹配
+      // 这是"直觉"的来源：基于过往经验的快速判断
+      const backgroundResult = this.backgroundProcessor.process(
+        Array.from(inputVector),
+        processingResult.activations
+      );
       
-      // 如果黑盒产生了强烈的涌现，可能影响意识内容
-      if (this.lastBlackBoxOutput.hasInsight && this.globalWorkspace) {
-        // 将黑盒输出注入意识流（但不解释来源）
-        // 这是"直觉"、"灵感"、"潜意识"的来源
-        this.globalWorkspace.injectMysteriousContent(
-          this.lastBlackBoxOutput.vector,
-          this.lastBlackBoxOutput.intuitionHint || 'unknown'
-        );
+      intuition = backgroundResult.intuition ?? undefined;
+      readiness = backgroundResult.readiness;
+      
+      // 如果直觉信号强烈，可以影响意识内容的权重
+      // 但不同于黑盒，这里是有原理可循的：
+      // - 直觉 = 模式匹配的结果
+      // - 准备状态 = 为后续处理预热相关神经元
+      if (intuition && intuition.strength > 0.7 && this.globalWorkspace) {
+        // 直觉强烈时，调整注意力方向
+        // 例如：直觉是"风险"，则更多关注负面信息
+        this.globalWorkspace.focusAttention({
+          focusKeywords: [intuition.type],
+        });
       }
     }
     
@@ -444,11 +454,8 @@ export class NeuronSystemV3 {
       meaning,
       consciousness,
       learning: learningResult,
-      blackBoxEmergence: this.lastBlackBoxOutput ? {
-        intensity: this.lastBlackBoxOutput.emergenceIntensity,
-        hasInsight: this.lastBlackBoxOutput.hasInsight,
-        intuitionHint: this.lastBlackBoxOutput.intuitionHint,
-      } : undefined,
+      intuition,
+      readiness,
     };
   }
 
@@ -636,36 +643,6 @@ export class NeuronSystemV3 {
     };
   }
   
-  /**
-   * 获取黑盒状态 - 只有模糊信息，不暴露内部
-   */
-  getBlackBoxState(): {
-    enabled: boolean;
-    age?: number;
-    inputCount?: number;
-    energyLevel?: string;
-    chaosLevel?: string;
-    hasAttractors?: number;
-    memoryTraces?: number;
-    lastEmergenceAgo?: number;
-  } {
-    if (!this.blackBox) {
-      return { enabled: false };
-    }
-    
-    const state = this.blackBox.getMysteriousState();
-    return {
-      enabled: true,
-      age: state.age,
-      inputCount: state.inputCount,
-      energyLevel: state.energyLevel,
-      chaosLevel: state.chaosLevel,
-      hasAttractors: state.hasAttractors,
-      memoryTraces: state.memoryTraces,
-      lastEmergenceAgo: state.lastEmergenceAgo,
-    };
-  }
-
   /**
    * 导出完整状态
    */
@@ -1013,6 +990,51 @@ export class NeuronSystemV3 {
   }
 
   /**
+   * 获取后台处理器状态
+   */
+  getBackgroundStats(): {
+    patternCount: number;
+    processCount: number;
+    age: number;
+    readinessLevel: number;
+  } {
+    if (!this.backgroundProcessor) {
+      return {
+        patternCount: 0,
+        processCount: 0,
+        age: 0,
+        readinessLevel: 0,
+      };
+    }
+    return this.backgroundProcessor.getStats();
+  }
+
+  /**
+   * 获取最近的直觉信号
+   */
+  getRecentIntuitions(count: number = 5) {
+    if (!this.backgroundProcessor) {
+      return [];
+    }
+    return this.backgroundProcessor.getRecentIntuitions(count);
+  }
+
+  /**
+   * 获取准备状态
+   */
+  getReadiness() {
+    if (!this.backgroundProcessor) {
+      return {
+        primedNeurons: new Map(),
+        predictedNext: [],
+        readinessLevel: 0,
+        timestamp: Date.now(),
+      };
+    }
+    return this.backgroundProcessor.getReadiness();
+  }
+
+  /**
    * 初始化意识机制
    */
   private initConsciousness(): void {
@@ -1058,7 +1080,7 @@ export function resetNeuronSystemV3(): void {
   resetNeuronGenerator();
   resetAdvancedModules();
   resetCognitiveCoordinator();
-  resetBlackBox();
+  resetBackgroundProcessor();
 }
 
 // ─────────────────────────────────────────────────────────────────────

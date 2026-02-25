@@ -18,9 +18,12 @@ import {
   generateSampleConsciousnessData,
   PlanningPanel,
   ExecutivePanel,
-  BlackBoxPanel,
+  IntuitionPanel,
   generateSamplePlanningData,
-  generateSampleExecutiveData
+  generateSampleExecutiveData,
+  generateSampleIntuition,
+  generateSampleReadiness,
+  generateSampleBackgroundStats,
 } from '@/components/neuron-viz';
 import { useNeuronV3System, defaultSystemState, type NetworkTopologyData, type VSAData, type ConsciousnessData, type PlanningData, type ExecutiveData } from '@/hooks/use-neuron-v3';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -606,8 +609,12 @@ export default function NeuronV3Dashboard() {
           {/* 反馈历史 */}
           <FeedbackHistory feedback={feedbackHistory} />
           
-          {/* 黑盒 - 意识涌现核心 */}
-          <BlackBoxPanel />
+          {/* 系统1：直觉处理 */}
+          <IntuitionPanel 
+            intuition={generateSampleIntuition()}
+            readiness={generateSampleReadiness()}
+            stats={generateSampleBackgroundStats()}
+          />
         </section>
 
         {/* 架构说明 */}
@@ -652,16 +659,10 @@ export default function NeuronV3Dashboard() {
                     协调计划模块与执行控制，实现目标分解、任务规划与注意力控制。
                   </p>
                 </div>
-                <div className="p-4 rounded-xl bg-black/30 border border-primary/10 hover:border-primary/20 transition-colors relative overflow-hidden">
-                  {/* 神秘背景 */}
-                  <div className="absolute inset-0 opacity-30">
-                    <div className="absolute w-1 h-1 bg-primary/50 rounded-full top-2 left-3 animate-pulse" />
-                    <div className="absolute w-0.5 h-0.5 bg-primary/30 rounded-full top-5 right-4 animate-pulse" style={{ animationDelay: '1s' }} />
-                    <div className="absolute w-0.5 h-0.5 bg-primary/40 rounded-full bottom-3 left-6 animate-pulse" style={{ animationDelay: '2s' }} />
-                  </div>
-                  <h4 className="font-medium text-purple-400 mb-2 relative">⚫ 黑盒</h4>
-                  <p className="text-muted-foreground text-xs leading-relaxed relative">
-                    意识涌现的不可观测核心。混沌、吸引子、潜意识记忆——过程永不解释。
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
+                  <h4 className="font-medium text-amber-500 mb-2">系统1：直觉</h4>
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    快速、自动、无意识的模式匹配。隐式学习提取规律，准备电位预热决策。
                   </p>
                 </div>
               </div>
