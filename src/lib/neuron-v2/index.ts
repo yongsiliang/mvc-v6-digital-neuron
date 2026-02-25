@@ -86,6 +86,28 @@ export type {
   ConsolidationTask,
 } from './memory';
 
+// 持久化
+export { 
+  PersistenceManager,
+  createPersistenceManager,
+} from './persistence';
+export type {
+  UserId,
+  SessionId,
+  PersistenceConfig,
+  UserBrainState,
+  SavedNeuron,
+  SavedConnection,
+  SavedMemory,
+} from './persistence';
+
+// 数据库操作
+export {
+  getOrCreateUser,
+  getUserByExternalId,
+  createDatabaseInterface,
+} from './db-operations';
+
 // 元层
 export { MetaLayer, createMetaLayer } from './meta-layer';
 
