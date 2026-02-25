@@ -249,13 +249,42 @@ export class NeuronSystemV3 {
    */
   private initDefaultNeurons(): void {
     const defaultRoles: Array<{ role: NeuronRole; label: string; receptiveField: string }> = [
-      { role: 'sensory', label: '感知神经元', receptiveField: '处理外部输入信号' },
-      { role: 'semantic', label: '语义神经元', receptiveField: '处理语言理解和概念' },
-      { role: 'episodic', label: '情景神经元', receptiveField: '存储和检索历史事件' },
-      { role: 'emotional', label: '情感神经元', receptiveField: '处理情感和情绪' },
-      { role: 'abstract', label: '抽象神经元', receptiveField: '处理高级抽象概念' },
-      { role: 'motor', label: '运动神经元', receptiveField: '生成输出响应' },
-      { role: 'metacognitive', label: '元认知神经元', receptiveField: '监控和调节认知过程' },
+      // 核心感知层
+      { role: 'sensory', label: '视觉感知神经元', receptiveField: '处理视觉和图像信息' },
+      { role: 'sensory', label: '听觉感知神经元', receptiveField: '处理声音和语音信号' },
+      { role: 'sensory', label: '文本感知神经元', receptiveField: '处理文本和文字输入' },
+      
+      // 语义处理层
+      { role: 'semantic', label: '词汇语义神经元', receptiveField: '理解单词和词汇含义' },
+      { role: 'semantic', label: '句法语义神经元', receptiveField: '理解句子结构和语法' },
+      { role: 'semantic', label: '概念语义神经元', receptiveField: '处理抽象概念和关系' },
+      
+      // 记忆层
+      { role: 'episodic', label: '情景记忆神经元', receptiveField: '存储和检索历史事件' },
+      { role: 'episodic', label: '工作记忆神经元', receptiveField: '临时存储当前上下文' },
+      
+      // 情感层
+      { role: 'emotional', label: '正向情感神经元', receptiveField: '识别和处理积极情绪' },
+      { role: 'emotional', label: '负向情感神经元', receptiveField: '识别和处理消极情绪' },
+      { role: 'emotional', label: '中性情感神经元', receptiveField: '处理客观和中性信息' },
+      
+      // 高级认知层
+      { role: 'abstract', label: '逻辑推理神经元', receptiveField: '处理逻辑和因果推理' },
+      { role: 'abstract', label: '创造性神经元', receptiveField: '生成创意和新颖想法' },
+      { role: 'abstract', label: '问题解决神经元', receptiveField: '分析和解决复杂问题' },
+      
+      // 输出层
+      { role: 'motor', label: '语言生成神经元', receptiveField: '生成自然语言响应' },
+      { role: 'motor', label: '行动规划神经元', receptiveField: '规划和组织行动计划' },
+      
+      // 元认知层
+      { role: 'metacognitive', label: '自我监控神经元', receptiveField: '监控认知过程状态' },
+      { role: 'metacognitive', label: '策略调节神经元', receptiveField: '调节学习和思考策略' },
+      { role: 'metacognitive', label: '目标管理神经元', receptiveField: '设定和管理认知目标' },
+      
+      // 注意力层
+      { role: 'sensory', label: '注意力聚焦神经元', receptiveField: '聚焦关键信息' },
+      { role: 'sensory', label: '注意力分配神经元', receptiveField: '分配注意资源' },
     ];
 
     for (const config of defaultRoles) {
