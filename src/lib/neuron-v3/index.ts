@@ -74,6 +74,34 @@ import {
   EmotionalModule,
   MetacognitiveModule,
 } from './global-workspace';
+import {
+  NeuronGenerator,
+  GenerationTrigger,
+  GenerationResult,
+  GenerationTriggerType,
+  NeuronGeneratorConfig,
+  getNeuronGenerator,
+  resetNeuronGenerator,
+} from './neuron-generator';
+import {
+  PlanningModule,
+  ExecutiveModule,
+  NeuronIntegratedModule,
+  Goal,
+  Plan,
+  Task,
+  getPlanningModule,
+  getExecutiveModule,
+  resetAdvancedModules,
+} from './advanced-modules';
+import {
+  CognitiveCoordinator,
+  CoordinatorConfig,
+  ProcessingContext,
+  CoordinatedResult,
+  getCognitiveCoordinator,
+  resetCognitiveCoordinator,
+} from './cognitive-coordinator';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -91,6 +119,15 @@ export interface NeuronSystemV3Config {
   
   /** 是否启用意义计算 */
   enableMeaningCalculation?: boolean;
+  
+  /** 是否启用计划模块 */
+  enablePlanning?: boolean;
+  
+  /** 是否启用执行控制模块 */
+  enableExecutive?: boolean;
+  
+  /** 是否启用自动神经元生成 */
+  enableAutoGeneration?: boolean;
 }
 
 export interface SystemState {
@@ -145,7 +182,9 @@ export interface ProcessInputResult {
 // ─────────────────────────────────────────────────────────────────────
 
 export class NeuronSystemV3 {
-  private config: Required<NeuronSystemV3Config>;
+  private config: Omit<Required<NeuronSystemV3Config>, 'learningConfig'> & {
+    learningConfig: Partial<LearningConfig>;
+  };
   
   // 核心组件
   private predictionLoop: PredictionLoop;
@@ -175,6 +214,9 @@ export class NeuronSystemV3 {
       learningConfig: {},
       enableConsciousness: true,
       enableMeaningCalculation: true,
+      enablePlanning: true,
+      enableExecutive: true,
+      enableAutoGeneration: true,
       ...config,
     };
     
@@ -560,6 +602,9 @@ export function resetNeuronSystemV3(): void {
   resetVSASpace();
   resetMeaningCalculator();
   resetGlobalWorkspace();
+  resetNeuronGenerator();
+  resetAdvancedModules();
+  resetCognitiveCoordinator();
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -573,3 +618,6 @@ export * from './reward-learner';
 export * from './vsa-space';
 export * from './meaning-calculator';
 export * from './global-workspace';
+export * from './neuron-generator';
+export * from './advanced-modules';
+export * from './cognitive-coordinator';
