@@ -25,7 +25,7 @@ import {
   generateSampleReadiness,
   generateSampleBackgroundStats,
 } from '@/components/neuron-viz';
-import { useNeuronV3System, defaultSystemState, type NetworkTopologyData, type VSAData, type ConsciousnessData, type PlanningData, type ExecutiveData } from '@/hooks/use-neuron-v3';
+import { useNeuronV3System, defaultSystemState, type NetworkTopologyData, type VSAData, type ConsciousnessData, type PlanningData, type ExecutiveData, type NeuronStatusData, type SelfCognitiveData } from '@/hooks/use-neuron-v3';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -60,6 +60,9 @@ export default function NeuronV3Dashboard() {
     fetchConsciousnessData,
     fetchPlanningData,
     fetchExecutiveData,
+    // 实时状态（从 SSE 接收）
+    neuronStatus,
+    selfCognitive,
   } = useNeuronV3System();
 
   // 网络数据 - 从API获取或使用默认值
@@ -76,6 +79,9 @@ export default function NeuronV3Dashboard() {
     streamCoherence: 0,
     trail: [],
   });
+
+  // 自我认知数据
+  const [selfCognitiveData, setSelfCognitiveData] = useState<SelfCognitiveData | null>(null);
 
   // 计划数据
   const [planningData, setPlanningData] = useState<PlanningData>({
@@ -197,6 +203,60 @@ export default function NeuronV3Dashboard() {
             type: 'learn',
             neuronId: 'system',
             details: summary,
+          }]);
+        }
+      },
+      // 神经元状态回调 - 实时更新网络可视化
+      (status) => {
+        // 更新网络数据中神经元的激活状态
+        setNetworkData(prev => ({
+          ...prev,
+          neurons: prev.neurons.map(n => ({
+            ...n,
+            activation: status.activations[n.id] ?? n.activation,
+            state: (status.activations[n.id] ?? 0) > 0.7 ? 'active' as const :
+                   (status.activations[n.id] ?? 0) > 0.3 ? 'predicting' as const : 'dormant' as const,
+          })),
+        }));
+        
+        // 更新意识数据
+        if (status.meaning || status.consciousness) {
+          setConsciousnessData(prev => ({
+            ...prev,
+            currentContent: prev.currentContent ? {
+              ...prev.currentContent,
+              type: (status.consciousness as 'perceptual' | 'semantic' | 'emotional' | 'memory' | 'thought' | 'motor' | 'metacognitive') || prev.currentContent.type,
+            } : null,
+          }));
+        }
+        
+        // 添加激活事件
+        const activeNeurons = Object.entries(status.activations)
+          .filter(([, v]) => v > 0.5)
+          .slice(0, 3);
+        
+        if (activeNeurons.length > 0) {
+          setActivityEvents(prev => [...prev, {
+            id: `act-${Date.now()}`,
+            timestamp: Date.now(),
+            type: 'activate',
+            neuronId: activeNeurons[0][0],
+            details: `神经元激活: ${activeNeurons.map(([id, v]) => `${id.slice(0, 8)}(${(v * 100).toFixed(0)}%)`).join(', ')}`,
+          }]);
+        }
+      },
+      // 自我认知回调
+      (cognitive) => {
+        setSelfCognitiveData(cognitive);
+        
+        // 添加反思事件
+        if (cognitive.reflections.length > 0) {
+          setActivityEvents(prev => [...prev, {
+            id: `act-${Date.now()}`,
+            timestamp: Date.now(),
+            type: 'learn',
+            neuronId: 'self',
+            details: `自我反思: ${cognitive.interpretation}`,
           }]);
         }
       }
@@ -463,6 +523,69 @@ export default function NeuronV3Dashboard() {
                         </div>
                       </div>
                     ))}
+                  </CardContent>
+                </Card>
+                
+                {/* 自我认知状态卡片 - 实时显示双向交互结果 */}
+                <Card className="relative overflow-hidden bg-card/50 backdrop-blur-sm border-primary/10">
+                  <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <span className={cn(
+                        "w-2 h-2 rounded-full",
+                        selfCognitiveData ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"
+                      )} />
+                      自我认知状态
+                      {selfCognitiveData && (
+                        <Badge variant="outline" className="text-xs ml-auto">
+                          一致性: {(selfCognitiveData.consistency * 100).toFixed(0)}%
+                        </Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selfCognitiveData ? (
+                      <>
+                        {/* 一致性进度条 */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>输出与认知一致性</span>
+                            <span>{(selfCognitiveData.consistency * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-primary/10 rounded-full overflow-hidden">
+                            <div 
+                              className={cn(
+                                "h-full rounded-full transition-all duration-500",
+                                selfCognitiveData.consistency >= 0.8 ? "bg-emerald-500" :
+                                selfCognitiveData.consistency >= 0.5 ? "bg-primary" : "bg-amber-500"
+                              )}
+                              style={{ width: `${selfCognitiveData.consistency * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* 解读 */}
+                        <div className="p-2 rounded-md bg-primary/5 text-sm">
+                          <p className="text-foreground">{selfCognitiveData.interpretation}</p>
+                        </div>
+                        
+                        {/* 反思列表 */}
+                        {selfCognitiveData.reflections.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">元认知反思：</p>
+                            {selfCognitiveData.reflections.slice(0, 2).map((reflection, i) => (
+                              <p key={i} className="text-xs text-foreground/80 pl-2 border-l border-primary/20">
+                                {reflection}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-sm text-muted-foreground text-center py-4">
+                        等待交互后显示自我认知状态...
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

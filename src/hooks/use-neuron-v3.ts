@@ -164,12 +164,34 @@ export interface FeedbackResult {
 }
 
 /**
+ * 神经元状态（从 SSE 接收）
+ */
+export interface NeuronStatusData {
+  activations: Record<string, number>;
+  meaning?: string;
+  consciousness?: string;
+}
+
+/**
+ * 自我认知状态（从 SSE 接收）
+ */
+export interface SelfCognitiveData {
+  consistency: number;
+  interpretation: string;
+  reflections: string[];
+}
+
+/**
  * 神经元V3系统Hook
  */
 export function useNeuronV3System() {
   const [systemState, setSystemState] = useState<SystemState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 实时状态（从 SSE 接收）
+  const [neuronStatus, setNeuronStatus] = useState<NeuronStatusData | null>(null);
+  const [selfCognitive, setSelfCognitive] = useState<SelfCognitiveData | null>(null);
 
   // 获取系统状态
   const fetchSystemState = useCallback(async () => {
@@ -304,7 +326,9 @@ export function useNeuronV3System() {
     message: string,
     history: Array<{ role: string; content: string }> = [],
     onContent?: (content: string) => void,
-    onComplete?: (fullContent: string, summary: string) => void
+    onComplete?: (fullContent: string, summary: string) => void,
+    onNeuronStatus?: (status: NeuronStatusData) => void,
+    onSelfCognitive?: (cognitive: SelfCognitiveData) => void
   ) => {
     setIsLoading(true);
     setError(null);
@@ -341,11 +365,25 @@ export function useNeuronV3System() {
             try {
               const data = JSON.parse(line.slice(6));
               
+              // 处理神经元状态事件
+              if (data.type === 'neuron_status') {
+                setNeuronStatus(data.data);
+                onNeuronStatus?.(data.data);
+              }
+              
+              // 处理 LLM 内容事件
               if (data.type === 'content') {
                 fullContent += data.data;
                 onContent?.(data.data);
               }
               
+              // 处理自我认知事件
+              if (data.type === 'self_cognitive') {
+                setSelfCognitive(data.data);
+                onSelfCognitive?.(data.data);
+              }
+              
+              // 处理完成事件
               if (data.type === 'complete') {
                 summary = data.data.learningSummary;
                 onComplete?.(fullContent, summary);
@@ -462,6 +500,10 @@ export function useNeuronV3System() {
     systemState,
     isLoading,
     error,
+    // 实时状态（从 SSE 接收）
+    neuronStatus,
+    selfCognitive,
+    // 方法
     fetchSystemState,
     processInput,
     sendFeedback,
