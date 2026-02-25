@@ -167,6 +167,10 @@ export default function Home() {
                 // 接收记忆上下文
                 setMemoryContext(data);
               } else if (type === 'done') {
+                // 先清空流式响应，避免重复显示
+                setCurrentResponse('');
+                setIsStreaming(false);
+                
                 // 添加完整响应到消息列表
                 const assistantMsg: Message = {
                   id: `assistant-${Date.now()}`,
