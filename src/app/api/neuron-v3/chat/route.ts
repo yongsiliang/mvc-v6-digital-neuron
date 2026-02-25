@@ -98,6 +98,12 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // 将 LLM 回复添加到神经元系统的对话历史
+          // 这样形成完整的对话记忆闭环：用户消息 + 系统回复
+          if (fullContent) {
+            neuronSystem.addAssistantMessage(fullContent);
+          }
+
           // 发送完成信号
           const complete = {
             type: 'complete',

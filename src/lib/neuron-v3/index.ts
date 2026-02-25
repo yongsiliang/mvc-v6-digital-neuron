@@ -700,6 +700,66 @@ export class NeuronSystemV3 {
   }
 
   // ══════════════════════════════════════════════════════════════════
+  // LLM 回复记录
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * 添加 LLM 回复到对话历史
+   * 
+   * 这是形成完整对话记忆的关键：不仅要记住用户说了什么，
+   * 还要记住系统自己回答了什么。这样才能：
+   * 1. 形成完整的对话上下文
+   * 2. 让神经元学习自己的输出模式
+   * 3. 支持自我反思和回顾
+   * 
+   * @param content LLM 生成的回复内容
+   */
+  addAssistantMessage(content: string): void {
+    if (!content || content.trim().length === 0) {
+      return;
+    }
+
+    this.recentMessages.push({
+      role: 'assistant',
+      content,
+      timestamp: Date.now(),
+    });
+
+    // 保留最近 50 条消息（用户 + 助手）
+    if (this.recentMessages.length > 50) {
+      this.recentMessages = this.recentMessages.slice(-50);
+    }
+
+    // 触发异步保存
+    if (this.persistenceEnabled) {
+      this.saveStateDebounced();
+    }
+
+    console.log(`[NeuronSystemV3] Added assistant message, total messages: ${this.recentMessages.length}`);
+  }
+
+  /**
+   * 获取最近的对话历史
+   */
+  getRecentMessages(limit: number = 10): Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: number;
+  }> {
+    return this.recentMessages.slice(-limit);
+  }
+
+  /**
+   * 清空对话历史
+   */
+  clearConversationHistory(): void {
+    this.recentMessages = [];
+    if (this.persistenceEnabled) {
+      this.saveStateDebounced();
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
   // 推理和意义计算
   // ══════════════════════════════════════════════════════════════════
 
