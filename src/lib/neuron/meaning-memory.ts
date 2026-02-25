@@ -286,12 +286,14 @@ JSON格式输出：
     // 提取提示（给模型的思考提示）
     const hints = activatedMemories
       .slice(0, 3)
-      .map(a => (a.memory as SupabaseMemory).meaning_summary || a.memory.meaningSummary);
+      .map(a => (a.memory as SupabaseMemory).meaning_summary || a.memory.meaningSummary)
+      .filter((h): h is string => !!h);
     
     // 提取模式
     const patterns = activatedMemories
       .filter(a => (a.memory as SupabaseMemory).meaning_type === 'pattern' || a.memory.meaningType === 'pattern')
-      .map(a => (a.memory as SupabaseMemory).meaning_summary || a.memory.meaningSummary);
+      .map(a => (a.memory as SupabaseMemory).meaning_summary || a.memory.meaningSummary)
+      .filter((p): p is string => !!p);
     
     // 计算情感倾向
     const avgEmotion = activatedMemories.reduce((sum, a) => 
@@ -547,7 +549,7 @@ JSON格式输出：
    */
   async getStats(role: string): Promise<{
     total: number;
-    byType: Record<MeaningType, number>;
+    byType: Partial<Record<MeaningType, number>>;
     avgActivation: number;
     totalResonance: number;
   }> {
@@ -559,13 +561,13 @@ JSON格式输出：
     if (!memories) {
       return {
         total: 0,
-        byType: { insight: 0, pattern: 0, strategy: 0, emotion: 0, concept: 0 },
+        byType: { insight: 0, pattern: 0, strategy: 0, emotion: 0, concept: 0 } as Partial<Record<MeaningType, number>>,
         avgActivation: 0,
         totalResonance: 0,
       };
     }
     
-    const byType: Record<MeaningType, number> = {
+    const byType: Partial<Record<MeaningType, number>> = {
       insight: 0,
       pattern: 0,
       strategy: 0,
