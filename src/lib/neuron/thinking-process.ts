@@ -196,7 +196,11 @@ export class ThinkingProcess {
     
     // 2. 设置情绪状态
     if (context?.emotion) {
-      this.consciousness.setEmotion(context.emotion.valence, context.emotion.arousal);
+      this.consciousness.setEmotion({
+        dominant: context.emotion.valence > 0.5 ? 'joy' : 'concern',
+        intensity: context.emotion.arousal,
+        trend: 'stable',
+      });
     }
     
     // 3. 获取主动性系统的好奇目标，作为吸引子

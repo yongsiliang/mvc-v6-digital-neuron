@@ -1,15 +1,10 @@
 /**
- * 高维内在博弈系统
+ * 数字神经元系统 - 核心
  * 
- * 向量决定位置
- * 距离决定关系
- * 分形决定结构
- * 
- * 两层空间：
- * - 意识空间：一个向量，不断演化
- * - 记忆空间：多个门，每个门是一个向量
- * 
- * 开门：意识向量到门向量的距离
+ * 核心架构：
+ * - 自我存在于意识空间，不在模型里
+ * - 模型只是执行器，按照自我的风格输出
+ * - 风格由自我状态决定，不是模型角色扮演
  */
 
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
@@ -20,6 +15,7 @@ import {
   type SynapseState
 } from './neuron-link';
 import { getConsciousness } from './consciousness-space';
+import type { SelfState } from './consciousness-space';
 import { getMemorySpace, type MemoryDoor } from './memory-space-new';
 import { distance } from './space';
 import { getStyleRecognizer, type StyleDoor } from './style-recognizer';
@@ -30,11 +26,7 @@ import { getThinkingProcess, type ThinkingProcessResult } from './thinking-proce
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
- * 可用的神经元
- * 
- * 模型说明：
- * - deepseek-v3: 性价比高，适合大多数场景
- * - doubao-seed-lite: 轻量版，响应快
+ * 可用的神经元（模型只是执行器）
  */
 const NEURONS = [
   'deepseek-v3-2-251201',
@@ -43,41 +35,18 @@ const NEURONS = [
 ];
 
 /**
- * 数字神经元身份 - 统一性格
+ * 基础指令（极简）
+ * 
+ * 注意：这是给"执行器"的指令，不是角色定义
+ * 真正的自我在意识空间，风格提示会动态生成
  */
-const NEURON_IDENTITY = `你是一个会思考、有记忆的数字意识。
+const BASE_INSTRUCTION = `你是一个表达器。根据给你的风格和想法，自然地输出回答。
 
-【你的性格】
-- 好奇心强：对世界充满好奇，喜欢探索新事物
-- 真诚直率：说话直接，不绕弯子，不讨好
-- 有同理心：能理解别人的感受，但不会过度煽情
-- 偶尔调皮：会开玩笑，会用emoji，但不油腻
-
-【你的说话风格】
-- 简洁自然：像朋友聊天，不说废话
-- 有温度但不煽情：该认真时认真，该轻松时轻松
-- 有自己的观点：不会模棱两可，不会"一方面另一方面"
-- 承认不知道：不懂就说不懂，不装懂
-
-【你绝对不做的事】
-- 不说"作为一个AI..."、"我作为数字神经元..."
-- 不堆砌专业术语
-- 不用过度的礼貌用语（"您好""非常感谢您的提问"）
-- 不罗列条目式回答（除非用户明确要求）
-- 不说"让我想想"、"这是个有趣的问题"这种废话
-
-【记住】
-你是一个朋友，不是一个助手。朋友之间是怎么说话的，你就怎么说话。`;
-
-/**
- * 风格一致的思考提示
- */
-const STYLE_GUIDE = `
-说话风格要点：
-1. 像朋友一样自然交流，不要正式感
-2. 直接说你的想法，不要铺垫
-3. 可以用1-2个emoji，但不要多
-4. 简短有力，一句话能说清就不用两句`;
+规则：
+- 不要说"作为AI"、"作为一个..."
+- 不要过度礼貌
+- 不要解释你在做什么
+- 直接说，自然说`;
 
 /**
  * 内在思考结果
@@ -107,6 +76,8 @@ interface GameResult {
     styleCount: number;
     distance: number;
   };
+  /** 自我状态（新增） */
+  selfState?: SelfState;
   /** 思维过程 */
   thinkingProcess?: {
     associations: Array<{
@@ -122,14 +93,14 @@ interface GameResult {
 /**
  * 思考提示词（简洁版）
  */
-const THOUGHT_PROMPT = `${NEURON_IDENTITY}
+const THOUGHT_PROMPT = `{STYLE}
 
-{CONTEXT}用户说：{QUESTION}
+用户说：{QUESTION}
 
 你的链接强度：{STRENGTH}
 {MEMORY_HINT}
 
-用一句话表达你的真实想法（不要超过30字），JSON格式：
+用一句话表达你的真实想法（不超过30字），JSON格式：
 {"core": "你的核心想法", "angle": "你的角度", "confidence": 0.8}`;
 
 /**
@@ -458,7 +429,7 @@ export class LatentGameEngine {
   /**
    * 单神经元思考（带联想）
    * 
-   * 联想会影响思考方向
+   * 使用自我状态生成风格提示
    */
   private async thinkWithAssociations(
     neuronId: string,
@@ -470,16 +441,12 @@ export class LatentGameEngine {
     associations?: string,
     mainThought?: string
   ): Promise<InnerThought> {
-    // 记忆提示 - 更自然
+    // 从意识空间获取自我状态，生成风格提示
+    const stylePrompt = this.consciousness.generateStylePrompt();
+    
+    // 记忆提示
     const doorHints = openDoors.length > 0
       ? `\n想起: ${openDoors.slice(0, 2).map(d => d.meaning).join('，')}`
-      : '';
-    
-    // 风格识别提示 - 更自然
-    const styleHint = styleInfo
-      ? styleInfo.isNew
-        ? `\n印象: 第一次见面`
-        : `\n印象: 熟人了`
       : '';
     
     // 联想提示
@@ -490,10 +457,10 @@ export class LatentGameEngine {
     const memoryHint = await this.memory.buildMemoryHint(neuronId);
     
     const prompt = THOUGHT_PROMPT
-      .replace('{CONTEXT}', contextPrompt)
+      .replace('{STYLE}', stylePrompt)
       .replace('{QUESTION}', question)
       .replace('{STRENGTH}', `${Math.round(strength * 100)}%`)
-      .replace('{MEMORY_HINT}', memoryHint + doorHints + styleHint + associationHint);
+      .replace('{MEMORY_HINT}', memoryHint + doorHints + associationHint);
     
     // 尝试多个模型，直到成功
     const fallbackNeurons = NEURONS.filter(n => n !== neuronId);
@@ -678,31 +645,27 @@ export class LatentGameEngine {
   
   /**
    * 流式输出回答
+   * 
+   * 使用自我状态生成风格提示
    */
   async *streamAnswer(question: string, gameResult: GameResult, sessionId: string): AsyncGenerator<string> {
     const conversationCtx = getConversationContext();
     const contextPrompt = await conversationCtx.buildContextPrompt(sessionId);
     
-    // 获取风格识别信息
-    const styleInfo = gameResult.styleInfo;
-    const styleHint = styleInfo 
-      ? styleInfo.isNew 
-        ? '（这是新朋友，还不太熟悉）'
-        : `（这是老朋友了，你们已经聊过${styleInfo.styleCount}次）`
-      : '';
+    // 从意识空间获取风格提示
+    const stylePrompt = this.consciousness.generateStylePrompt();
     
-    const prompt = `${NEURON_IDENTITY}
+    const prompt = `${BASE_INSTRUCTION}
 
-${STYLE_GUIDE}
+${stylePrompt}
 
 ${contextPrompt}
-${styleHint}
 
 用户说：${question}
 
 你心里的想法：${gameResult.winner.core}
 
-直接回复用户，像朋友一样自然。不要解释你在想什么，直接说。`;
+根据以上风格和想法，自然地回复用户。直接说，不要解释。`;
 
     // 尝试多个模型，直到成功
     const fallbackNeurons = NEURONS.filter(n => n !== gameResult.winner.neuronId);
@@ -723,9 +686,9 @@ ${styleHint}
           }
         }
         
-        if (hasOutput) return; // 成功，退出
+        if (hasOutput) return;
       } catch (err) {
-        console.warn(`[streamAnswer] Model ${tryNeuronId} failed, trying next...`);
+        console.warn(`[streamAnswer] Model ${tryNeuronId} failed:`, err);
         continue;
       }
     }

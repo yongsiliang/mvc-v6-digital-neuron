@@ -353,21 +353,23 @@ export class NeuronLinkDynamics {
     }));
     
     const totalActivations = synapseList.reduce((sum, s) => sum + s.totalActivations, 0);
-    const averageStrength = synapseList.reduce((sum, s) => sum + s.strength, 0) / synapseList.length;
+    const averageStrength = synapseList.length > 0 
+      ? synapseList.reduce((sum, s) => sum + s.strength, 0) / synapseList.length 
+      : 0;
     
-    const strongest = synapses.reduce((best, s) => 
-      s.effectiveStrength > best.effectiveStrength ? s : best
-    );
-    const mostFatigued = synapses.reduce((worst, s) => 
-      s.fatigue > worst.fatigue ? s : worst
-    );
+    const strongest = synapses.length > 0 
+      ? synapses.reduce((best, s) => s.effectiveStrength > best.effectiveStrength ? s : best)
+      : null;
+    const mostFatigued = synapses.length > 0 
+      ? synapses.reduce((worst, s) => s.fatigue > worst.fatigue ? s : worst)
+      : null;
     
     return {
       synapses,
       totalActivations,
       averageStrength,
-      strongestNeuron: strongest.id,
-      mostFatigued: mostFatigued.id,
+      strongestNeuron: strongest?.id || 'none',
+      mostFatigued: mostFatigued?.id || 'none',
     };
   }
   

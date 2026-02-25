@@ -431,6 +431,9 @@ export class EmotionTracker {
     const firstHalf = records.slice(0, Math.floor(records.length / 2));
     const secondHalf = records.slice(Math.floor(records.length / 2));
     
+    // 防止除零错误
+    if (firstHalf.length === 0 || secondHalf.length === 0) return 'stable';
+    
     const firstAvg = firstHalf.reduce((sum, r) => sum + this.emotionToValue(r.type), 0) / firstHalf.length;
     const secondAvg = secondHalf.reduce((sum, r) => sum + this.emotionToValue(r.type), 0) / secondHalf.length;
     
