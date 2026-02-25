@@ -54,6 +54,7 @@ export default function NeuronV3Dashboard() {
     isLoading: apiLoading, 
     processInput, 
     sendFeedback,
+    chat,
     fetchNetworkTopology,
     fetchVSAData,
     fetchConsciousnessData,
@@ -102,6 +103,9 @@ export default function NeuronV3Dashboard() {
   const [currentStage, setCurrentStage] = useState<string>('');
   const [lastResponse, setLastResponse] = useState<string>('');
   const [feedbackHistory, setFeedbackHistory] = useState<FeedbackItem[]>([]);
+  
+  // 对话历史（用于 LLM 上下文）
+  const [chatHistory, setChatHistory] = useState<Array<{ role: string; content: string }>>([]);
 
   // 使用真实系统状态
   const stats = {
@@ -150,7 +154,7 @@ export default function NeuronV3Dashboard() {
     }
   }, [systemState, stats.consciousnessLevel, stats.selfAwarenessIndex]);
 
-  // 处理消息发送 - 使用真实API
+  // 处理消息发送 - 使用 LLM 生成自然语言响应
   const handleSendMessage = useCallback(async (message: string) => {
     setIsProcessing(true);
     setLastResponse('');
@@ -164,43 +168,36 @@ export default function NeuronV3Dashboard() {
       details: `用户输入: ${message.slice(0, 30)}...`,
     }]);
 
-    // 调用真实API
-    const result = await processInput(
+    // 添加用户消息到历史
+    const newHistory = [...chatHistory, { role: 'user', content: message }];
+    
+    // 流式响应内容
+    let responseContent = '';
+    
+    // 调用 chat API（神经元系统 + LLM）
+    await chat(
       message,
-      undefined,
-      (stage, msg) => {
-        // 处理阶段回调
-        setCurrentStage(msg);
-        setActivityEvents(prev => [...prev, {
-          id: `act-${Date.now()}`,
-          timestamp: Date.now(),
-          type: stage === 'prediction' ? 'predict' : 
-                stage === 'learning' ? 'learn' : 
-                stage === 'comparison' ? 'surprise' : 'activate',
-          neuronId: 'system',
-          details: msg,
-        }]);
+      chatHistory,
+      // 流式内容回调
+      (content) => {
+        responseContent += content;
+        setLastResponse(responseContent);
+        setCurrentStage('生成响应...');
       },
-      (processResult) => {
-        // 完成回调
-        if (processResult) {
-          // 构建响应文本
-          const meaning = processResult.meaning;
-          const learning = processResult.learning;
-          
-          let response = '';
-          if (meaning) {
-            response += `**意义理解**: ${meaning.interpretation}\n`;
-            response += `- 自我关联度: ${(meaning.selfRelevance * 100).toFixed(0)}%\n`;
-            response += `- 情感色彩: ${meaning.sentiment > 0 ? '正面' : meaning.sentiment < 0 ? '负面' : '中性'}\n\n`;
-          }
-          if (learning) {
-            response += `**学习结果**: ${learning.summary}\n`;
-            response += `- 调整神经元: ${learning.adjustedNeurons} 个\n`;
-            response += `- 新增神经元: ${learning.newNeurons} 个`;
-          }
-          
-          setLastResponse(response || '处理完成');
+      // 完成回调
+      (fullContent, summary) => {
+        // 更新对话历史
+        setChatHistory([...newHistory, { role: 'assistant', content: fullContent }]);
+        
+        // 添加学习事件
+        if (summary) {
+          setActivityEvents(prev => [...prev, {
+            id: `act-${Date.now()}`,
+            timestamp: Date.now(),
+            type: 'learn',
+            neuronId: 'system',
+            details: summary,
+          }]);
         }
       }
     );
@@ -216,7 +213,7 @@ export default function NeuronV3Dashboard() {
 
     setIsProcessing(false);
     setCurrentStage('');
-  }, [processInput]);
+  }, [chat, chatHistory]);
 
   // 处理反馈 - 使用真实API
   const handleFeedback = useCallback(async (type: 'positive' | 'negative') => {
