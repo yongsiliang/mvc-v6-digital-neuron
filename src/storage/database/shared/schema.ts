@@ -1,4 +1,4 @@
-import { pgTable, unique, uuid, varchar, integer, real, timestamp, text, serial, jsonb, index, boolean } from "drizzle-orm/pg-core"
+import { pgTable, unique, uuid, varchar, integer, real, timestamp, text, serial, jsonb, index, boolean, foreignKey } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -286,91 +286,24 @@ export const systemStates = pgTable("system_states", {
 	index("system_states_time_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
 ]);
 
-// ═══════════════════════════════════════════════════════════════════════
-// V2 表：带用户隔离的神经元系统
-// V2 Tables: Neuron System with User Isolation
-// ═══════════════════════════════════════════════════════════════════════
-
-/**
- * 用户表
- * 
- * 存储用户的基本信息，用于跨设备识别
- */
 export const users = pgTable("users", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	externalAuthId: varchar("external_auth_id", { length: 255 }).unique(),
+	externalAuthId: varchar("external_auth_id", { length: 255 }),
 	displayName: varchar("display_name", { length: 100 }),
-	email: varchar({ length: 255 }).unique(),
+	email: varchar({ length: 255 }),
 	avatarUrl: varchar("avatar_url", { length: 500 }),
 	preferences: jsonb().default({}),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 	lastActiveAt: timestamp("last_active_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
-	unique("users_external_auth_id_unique").on(table.externalAuthId),
-	unique("users_email_unique").on(table.email),
+	unique("users_external_auth_id_key").on(table.externalAuthId),
+	unique("users_email_key").on(table.email),
 ]);
 
-/**
- * 神经元表 V2
- * 
- * 每个用户的神经元独立存储
- */
-export const neuronsV2 = pgTable("neurons_v2", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
-	label: varchar({ length: 255 }),
-	labelSource: varchar("label_source", { length: 20 }),
-	functionalRole: varchar("functional_role", { length: 20 }).default('latent').notNull(),
-	emergentLayer: varchar("emergent_layer", { length: 20 }),
-	sensitivityVector: jsonb("sensitivity_vector").notNull(),
-	sensitivityDimension: integer("sensitivity_dimension").default(768).notNull(),
-	sensitivityPlasticity: real("sensitivity_plasticity").default(0.5).notNull(),
-	activation: real().default(0).notNull(),
-	activationTrend: varchar("activation_trend", { length: 10 }).default('stable'),
-	refractoryPeriod: integer("refractory_period").default(100).notNull(),
-	lastActivatedAt: timestamp("last_activated_at", { withTimezone: true, mode: 'string' }),
-	totalActivations: integer("total_activations").default(0).notNull(),
-	averageActivation: real("average_activation").default(0).notNull(),
-	connectionChanges: integer("connection_changes").default(0).notNull(),
-	usefulness: real().default(0.5).notNull(),
-	source: varchar({ length: 20 }).default('created').notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
-}, (table) => [
-	index("neurons_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	index("neurons_v2_activation_idx").using("btree", table.activation.asc().nullsLast().op("float4_ops")),
-]);
-
-/**
- * 连接表 V2
- */
-export const connectionsV2 = pgTable("connections_v2", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
-	from: uuid("from_neuron").notNull().references(() => neuronsV2.id, { onDelete: 'cascade' }),
-	to: uuid("to_neuron").notNull().references(() => neuronsV2.id, { onDelete: 'cascade' }),
-	type: varchar({ length: 20 }).default('excitatory').notNull(),
-	strength: real().default(0.5).notNull(),
-	plasticity: real().default(0.5).notNull(),
-	delay: real().default(0).notNull(),
-	efficiency: real().default(1).notNull(),
-	lastActivatedAt: timestamp("last_activated_at", { withTimezone: true, mode: 'string' }),
-	totalActivations: integer("total_activations").default(0).notNull(),
-	averageActivationStrength: real("average_activation_strength").default(0).notNull(),
-	source: varchar({ length: 20 }).default('created').notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("connections_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	index("connections_v2_from_idx").using("btree", table.from.asc().nullsLast().op("uuid_ops")),
-]);
-
-/**
- * 记忆表 V2
- */
 export const memoriesV2 = pgTable("memories_v2", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+	userId: uuid("user_id"),
 	content: text().notNull(),
 	type: varchar({ length: 20 }).notNull(),
 	importance: real().default(0.5).notNull(),
@@ -383,19 +316,22 @@ export const memoriesV2 = pgTable("memories_v2", {
 	tags: jsonb().default([]),
 	recallCount: integer("recall_count").default(0).notNull(),
 	lastRecalledAt: timestamp("last_recalled_at", { withTimezone: true, mode: 'string' }),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
-	index("memories_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("memories_v2_created_idx").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	index("memories_v2_type_idx").using("btree", table.type.asc().nullsLast().op("text_ops")),
+	index("memories_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "memories_v2_user_id_fkey"
+		}).onDelete("cascade"),
 ]);
 
-/**
- * 自我模型表 V2
- */
 export const selfModelsV2 = pgTable("self_models_v2", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+	userId: uuid("user_id"),
 	coreTraits: jsonb("core_traits").default([]),
 	values: jsonb().default([]),
 	beliefs: jsonb().default([]),
@@ -405,100 +341,63 @@ export const selfModelsV2 = pgTable("self_models_v2", {
 	significantEvents: jsonb("significant_events").default([]),
 	learnedLessons: jsonb("learned_lessons").default([]),
 	version: integer().default(1).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
-	index("self_models_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "self_models_v2_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("self_models_v2_user_id_key").on(table.userId),
 ]);
 
-/**
- * 系统状态表 V2
- */
 export const systemStatesV2 = pgTable("system_states_v2", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+	userId: uuid("user_id"),
 	neuronCount: integer("neuron_count").default(0).notNull(),
 	connectionCount: integer("connection_count").default(0).notNull(),
 	globalActivationLevel: real("global_activation_level").default(0).notNull(),
 	entropy: real().default(0).notNull(),
 	coherence: real().default(0).notNull(),
 	vitality: real().default(0).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	snapshotData: jsonb("snapshot_data").default({}),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
-	index("system_states_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "system_states_v2_user_id_fkey"
+		}).onDelete("cascade"),
 ]);
 
 // ═══════════════════════════════════════════════════════════════════════
-// 类型导出
-// Type Exports
+// 神经元系统 V3 表
 // ═══════════════════════════════════════════════════════════════════════
 
-/**
- * 神经元记忆类型
- */
-export interface NeuronMemory {
-  id: string;
-  memoryType: string;
-  role: string;
-  content: string;
-  contextTags?: Record<string, unknown>;
-  questionSummary?: string;
-  importance: number;
-  accessCount: number;
-  lastAccessedAt?: string;
-  createdAt: string;
-}
+export const neuronV3States = pgTable("neuron_v3_states", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: varchar("user_id", { length: 100 }).default('default-user').notNull(),
+	neurons: jsonb().default([]).notNull(),
+	connections: jsonb().default([]).notNull(),
+	concepts: jsonb().default([]).notNull(),
+	learningStats: jsonb("learning_stats").default({}).notNull(),
+	selfModel: jsonb("self_model"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	unique("neuron_v3_states_user_id_key").on(table.userId),
+]);
 
-/**
- * 学习角度类型
- */
-export interface LearnedAngle {
-  id: string;
-  learnerRole: string;
-  teacherRole: string;
-  angle: string;
-  strength: number;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-/**
- * 记忆类型枚举
- */
-export type MeaningType = 'episodic' | 'semantic' | 'procedural' | 'emotional' | 'insight' | 'pattern' | 'strategy' | 'concept' | 'emotion';
-
-/**
- * 连接类型
- */
-export type ConnectionType = 'excitatory' | 'inhibitory' | 'modulatory' | 'complementary' | 'similar' | 'contrastive';
-
-/**
- * 触发源类型
- */
-export type TriggerSource = 'external' | 'internal' | 'spontaneous' | 'learned' | 'input' | 'resonance';
-
-/**
- * 意义记忆类型
- */
-export interface MeaningMemory {
-  id: string;
-  content: string;
-  meaningType: MeaningType;
-  importance: number;
-  createdAt: string;
-  meaningSummary?: string;
-  emotionalWeight?: number;
-  meaningVector?: number[];
-  connectedMemoryIds?: string[];
-}
-
-/**
- * 意义连接类型
- */
-export interface MeaningConnection {
-  id: string;
-  fromMeaningId: string;
-  toMeaningId: string;
-  connectionType: ConnectionType;
-  strength: number;
-}
+export const neuronV3LearningEvents = pgTable("neuron_v3_learning_events", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: varchar("user_id", { length: 100 }).default('default-user').notNull(),
+	neuronId: varchar("neuron_id", { length: 100 }).notNull(),
+	eventType: varchar("event_type", { length: 50 }).notNull(),
+	value: real().notNull(),
+	reason: text().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("neuron_v3_events_user_idx").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	index("neuron_v3_events_time_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+]);

@@ -621,3 +621,4 @@ export * from './global-workspace';
 export * from './neuron-generator';
 export * from './advanced-modules';
 export * from './cognitive-coordinator';
+export * from './persistence';
