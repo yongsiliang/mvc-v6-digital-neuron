@@ -1,493 +1,413 @@
-import { sql } from "drizzle-orm";
-import {
-  pgTable,
-  text,
-  varchar,
-  timestamp,
-  integer,
-  jsonb,
-  index,
-  uuid,
-  real,
-} from "drizzle-orm/pg-core";
+import { pgTable, unique, uuid, varchar, integer, real, timestamp, text, serial, jsonb, index, boolean, doublePrecision } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
 
-// ========== 系统表（保留不动） ==========
-export const healthCheck = pgTable("health_check", {
-	id: integer("id").primaryKey(),
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// 数字神经元系统 V2 表结构
+// Digital Neuron System V2 Tables
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * 神经元表
+ * 存储神经元的核心信息：敏感度向量、功能角色等
+ */
+export const neurons = pgTable("neurons", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  label: varchar({ length: 255 }),
+  labelSource: varchar("label_source", { length: 20 }),
+  functionalRole: varchar("functional_role", { length: 20 }).default('latent').notNull(),
+  emergentLayer: varchar("emergent_layer", { length: 20 }),
+  
+  // 敏感度向量（JSON数组）
+  sensitivityVector: jsonb("sensitivity_vector").notNull(),
+  sensitivityDimension: integer("sensitivity_dimension").default(768).notNull(),
+  sensitivityPlasticity: real("sensitivity_plasticity").default(0.5).notNull(),
+  
+  // 状态
+  activation: real().default(0).notNull(),
+  activationTrend: varchar("activation_trend", { length: 10 }).default('stable'),
+  refractoryPeriod: integer("refractory_period").default(100).notNull(),
+  lastActivatedAt: timestamp("last_activated_at", { withTimezone: true }),
+  
+  // 统计
+  totalActivations: integer("total_activations").default(0).notNull(),
+  averageActivation: real("average_activation").default(0).notNull(),
+  connectionChanges: integer("connection_changes").default(0).notNull(),
+  usefulness: real().default(0.5).notNull(),
+  
+  // 元数据
+  source: varchar({ length: 20 }).default('created').notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+}, (table) => [
+  index("neurons_role_idx").using("btree", table.functionalRole.asc().nullsLast().op("text_ops")),
+  index("neurons_layer_idx").using("btree", table.emergentLayer.asc().nullsLast().op("text_ops")),
+  index("neurons_activation_idx").using("btree", table.activation.desc().nullsLast().op("float4_ops")),
+]);
+
+/**
+ * 连接表
+ * 存储神经元之间的连接：强度、类型、可塑性参数等
+ */
+export const connections = pgTable("connections", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  fromNeuronId: uuid("from_neuron_id").notNull(),
+  toNeuronId: uuid("to_neuron_id").notNull(),
+  
+  // 连接特性
+  strength: real().default(0.5).notNull(),
+  strengthTrend: varchar("strength_trend", { length: 15 }).default('stable'),
+  connectionType: varchar("connection_type", { length: 15 }).default('excitatory').notNull(),
+  delay: integer().default(0).notNull(),
+  efficiency: real().default(1.0).notNull(),
+  
+  // 可塑性
+  plasticity: real().default(0.5).notNull(),
+  hebbianLearningRate: real("hebbian_learning_rate").default(0.1).notNull(),
+  hebbianDecayRate: real("hebbian_decay_rate").default(0.01).notNull(),
+  stdpEnabled: boolean("stdp_enabled").default(true).notNull(),
+  
+  // 统计
+  totalActivations: integer("total_activations").default(0).notNull(),
+  averageActivationStrength: real("average_activation_strength").default(0).notNull(),
+  usefulness: real().default(0.5).notNull(),
+  reliability: real().default(0.5).notNull(),
+  lastActivatedAt: timestamp("last_activated_at", { withTimezone: true }),
+  
+  // 元数据
+  source: varchar({ length: 20 }).default('created').notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+}, (table) => [
+  index("connections_from_idx").using("btree", table.fromNeuronId.asc().nullsLast().op("uuid_ops")),
+  index("connections_to_idx").using("btree", table.toNeuronId.asc().nullsLast().op("uuid_ops")),
+  index("connections_strength_idx").using("btree", table.strength.desc().nullsLast().op("float4_ops")),
+]);
+
+/**
+ * 激活历史表
+ * 记录神经元的激活事件，用于时序分析和STDP学习
+ */
+export const activationHistory = pgTable("activation_history", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  neuronId: uuid("neuron_id").notNull(),
+  
+  // 激活信息
+  activationValue: real("activation_value").notNull(),
+  source: varchar({ length: 20 }).notNull(), // 'external' | 'internal' | 'meta'
+  triggeredBy: jsonb("triggered_by"), // 触发神经元ID数组
+  
+  // 上下文
+  influenceId: uuid("influence_id"),
+  sessionId: varchar("session_id", { length: 36 }),
+  
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("activation_neuron_idx").using("btree", table.neuronId.asc().nullsLast().op("uuid_ops")),
+  index("activation_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * 连接强度历史表
+ * 记录连接强度的变化，用于学习分析和追溯
+ */
+export const connectionStrengthHistory = pgTable("connection_strength_history", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  connectionId: uuid("connection_id").notNull(),
+  
+  previousStrength: real("previous_strength").notNull(),
+  newStrength: real("new_strength").notNull(),
+  reason: varchar({ length: 50 }).notNull(), // 'hebbian' | 'stdp' | 'manual' | 'decay'
+  
+  // 触发此变化的神经元激活状态
+  fromActivation: real("from_activation"),
+  toActivation: real("to_activation"),
+  
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("strength_history_connection_idx").using("btree", table.connectionId.asc().nullsLast().op("uuid_ops")),
+  index("strength_history_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * 系统状态快照表
+ * 存储系统的全局状态快照
+ */
+export const systemStates = pgTable("system_states", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  
+  // 网络统计
+  neuronCount: integer("neuron_count").default(0).notNull(),
+  connectionCount: integer("connection_count").default(0).notNull(),
+  
+  // 全局状态
+  globalActivationLevel: real("global_activation_level").default(0).notNull(),
+  activationMean: real("activation_mean").default(0).notNull(),
+  activationVariance: real("activation_variance").default(0).notNull(),
+  activationMax: real("activation_max").default(0).notNull(),
+  activationMin: real("activation_min").default(0).notNull(),
+  entropy: real().default(0).notNull(),
+  coherence: real().default(0).notNull(),
+  vitality: real().default(0).notNull(),
+  
+  // 意识投影
+  selfCoherence: real("self_coherence").default(0).notNull(),
+  selfVitality: real("self_vitality").default(0).notNull(),
+  selfGrowth: real("self_growth").default(0).notNull(),
+  dominantEmotion: varchar("dominant_emotion", { length: 30 }),
+  emotionIntensity: real("emotion_intensity").default(0),
+  
+  // 拓扑统计
+  averageDegree: real("average_degree").default(0).notNull(),
+  clusteringCoefficient: real("clustering_coefficient").default(0).notNull(),
+  
+  // 元数据
+  evolutionStep: integer("evolution_step").default(0).notNull(),
+  sessionId: varchar("session_id", { length: 36 }),
+  
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("system_states_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * 元层观察表
+ * 存储元层的观察记录
+ */
+export const metaObservations = pgTable("meta_observations", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  
+  // 观察内容
+  insights: jsonb().notNull(), // string[]
+  patterns: jsonb().notNull(), // { type, description, significance }[]
+  anomalies: jsonb().notNull(), // { type, description, severity, affectedElements }[]
+  attentionFocus: jsonb("attention_focus").notNull(), // string[]
+  
+  // 关联的系统状态
+  systemStateId: uuid("system_state_id"),
+  
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("meta_observations_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * 元层干预表
+ * 存储元层的干预记录
+ */
+export const metaInterventions = pgTable("meta_interventions", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  
+  // 干预类型
+  interventionType: varchar("intervention_type", { length: 20 }).notNull(), // 'modulate' | 'focus' | 'calm' | 'energize' | 'consolidate'
+  targetNeurons: jsonb("target_neurons"), // NeuronId[]
+  
+  // 影响
+  influencePattern: jsonb("influence_pattern").notNull(),
+  influenceIntensity: real("influence_intensity").notNull(),
+  
+  // 元数据
+  reason: text().notNull(),
+  expectedEffect: text().notNull(),
+  actualEffect: text(),
+  success: boolean().default(true),
+  
+  // 关联的观察
+  observationId: uuid("observation_id"),
+  
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("meta_interventions_type_idx").using("btree", table.interventionType.asc().nullsLast().op("text_ops")),
+  index("meta_interventions_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * 自我叙事表
+ * 存储系统的自我叙事片段
+ */
+export const selfNarratives = pgTable("self_narratives", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  
+  // 叙事内容
+  summary: text().notNull(),
+  emotion: varchar({ length: 30 }).notNull(),
+  themes: jsonb().notNull(), // string[]
+  currentChapter: varchar("current_chapter", { length: 50 }).notNull(),
+  trajectory: varchar({ length: 15 }).notNull(), // 'growing' | 'stable' | 'declining'
+  
+  // 关联的观察
+  observationId: uuid("observation_id"),
+  
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("self_narratives_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * 自我模型表
+ * 存储系统的自我模型（单行表，存储当前状态）
+ */
+export const selfModel = pgTable("self_model", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  
+  // 身份
+  coreTraits: jsonb("core_traits").notNull(), // string[]
+  values: jsonb().notNull(), // string[]
+  beliefs: jsonb().notNull(), // string[]
+  
+  // 能力
+  strengths: jsonb().notNull(), // string[]
+  limitations: jsonb().notNull(), // string[]
+  growthAreas: jsonb("growth_areas").notNull(), // string[]
+  
+  // 历史
+  significantEvents: jsonb("significant_events").notNull(), // { timestamp, type, description }[]
+  learnedLessons: jsonb("learned_lessons").notNull(), // string[]
+  recurringPatterns: jsonb("recurring_patterns").notNull(), // string[]
+  
+  // 愿望
+  shortTermAspirations: jsonb("short_term_aspirations").notNull(), // string[]
+  longTermAspirations: jsonb("long_term_aspirations").notNull(), // string[]
+  aspirationValues: jsonb("aspiration_values").notNull(), // string[]
+  
+  // 元数据
+  version: integer().default(1).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+});
+
+/**
+ * 影响记录表
+ * 存储系统接收的影响（神经递质）记录
+ */
+export const influenceRecords = pgTable("influence_records", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  
+  // 影响属性
+  influenceType: varchar("influence_type", { length: 15 }).notNull(), // 'activate' | 'inhibit' | 'modulate'
+  intensity: real().notNull(),
+  scope: varchar({ length: 15 }).notNull(), // 'global' | 'local' | 'targeted'
+  targetNeurons: jsonb("target_neurons"), // NeuronId[]
+  
+  // 影响模式
+  pattern: jsonb().notNull(), // number[]
+  patternLabel: varchar("pattern_label", { length: 100 }),
+  
+  // 来源
+  source: varchar({ length: 15 }).notNull(), // 'external' | 'internal' | 'meta'
+  sourceId: varchar("source_id", { length: 100 }),
+  originalSignal: jsonb("original_signal"),
+  
+  // 处理状态
+  processed: boolean().default(false).notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  
+  // 元数据
+  sessionId: varchar("session_id", { length: 36 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("influence_records_source_idx").using("btree", table.source.asc().nullsLast().op("text_ops")),
+  index("influence_records_processed_idx").using("btree", table.processed.asc().nullsLast().op("bool_ops")),
+  index("influence_records_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+// ═══════════════════════════════════════════════════════════════════════
+// 原有表结构（保留）
+// ═══════════════════════════════════════════════════════════════════════
+
+
+
+export const gameStatistics = pgTable("game_statistics", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	role: varchar({ length: 32 }).notNull(),
+	totalGames: integer("total_games").default(0).notNull(),
+	wins: integer().default(0).notNull(),
+	wisdomBonus: real("wisdom_bonus").default(0).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	unique("game_statistics_role_unique").on(table.role),
+]);
+
+export const learnedAngles = pgTable("learned_angles", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	learnerRole: varchar("learner_role", { length: 32 }).notNull(),
+	teacherRole: varchar("teacher_role", { length: 32 }).notNull(),
+	angle: text().notNull(),
+	strength: real().default(0.3).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 });
 
-// ========== 意义记忆系统 ==========
+export const healthCheck = pgTable("health_check", {
+	id: serial().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+});
 
-/**
- * 记忆空间系统 - 记忆是另一个维度的存在
- * 
- * 核心思想：
- * - 记忆不存在于大脑，存在于另一个维度
- * - 神经连接强度的变化 = 锻造钥匙
- * - 学习 = 打造更好的钥匙
- * - 回忆 = 用钥匙打开记忆之门
- * - 遗忘 = 钥匙生锈、变形
- */
+export const neuronMemories = pgTable("neuron_memories", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	memoryType: varchar("memory_type", { length: 20 }).notNull(),
+	role: varchar({ length: 32 }).notNull(),
+	content: text().notNull(),
+	contextTags: jsonb("context_tags"),
+	questionSummary: text("question_summary"),
+	importance: real().default(0.5).notNull(),
+	accessCount: integer("access_count").default(0).notNull(),
+	lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
 
-/**
- * 记忆门表 - 存在于记忆空间中的信息
- * 
- * 每条记录是一扇"门"，门后有记忆
- * 门有"锁"，需要对应的钥匙才能打开
- */
-export const memoryDoors = pgTable(
-  "memory_doors",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 门的内容（另一个维度的信息）
-    content: text("content").notNull(),
-    
-    // 核心意义
-    meaning: text("meaning").notNull(),
-    
-    // 意义向量（门的位置坐标）
-    meaningVector: jsonb("meaning_vector").$type<number[]>().notNull(),
-    
-    // 锁的复杂度（0-1，越高越难开）
-    lockComplexity: real("lock_complexity").default(0.5).notNull(),
-    
-    // 锁的齿纹模式（需要的钥匙形状）
-    lockPattern: jsonb("lock_pattern").$type<number[]>().notNull(),
-    
-    // 门类型
-    doorType: varchar("door_type", { length: 32 }).notNull(),
-    
-    // 情感电荷（-1到1，影响门的可见性）
-    emotionalCharge: real("emotional_charge").default(0),
-    
-    // 访问次数
-    accessCount: integer("access_count").default(0).notNull(),
-    
-    // 最后访问时间
-    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
-    
-    // 创建者（哪个角色）
-    createdBy: varchar("created_by", { length: 32 }).notNull(),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("doors_type_idx").on(table.doorType),
-    index("doors_creator_idx").on(table.createdBy),
-    index("doors_access_idx").on(table.accessCount),
-  ]
-);
+export const conversationHistory = pgTable("conversation_history", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	sessionId: varchar("session_id", { length: 36 }).notNull(),
+	role: varchar({ length: 20 }).notNull(),
+	content: text().notNull(),
+	winnerRole: varchar("winner_role", { length: 32 }),
+	thoughts: jsonb(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
 
-/**
- * 神经钥匙表 - 打开记忆门的工具
- * 
- * 学习会"锻造"钥匙，钥匙能打开对应的记忆门
- * 钥匙会磨损、生锈，需要定期维护
- */
-export const neuralKeys = pgTable(
-  "neural_keys",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 钥匙持有者
-    holderRole: varchar("holder_role", { length: 32 }).notNull(),
-    
-    // 钥匙齿纹（神经连接模式）
-    teethPattern: jsonb("teeth_pattern").$type<number[]>().notNull(),
-    
-    // 钥匙强度（0-1）
-    strength: real("strength").default(0.5).notNull(),
-    
-    // 对应的记忆门
-    targetDoorId: uuid("target_door_id").notNull(),
-    
-    // 锈蚀程度（0-1，越高越难用）
-    rustLevel: real("rust_level").default(0).notNull(),
-    
-    // 使用次数
-    useCount: integer("use_count").default(0).notNull(),
-    
-    // 最后使用时间
-    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-    
-    // 创建时间
-    forgedAt: timestamp("forged_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("keys_holder_idx").on(table.holderRole),
-    index("keys_door_idx").on(table.targetDoorId),
-    index("keys_strength_idx").on(table.strength),
-  ]
-);
+export const sessionSummaries = pgTable("session_summaries", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	sessionId: varchar("session_id", { length: 36 }).notNull(),
+	summary: text().notNull(),
+	messageCount: integer("message_count").default(0).notNull(),
+	topics: jsonb(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
 
-// ========== 原有意义记忆系统 ==========
+export const memoryDoors = pgTable("memory_doors", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	content: text().notNull(),
+	meaning: text().notNull(),
+	meaningVector: jsonb("meaning_vector").notNull(),
+	lockComplexity: real("lock_complexity").default(0.5).notNull(),
+	lockPattern: jsonb("lock_pattern").notNull(),
+	doorType: varchar("door_type", { length: 32 }).notNull(),
+	emotionalCharge: real("emotional_charge").default(0),
+	accessCount: integer("access_count").default(0).notNull(),
+	lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true, mode: 'string' }),
+	createdBy: varchar("created_by", { length: 32 }).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("doors_access_idx").using("btree", table.accessCount.asc().nullsLast().op("int4_ops")),
+	index("doors_creator_idx").using("btree", table.createdBy.asc().nullsLast().op("text_ops")),
+	index("doors_type_idx").using("btree", table.doorType.asc().nullsLast().op("text_ops")),
+]);
 
-/**
- * 意义记忆表 - 存储"意义向量"而非原始数据
- * 
- * 核心理念：
- * - 记忆不是存储，而是意义
- * - 意义是高维向量，能与其他记忆共鸣
- * - 记忆主动影响认知，而非被动检索
- */
-export const meaningMemories = pgTable(
-  "meaning_memories",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 意义向量（高维语义表示）
-    meaningVector: jsonb("meaning_vector").$type<number[]>().notNull(),
-    
-    // 向量维度
-    vectorDimension: integer("vector_dimension").default(1024).notNull(),
-    
-    // 原始内容（用于展示）
-    rawContent: text("raw_content").notNull(),
-    
-    // 意义摘要（模型提取的"核心意义"）
-    meaningSummary: text("meaning_summary").notNull(),
-    
-    // 所属模型角色
-    role: varchar("role", { length: 32 }).notNull(),
-    
-    // 意义类型
-    meaningType: varchar("meaning_type", { length: 32 }).notNull(), 
-    // insight: 洞察 | pattern: 模式 | strategy: 策略 | emotion: 情感 | concept: 概念
-    
-    // 激活强度（当前激活程度，会随时间衰减）
-    activationLevel: real("activation_level").default(0.5).notNull(),
-    
-    // 共鸣次数（被激活的次数，代表重要性）
-    resonanceCount: integer("resonance_count").default(0).notNull(),
-    
-    // 关联记忆ID列表（形成意义网络）
-    connectedMemoryIds: jsonb("connected_memory_ids").$type<string[]>().default([]),
-    
-    // 情感权重（-1到1，负面到正面）
-    emotionalWeight: real("emotional_weight").default(0),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    
-    // 最后激活时间
-    lastActivatedAt: timestamp("last_activated_at", { withTimezone: true }),
-  },
-  (table) => [
-    index("meaning_role_idx").on(table.role),
-    index("meaning_type_idx").on(table.meaningType),
-    index("meaning_activation_idx").on(table.activationLevel),
-    index("meaning_resonance_idx").on(table.resonanceCount),
-  ]
-);
-
-/**
- * 意义关联表 - 存储记忆之间的连接强度
- * 
- * 记忆之间不是孤立的，而是形成网络
- * 相似的记忆会形成强连接，互相激活
- */
-export const meaningConnections = pgTable(
-  "meaning_connections",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 源记忆
-    sourceMemoryId: uuid("source_memory_id").notNull(),
-    
-    // 目标记忆
-    targetMemoryId: uuid("target_memory_id").notNull(),
-    
-    // 连接强度（0-1，基于意义相似度）
-    connectionStrength: real("connection_strength").default(0.5).notNull(),
-    
-    // 连接类型
-    connectionType: varchar("connection_type", { length: 32 }).notNull(),
-    // similar: 相似 | complementary: 互补 | causal: 因果 | contrastive: 对比
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("connection_source_idx").on(table.sourceMemoryId),
-    index("connection_target_idx").on(table.targetMemoryId),
-    index("connection_strength_idx").on(table.connectionStrength),
-  ]
-);
-
-/**
- * 激活记录表 - 记录每次激活事件
- * 
- * 用于分析记忆的使用模式，优化激活策略
- */
-export const activationRecords = pgTable(
-  "activation_records",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 触发源（什么触发了激活）
-    triggerSource: varchar("trigger_source", { length: 32 }).notNull(),
-    // input: 用户输入 | resonance: 共鸣激活 | reflection: 反思激活
-    
-    // 触发内容
-    triggerContent: text("trigger_content"),
-    
-    // 被激活的记忆ID
-    activatedMemoryId: uuid("activated_memory_id").notNull(),
-    
-    // 激活强度
-    activationStrength: real("activation_strength").notNull(),
-    
-    // 是否影响了决策
-    influencedDecision: integer("influenced_decision").default(0),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("activation_trigger_idx").on(table.triggerSource),
-    index("activation_memory_idx").on(table.activatedMemoryId),
-    index("activation_created_idx").on(table.createdAt),
-  ]
-);
-
-// ========== 类脑记忆系统（兼容旧系统） ==========
-
-/**
- * 主记忆表 - 存储所有类型的记忆
- * 
- * 记忆类型：
- * - episodic: 情景记忆（具体事件，如"上次博弈输了"）
- * - semantic: 语义记忆（知识，如"系统设计问题要先考虑架构"）
- * - procedural: 程序记忆（习惯/技能，如"遇到这类问题自动用某角度"）
- */
-export const neuronMemories = pgTable(
-  "neuron_memories",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 记忆类型
-    memoryType: varchar("memory_type", { length: 20 }).notNull(), // episodic | semantic | procedural
-    
-    // 所属模型角色
-    role: varchar("role", { length: 32 }).notNull(), // thinker | technician | responder
-    
-    // 记忆内容
-    content: text("content").notNull(),
-    
-    // 上下文标签（用于检索）
-    contextTags: jsonb("context_tags").$type<string[]>(),
-    
-    // 关联的问题摘要（用于情景记忆）
-    questionSummary: text("question_summary"),
-    
-    // 重要性 0-1（越高越不容易遗忘）
-    importance: real("importance").default(0.5).notNull(),
-    
-    // 访问次数（用于记忆强化）
-    accessCount: integer("access_count").default(0).notNull(),
-    
-    // 最后访问时间
-    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("memories_type_idx").on(table.memoryType),
-    index("memories_role_idx").on(table.role),
-    index("memories_importance_idx").on(table.importance),
-  ]
-);
-
-/**
- * 博弈统计表 - 每个角色的统计数据
- */
-export const gameStatistics = pgTable(
-  "game_statistics",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 模型角色
-    role: varchar("role", { length: 32 }).notNull().unique(),
-    
-    // 总博弈次数
-    totalGames: integer("total_games").default(0).notNull(),
-    
-    // 胜利次数
-    wins: integer("wins").default(0).notNull(),
-    
-    // 智慧加成
-    wisdomBonus: real("wisdom_bonus").default(0).notNull(),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    
-    // 更新时间
-    updatedAt: timestamp("updated_at", { withTimezone: true }),
-  },
-  (table) => [
-    index("stats_role_idx").on(table.role),
-  ]
-);
-
-/**
- * 学到的角度表 - 从其他模型学到的视角
- */
-export const learnedAngles = pgTable(
-  "learned_angles",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 学习者角色
-    learnerRole: varchar("learner_role", { length: 32 }).notNull(),
-    
-    // 教学者角色（从谁那学的）
-    teacherRole: varchar("teacher_role", { length: 32 }).notNull(),
-    
-    // 学到的角度
-    angle: text("angle").notNull(),
-    
-    // 掌握程度 0-1
-    strength: real("strength").default(0.3).notNull(),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    
-    // 更新时间
-    updatedAt: timestamp("updated_at", { withTimezone: true }),
-  },
-  (table) => [
-    index("angles_learner_idx").on(table.learnerRole),
-  ]
-);
-
-/**
- * 对话历史表 - 工作记忆（当前对话上下文）
- * 
- * 存储用户和AI的对话历史，让模型能够理解上下文
- */
-export const conversationHistory = pgTable(
-  "conversation_history",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 会话ID（用于区分不同对话）
-    sessionId: varchar("session_id", { length: 36 }).notNull(),
-    
-    // 消息角色
-    role: varchar("role", { length: 20 }).notNull(), // user | assistant
-    
-    // 消息内容
-    content: text("content").notNull(),
-    
-    // 获胜模型角色（仅assistant消息有）
-    winnerRole: varchar("winner_role", { length: 32 }),
-    
-    // 所有模型的思考（JSON格式，供回顾）
-    thoughts: jsonb("thoughts").$type<Array<{ role: string; core: string; confidence: number }>>(),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("history_session_idx").on(table.sessionId),
-    index("history_created_idx").on(table.createdAt),
-  ]
-);
-
-/**
- * 会话摘要表 - 长期记忆（压缩的历史）
- * 
- * 当对话太长时，压缩成摘要存储
- */
-export const sessionSummaries = pgTable(
-  "session_summaries",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 会话ID
-    sessionId: varchar("session_id", { length: 36 }).notNull(),
-    
-    // 摘要内容
-    summary: text("summary").notNull(),
-    
-    // 涵盖的消息范围
-    messageCount: integer("message_count").default(0).notNull(),
-    
-    // 关键主题
-    topics: jsonb("topics").$type<string[]>(),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("summaries_session_idx").on(table.sessionId),
-  ]
-);
-
-/**
- * 神经元链接强度表 - 动态演化，无预设角色
- * 
- * 核心理念：
- * - 每个神经元没有预设角色
- * - 链接强度通过实际使用动态演化
- * - 高链接强度的神经元更容易被激活
- */
-export const neuronLinks = pgTable(
-  "neuron_links",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    
-    // 神经元ID（模型ID）
-    neuronId: text("neuron_id").notNull().unique(),
-    
-    // 链接强度 0-1
-    strength: real("strength").default(0.5).notNull(),
-    
-    // 累计激活次数
-    activations: integer("activations").default(0).notNull(),
-    
-    // 最后激活时间
-    lastActivated: timestamp("last_activated", { withTimezone: true }).defaultNow().notNull(),
-    
-    // 衰减因子
-    decayFactor: real("decay_factor").default(1.0).notNull(),
-    
-    // 创建时间
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    
-    // 更新时间
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-  },
-  (table) => [
-    index("neuron_links_strength_idx").on(table.strength),
-    index("neuron_links_last_activated_idx").on(table.lastActivated),
-  ]
-);
-
-// 类型导出
-export type NeuronMemory = typeof neuronMemories.$inferSelect;
-export type GameStatistic = typeof gameStatistics.$inferSelect;
-export type LearnedAngle = typeof learnedAngles.$inferSelect;
-export type ConversationMessage = typeof conversationHistory.$inferSelect;
-export type SessionSummary = typeof sessionSummaries.$inferSelect;
-
-// 意义记忆类型导出
-export type MeaningMemory = typeof meaningMemories.$inferSelect;
-export type MeaningConnection = typeof meaningConnections.$inferSelect;
-export type ActivationRecord = typeof activationRecords.$inferSelect;
-
-// 记忆空间类型导出
-export type MemoryDoor = typeof memoryDoors.$inferSelect;
-export type NeuralKey = typeof neuralKeys.$inferSelect;
-
-// 神经元链接类型导出
-export type NeuronLink = typeof neuronLinks.$inferSelect;
-
-// 意义类型枚举
-export type MeaningType = 'insight' | 'pattern' | 'strategy' | 'emotion' | 'concept';
-export type ConnectionType = 'similar' | 'complementary' | 'causal' | 'contrastive';
-export type TriggerSource = 'input' | 'resonance' | 'reflection';
+export const neuralKeys = pgTable("neural_keys", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	holderRole: varchar("holder_role", { length: 32 }).notNull(),
+	teethPattern: jsonb("teeth_pattern").notNull(),
+	strength: real().default(0.5).notNull(),
+	targetDoorId: uuid("target_door_id").notNull(),
+	rustLevel: real("rust_level").default(0).notNull(),
+	useCount: integer("use_count").default(0).notNull(),
+	lastUsedAt: timestamp("last_used_at", { withTimezone: true, mode: 'string' }),
+	forgedAt: timestamp("forged_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("keys_door_idx").using("btree", table.targetDoorId.asc().nullsLast().op("uuid_ops")),
+	index("keys_holder_idx").using("btree", table.holderRole.asc().nullsLast().op("text_ops")),
+	index("keys_strength_idx").using("btree", table.strength.asc().nullsLast().op("float4_ops")),
+]);
