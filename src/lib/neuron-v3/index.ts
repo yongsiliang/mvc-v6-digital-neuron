@@ -111,6 +111,15 @@ import {
   getBackgroundProcessor,
   resetBackgroundProcessor,
 } from './background-processing';
+import {
+  getNeuronV3Persistence,
+  NeuronData,
+  ConceptData,
+  LearningStatsData,
+  SelfModelData,
+  RecentMessageData,
+  resetPersistence,
+} from './persistence';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -225,8 +234,13 @@ export class NeuronSystemV3 {
   private emotionalModule: EmotionalModule | null = null;
   private metacognitiveModule: MetacognitiveModule | null = null;
   
+  // 持久化服务
+  private persistence: ReturnType<typeof getNeuronV3Persistence>;
+  private persistenceEnabled: boolean = true;
+  
   // 系统状态
   private initialized = false;
+  private stateLoaded = false;
   private userId: string;
   private sessionId: string;
   private recentMessages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: number }> = [];
@@ -249,14 +263,14 @@ export class NeuronSystemV3 {
     this.userId = 'default-user';
     this.sessionId = uuidv4();
     
+    // 初始化持久化服务
+    this.persistence = getNeuronV3Persistence(this.userId);
+    
     // 初始化核心组件
     this.vsaSpace = getVSASpace(this.config.vsaDimension);
     this.predictionLoop = getPredictionLoop(this.userId);
     this.feedbackCollector = getFeedbackCollector();
     this.rewardLearner = getRewardLearner(this.predictionLoop, this.config.learningConfig);
-    
-    // 初始化默认神经元
-    this.initDefaultNeurons();
     
     // 初始化可选组件
     if (this.config.enableMeaningCalculation) {
@@ -275,6 +289,148 @@ export class NeuronSystemV3 {
     }
     
     this.initialized = true;
+    
+    // 异步加载持久化状态（不阻塞构造函数）
+    this.loadPersistedState();
+  }
+
+  /**
+   * 加载持久化状态
+   */
+  private async loadPersistedState(): Promise<void> {
+    try {
+      const savedState = await this.persistence.loadState();
+      
+      if (savedState) {
+        console.log('[NeuronSystemV3] Loading persisted state...');
+        
+        // 恢复神经元
+        if (savedState.neurons.length > 0) {
+          this.restoreNeurons(savedState.neurons);
+        } else {
+          // 没有保存的神经元，初始化默认神经元
+          this.initDefaultNeurons();
+        }
+        
+        // 恢复概念
+        if (savedState.concepts.length > 0) {
+          this.restoreConcepts(savedState.concepts);
+        }
+        
+        // 恢复对话历史
+        if (savedState.recentMessages.length > 0) {
+          this.recentMessages = savedState.recentMessages.slice(-50); // 保留最近50条
+        }
+        
+        this.stateLoaded = true;
+        console.log(`[NeuronSystemV3] State loaded: ${savedState.neurons.length} neurons, ${savedState.concepts.length} concepts`);
+      } else {
+        // 没有保存的状态，初始化默认神经元
+        this.initDefaultNeurons();
+        console.log('[NeuronSystemV3] No saved state, initialized with default neurons');
+      }
+    } catch (error) {
+      console.error('[NeuronSystemV3] Failed to load persisted state:', error);
+      // 加载失败，初始化默认神经元
+      this.initDefaultNeurons();
+    }
+  }
+
+  /**
+   * 恢复神经元
+   */
+  private restoreNeurons(neuronsData: NeuronData[]): void {
+    for (const neuronData of neuronsData) {
+      const neuron: PredictiveNeuron = {
+        id: neuronData.id,
+        userId: this.userId,
+        label: neuronData.label,
+        role: neuronData.role as NeuronRole,
+        sensitivityVector: neuronData.sensitivityVector,
+        sensitivityDimension: neuronData.sensitivityVector.length,
+        sensitivityPlasticity: neuronData.sensitivityPlasticity,
+        receptiveField: neuronData.receptiveField,
+        
+        prediction: {
+          expectedActivation: neuronData.prediction.expectedActivation,
+          confidence: neuronData.prediction.confidence,
+          contextDependencies: neuronData.prediction.contextDependencies,
+          predictedAt: Date.now(),
+          basis: neuronData.prediction.basis,
+        },
+        
+        actual: {
+          activation: neuronData.actual.activation,
+          receivedInputs: new Map(),
+          lastActivatedAt: neuronData.actual.lastActivatedAt,
+          activationHistory: neuronData.actual.activationHistory,
+        },
+        
+        learning: {
+          predictionError: neuronData.learning.predictionError,
+          errorHistory: neuronData.learning.errorHistory,
+          accumulatedSurprise: neuronData.learning.accumulatedSurprise,
+          learningRate: neuronData.learning.learningRate,
+          lastLearningAt: null,
+          totalLearningEvents: neuronData.learning.totalLearningEvents,
+        },
+        
+        meta: {
+          creationReason: neuronData.meta.creationReason,
+          usefulness: neuronData.meta.usefulness,
+          totalActivations: neuronData.meta.totalActivations,
+          averageActivation: neuronData.meta.averageActivation,
+          createdAt: neuronData.meta.createdAt,
+          lastUpdateAt: Date.now(),
+          level: neuronData.meta.level,
+          pruningCandidate: neuronData.meta.pruningCandidate,
+        },
+        
+        outgoingConnections: neuronData.outgoingConnections.map(conn => ({
+          targetId: conn.targetId,
+          type: conn.type as 'excitatory' | 'inhibitory' | 'modulatory',
+          strength: conn.strength,
+          efficiency: conn.efficiency,
+          delay: conn.delay,
+          hebbianRate: conn.hebbianRate,
+        })),
+        
+        incomingConnections: neuronData.incomingConnections.map(conn => ({
+          targetId: conn.targetId,
+          type: conn.type as 'excitatory' | 'inhibitory' | 'modulatory',
+          strength: conn.strength,
+          efficiency: conn.efficiency,
+          delay: conn.delay,
+          hebbianRate: conn.hebbianRate,
+        })),
+      };
+      
+      this.predictionLoop.addNeuron(neuron);
+    }
+  }
+
+  /**
+   * 恢复概念
+   */
+  private restoreConcepts(conceptsData: ConceptData[]): void {
+    // 使用 importState 恢复概念
+    const conceptEntries: [string, import('./vsa-space').ConceptEntry][] = conceptsData.map(c => [
+      c.name,
+      {
+        name: c.name,
+        vector: c.vector,
+        type: c.type as import('./vsa-space').ConceptType,
+        components: c.components,
+        createdAt: c.createdAt,
+        usageCount: c.usageCount,
+        source: c.source as 'predefined' | 'learned' | 'composed',
+      },
+    ]);
+    
+    this.vsaSpace.importState({
+      concepts: conceptEntries,
+      relations: [],
+    });
   }
 
   /**
@@ -442,6 +598,11 @@ export class NeuronSystemV3 {
           focusKeywords: [intuition.type],
         });
       }
+    }
+    
+    // 10. 异步保存状态（防抖，不阻塞响应）
+    if (this.persistenceEnabled) {
+      this.saveStateDebounced();
     }
     
     return {
@@ -1054,6 +1215,130 @@ export class NeuronSystemV3 {
     this.globalWorkspace.registerModule(this.emotionalModule);
     this.globalWorkspace.registerModule(this.metacognitiveModule);
   }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 持久化方法
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * 防抖保存状态
+   */
+  private saveTimeout: NodeJS.Timeout | null = null;
+  
+  private saveStateDebounced(): void {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+    
+    this.saveTimeout = setTimeout(() => {
+      this.saveToDatabase();
+    }, 3000); // 3秒后保存
+  }
+
+  /**
+   * 保存状态到数据库
+   */
+  async saveToDatabase(): Promise<boolean> {
+    try {
+      const state = this.predictionLoop.exportState();
+      const neurons = state.neurons;
+      
+      // 获取概念 - 使用 exportState
+      const vsaState = this.vsaSpace.exportState();
+      const concepts = new Map<string, { vector: number[]; type: string; usageCount: number; source: string }>();
+      
+      for (const [name, entry] of vsaState.concepts) {
+        concepts.set(name, {
+          vector: Array.from(entry.vector),
+          type: entry.type,
+          usageCount: entry.usageCount,
+          source: entry.source,
+        });
+      }
+      
+      // 获取学习统计
+      const learningStats = this.rewardLearner.getStats();
+      const predictionStats = this.predictionLoop.getStats();
+      
+      const stats: LearningStatsData = {
+        totalLearningEvents: learningStats.totalLearningEvents,
+        totalReward: learningStats.totalReward,
+        totalPunishment: learningStats.totalPunishment,
+        averageValue: learningStats.averageValue,
+        totalPredictions: predictionStats.totalPredictions,
+        accuratePredictions: predictionStats.accuratePredictions,
+        totalSurprise: predictionStats.totalSurprise,
+        neuronsCreated: predictionStats.neuronsCreated,
+        neuronsPruned: predictionStats.neuronsPruned,
+      };
+      
+      // 获取自我模型
+      const selfModel: SelfModelData | null = this.meaningCalculator ? {
+        coreTraits: ['好奇', '理性', '友善'],
+        values: ['理解', '帮助', '真实'],
+        currentGoals: [],
+        emotionalBaseline: {
+          valence: 0.3,
+          arousal: 0.5,
+        },
+      } : null;
+      
+      return await this.persistence.saveState({
+        neurons,
+        concepts,
+        learningStats: stats,
+        selfModel,
+        recentMessages: this.recentMessages.slice(-50).map(m => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
+      });
+    } catch (error) {
+      console.error('[NeuronSystemV3] Failed to save state:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 手动触发保存
+   */
+  async forceSave(): Promise<boolean> {
+    return this.saveToDatabase();
+  }
+
+  /**
+   * 检查状态是否已加载
+   */
+  isStateLoaded(): boolean {
+    return this.stateLoaded;
+  }
+
+  /**
+   * 启用/禁用持久化
+   */
+  setPersistenceEnabled(enabled: boolean): void {
+    this.persistenceEnabled = enabled;
+  }
+
+  /**
+   * 获取持久化统计
+   */
+  async getPersistenceStats(): Promise<{
+    hasState: boolean;
+    neuronCount: number;
+    conceptCount: number;
+    lastUpdated: string | null;
+  }> {
+    return this.persistence.getStats();
+  }
+
+  /**
+   * 清除持久化状态
+   */
+  async clearPersistedState(): Promise<boolean> {
+    return this.persistence.clearState();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1081,6 +1366,7 @@ export function resetNeuronSystemV3(): void {
   resetAdvancedModules();
   resetCognitiveCoordinator();
   resetBackgroundProcessor();
+  resetPersistence();
 }
 
 // ─────────────────────────────────────────────────────────────────────
