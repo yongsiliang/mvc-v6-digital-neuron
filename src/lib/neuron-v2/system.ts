@@ -28,6 +28,13 @@ import { TextEncoder, LLMEncoder, EncoderManager } from './encoder';
 import { TextDecoder, LLMDecoder, DecoderManager } from './decoder';
 import { LearningManager } from './learning';
 import { MetaLayer } from './meta-layer';
+import { 
+  MemoryManager, 
+  MemoryConfig, 
+  MemoryType, 
+  RecallResult,
+  MemoryRecord,
+} from './memory';
 
 // ─────────────────────────────────────────────────────────────────────
 // 系统状态
@@ -91,6 +98,16 @@ export interface DigitalNeuronSystemConfig {
    * 元层配置
    */
   metaConfig?: Partial<MetaLayerConfig>;
+
+  /**
+   * 记忆配置
+   */
+  memoryConfig?: Partial<MemoryConfig>;
+
+  /**
+   * 是否启用记忆
+   */
+  enableMemory?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -112,6 +129,7 @@ export class DigitalNeuronSystem {
   private _decoderManager: DecoderManager;
   private _learningManager: LearningManager;
   private _metaLayer: MetaLayer;
+  private _memoryManager: MemoryManager;
 
   // ─────────────────────────────────────────────────────────────────
   // 系统状态
@@ -145,6 +163,7 @@ export class DigitalNeuronSystem {
     this._decoderManager = new DecoderManager();
     this._learningManager = new LearningManager(config.learningConfig);
     this._metaLayer = new MetaLayer(config.metaConfig);
+    this._memoryManager = new MemoryManager(this._network, config.memoryConfig);
 
     // 注册默认编码器/解码器
     this._encoderManager.register(new TextEncoder(), true);
@@ -180,6 +199,10 @@ export class DigitalNeuronSystem {
 
   get metaLayer(): MetaLayer {
     return this._metaLayer;
+  }
+
+  get memoryManager(): MemoryManager {
+    return this._memoryManager;
   }
 
   get state(): SystemState {
@@ -342,6 +365,95 @@ export class DigitalNeuronSystem {
 
     const intervention = this._metaLayer.intervene(type, target);
     this._network.receiveInfluence(intervention.influence);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // 核心方法：记忆
+  // ─────────────────────────────────────────────────────────────────
+
+  /**
+   * 记住内容
+   * 
+   * 将信息编码为长期记忆痕迹
+   */
+  async remember(
+    content: string,
+    options: {
+      type?: MemoryType;
+      importance?: number;
+      emotionalIntensity?: number;
+      emotionalValence?: number;
+      tags?: string[];
+    } = {}
+  ): Promise<string> {
+    if (this._config.enableMemory === false) {
+      throw new Error('Memory system is disabled');
+    }
+
+    return this._memoryManager.encode(content, options);
+  }
+
+  /**
+   * 回忆
+   * 
+   * 基于线索激活传播，重构记忆状态
+   */
+  async recall(cue: string): Promise<RecallResult> {
+    if (this._config.enableMemory === false) {
+      throw new Error('Memory system is disabled');
+    }
+
+    return this._memoryManager.recall(cue);
+  }
+
+  /**
+   * 执行记忆巩固
+   * 
+   * 强化重要记忆的连接痕迹
+   */
+  async consolidateMemories(): Promise<{
+    processed: number;
+    consolidated: string[];
+  }> {
+    return this._memoryManager.consolidate();
+  }
+
+  /**
+   * 应用记忆衰减（遗忘）
+   */
+  applyMemoryDecay(): {
+    neuronsDecayed: number;
+    connectionsPruned: number;
+    memoriesForgotten: string[];
+  } {
+    return this._memoryManager.applyDecay();
+  }
+
+  /**
+   * 获取所有记忆
+   */
+  getAllMemories(): MemoryRecord[] {
+    return this._memoryManager.getAllMemories();
+  }
+
+  /**
+   * 获取记忆统计
+   */
+  getMemoryStats(): {
+    total: number;
+    byType: Record<MemoryType, number>;
+    consolidated: number;
+    averageStrength: number;
+    pendingConsolidation: number;
+  } {
+    return this._memoryManager.getStats();
+  }
+
+  /**
+   * 清除所有记忆
+   */
+  clearMemories(): void {
+    this._memoryManager.clear();
   }
 
   // ─────────────────────────────────────────────────────────────────

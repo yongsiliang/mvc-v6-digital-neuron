@@ -73,6 +73,19 @@ export type {
   LearningRuleConfig 
 } from './learning';
 
+// 记忆
+export { 
+  MemoryManager, 
+  createMemoryManager,
+} from './memory';
+export type { 
+  MemoryType,
+  MemoryRecord,
+  MemoryConfig,
+  RecallResult,
+  ConsolidationTask,
+} from './memory';
+
 // 元层
 export { MetaLayer, createMetaLayer } from './meta-layer';
 
