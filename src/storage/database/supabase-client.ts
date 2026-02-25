@@ -6,6 +6,7 @@ let envLoaded = false;
 interface SupabaseCredentials {
   url: string;
   anonKey: string;
+  databaseUrl?: string;  // PostgreSQL 直连 URL
 }
 
 function loadEnv(): void {
@@ -72,6 +73,7 @@ function getSupabaseCredentials(): SupabaseCredentials {
 
   const url = process.env.COZE_SUPABASE_URL;
   const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
+  const databaseUrl = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
 
   if (!url) {
     throw new Error('COZE_SUPABASE_URL is not set');
@@ -80,7 +82,7 @@ function getSupabaseCredentials(): SupabaseCredentials {
     throw new Error('COZE_SUPABASE_ANON_KEY is not set');
   }
 
-  return { url, anonKey };
+  return { url, anonKey, databaseUrl };
 }
 
 function getSupabaseClient(token?: string): SupabaseClient {

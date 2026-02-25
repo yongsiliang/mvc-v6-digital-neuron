@@ -301,6 +301,68 @@ export const users = pgTable("users", {
 	unique("users_email_key").on(table.email),
 ]);
 
+// ═══════════════════════════════════════════════════════════════════════
+// 神经元系统 V2 表
+// ═══════════════════════════════════════════════════════════════════════
+
+export const neuronsV2 = pgTable("neurons_v2", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id"),
+	label: text(),
+	labelSource: varchar("label_source", { length: 20 }),
+	functionalRole: varchar("functional_role", { length: 32 }).notNull(),
+	emergentLayer: integer("emergent_layer").default(0).notNull(),
+	sensitivityVector: jsonb("sensitivity_vector").notNull(),
+	sensitivityDimension: integer("sensitivity_dimension").default(10000).notNull(),
+	sensitivityPlasticity: real("sensitivity_plasticity").default(0.1).notNull(),
+	activation: real().default(0).notNull(),
+	activationTrend: varchar("activation_trend", { length: 15 }).default('stable'),
+	refractoryPeriod: integer("refractory_period").default(0).notNull(),
+	lastActivatedAt: timestamp("last_activated_at", { withTimezone: true, mode: 'string' }),
+	totalActivations: integer("total_activations").default(0).notNull(),
+	averageActivation: real("average_activation").default(0).notNull(),
+	connectionChanges: integer("connection_changes").default(0).notNull(),
+	usefulness: real().default(0.5).notNull(),
+	source: varchar({ length: 20 }).default('created').notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("neurons_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("neurons_v2_role_idx").using("btree", table.functionalRole.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "neurons_v2_user_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+export const connectionsV2 = pgTable("connections_v2", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id"),
+	from: uuid("from_neuron_id").notNull(),
+	to: uuid("to_neuron_id").notNull(),
+	type: varchar({ length: 15 }).default('excitatory').notNull(),
+	strength: real().default(0.5).notNull(),
+	plasticity: real().default(0.5).notNull(),
+	delay: integer().default(0).notNull(),
+	efficiency: real().default(1).notNull(),
+	lastActivatedAt: timestamp("last_activated_at", { withTimezone: true, mode: 'string' }),
+	totalActivations: integer("total_activations").default(0).notNull(),
+	averageActivationStrength: real("average_activation_strength").default(0).notNull(),
+	source: varchar({ length: 20 }).default('created').notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("connections_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("connections_v2_from_idx").using("btree", table.from.asc().nullsLast().op("uuid_ops")),
+	index("connections_v2_to_idx").using("btree", table.to.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "connections_v2_user_id_fkey"
+		}).onDelete("cascade"),
+]);
+
 export const memoriesV2 = pgTable("memories_v2", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id"),
