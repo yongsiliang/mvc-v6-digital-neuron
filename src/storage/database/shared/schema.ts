@@ -427,3 +427,78 @@ export const systemStatesV2 = pgTable("system_states_v2", {
 }, (table) => [
 	index("system_states_v2_user_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 ]);
+
+// ═══════════════════════════════════════════════════════════════════════
+// 类型导出
+// Type Exports
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * 神经元记忆类型
+ */
+export interface NeuronMemory {
+  id: string;
+  memoryType: string;
+  role: string;
+  content: string;
+  contextTags?: Record<string, unknown>;
+  questionSummary?: string;
+  importance: number;
+  accessCount: number;
+  lastAccessedAt?: string;
+  createdAt: string;
+}
+
+/**
+ * 学习角度类型
+ */
+export interface LearnedAngle {
+  id: string;
+  learnerRole: string;
+  teacherRole: string;
+  angle: string;
+  strength: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/**
+ * 记忆类型枚举
+ */
+export type MeaningType = 'episodic' | 'semantic' | 'procedural' | 'emotional' | 'insight' | 'pattern' | 'strategy' | 'concept' | 'emotion';
+
+/**
+ * 连接类型
+ */
+export type ConnectionType = 'excitatory' | 'inhibitory' | 'modulatory' | 'complementary' | 'similar' | 'contrastive';
+
+/**
+ * 触发源类型
+ */
+export type TriggerSource = 'external' | 'internal' | 'spontaneous' | 'learned' | 'input' | 'resonance';
+
+/**
+ * 意义记忆类型
+ */
+export interface MeaningMemory {
+  id: string;
+  content: string;
+  meaningType: MeaningType;
+  importance: number;
+  createdAt: string;
+  meaningSummary?: string;
+  emotionalWeight?: number;
+  meaningVector?: number[];
+  connectedMemoryIds?: string[];
+}
+
+/**
+ * 意义连接类型
+ */
+export interface MeaningConnection {
+  id: string;
+  fromMeaningId: string;
+  toMeaningId: string;
+  connectionType: ConnectionType;
+  strength: number;
+}

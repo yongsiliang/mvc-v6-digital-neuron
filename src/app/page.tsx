@@ -65,6 +65,14 @@ export default function Home() {
   const [openDoors, setOpenDoors] = useState<string[]>([]);
   const [styleInfo, setStyleInfo] = useState<{ isNew: boolean; styleCount: number; distance: number } | undefined>();
   
+  // 记忆上下文状态
+  const [memoryContext, setMemoryContext] = useState<{
+    count: number;
+    topics: string[];
+    emotionalContext: string;
+    preview: Array<{ summary: string[]; importance: number }>;
+  } | null>(null);
+  
   // 移动端 Tab 状态
   const [mobileTab, setMobileTab] = useState<string>('chat');
   const [desktopActiveTab, setDesktopActiveTab] = useState<string>('space');
@@ -106,6 +114,7 @@ export default function Home() {
     setConsciousnessTrail(0);
     setOpenDoors([]);
     setStyleInfo(undefined);
+    setMemoryContext(null); // 重置记忆上下文
 
     try {
       const response = await fetch('/api/stream', {
@@ -154,6 +163,9 @@ export default function Home() {
                 setConsciousnessTrail(data.trail);
               } else if (type === 'open-doors') {
                 setOpenDoors(data.meanings || []);
+              } else if (type === 'memory-context') {
+                // 接收记忆上下文
+                setMemoryContext(data);
               } else if (type === 'done') {
                 // 添加完整响应到消息列表
                 const assistantMsg: Message = {
@@ -231,6 +243,30 @@ export default function Home() {
               <span className="ml-1 font-bold text-primary">{neuronState?.stats.neuronCount || 0}</span>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* 记忆上下文 */}
+      {memoryContext && (
+        <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
+          <div className="text-sm font-medium text-primary mb-2">记忆上下文</div>
+          <div className="text-xs text-muted-foreground mb-2">
+            已回忆 {memoryContext.count} 条相关记忆
+          </div>
+          {memoryContext.topics.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {memoryContext.topics.slice(0, 4).map((topic, i) => (
+                <span key={i} className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">
+                  {topic}
+                </span>
+              ))}
+            </div>
+          )}
+          {memoryContext.emotionalContext && (
+            <div className="text-xs text-muted-foreground">
+              情感: {memoryContext.emotionalContext}
+            </div>
+          )}
         </div>
       )}
       

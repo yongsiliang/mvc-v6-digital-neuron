@@ -4,6 +4,8 @@ import { LatentGameEngine } from '@/lib/neuron/latent-game';
 import { getConversationContext } from '@/lib/neuron/conversation-context';
 import { HeaderUtils } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { MemoryIntegrationService } from '@/lib/neuron-v2/memory-integration';
+import { getUserIdFromRequest, isValidUserId } from '@/lib/neuron-v2/auth';
 
 /**
  * 流式聊天API - SSE协议
@@ -17,7 +19,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, context, sessionId } = body;
+    const { message, context, sessionId, userId: clientUserId } = body;
 
     if (!message || typeof message !== 'string') {
       return new Response(JSON.stringify({ error: '消息内容不能为空' }), {
@@ -26,7 +28,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // 获取用户ID（优先从请求体，其次从请求头）
+    const userId = clientUserId || getUserIdFromRequest(request);
+    const validUserId = userId && isValidUserId(userId) ? userId : null;
+
     const sid = sessionId || 'default-session';
+    
+    // 初始化记忆集成服务
+    const memoryService = new MemoryIntegrationService({
+      maxRelevantMemories: 5,
+      importanceThreshold: 0.3,
+    });
+    
+    if (validUserId) {
+      memoryService.setUserId(validUserId);
+    }
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
@@ -40,6 +56,29 @@ export async function POST(request: NextRequest) {
         try {
           const headers = HeaderUtils.extractForwardHeaders(request.headers);
           
+          // ==================== 记忆回忆 ====================
+          // 在对话开始前，回忆相关记忆
+          let memoryContext = null;
+          if (validUserId) {
+            try {
+              memoryContext = await memoryService.recallRelevantMemories(message);
+              // 发送记忆上下文给前端
+              if (memoryContext.relevantMemories.length > 0) {
+                send('memory-context', {
+                  count: memoryContext.relevantMemories.length,
+                  topics: memoryContext.topics,
+                  emotionalContext: memoryContext.emotionalContext,
+                  preview: memoryContext.relevantMemories.slice(0, 2).map(m => ({
+                    summary: m.keyPoints?.slice(0, 2) || [],
+                    importance: m.importance,
+                  })),
+                });
+              }
+            } catch (err) {
+              console.error('Memory recall error:', err);
+            }
+          }
+          
           // ==================== 神经元工作流 ====================
           
           // 1. 感官层：接收输入
@@ -52,12 +91,25 @@ export async function POST(request: NextRequest) {
           send('neuron', { neuronId: 'meaning-anchor', message: '计算自我关联' });
           await new Promise(r => setTimeout(r, 100));
           
-          send('neuron', { neuronId: 'memory-associate', message: '检索相关记忆' });
+          send('neuron', { neuronId: 'memory-associate', message: memoryContext 
+            ? `检索到 ${memoryContext.relevantMemories.length} 条相关记忆` 
+            : '检索相关记忆' });
           await new Promise(r => setTimeout(r, 100));
           
           send('neuron', { neuronId: 'meaning-generate', message: '生成主观意义' });
           
-          const neuronResult = await system.process(message, context);
+          // 构建增强的上下文（包含记忆）
+          const enhancedContext = memoryContext && memoryContext.relevantMemories.length > 0
+            ? {
+                ...context,
+                memoryContext: `相关记忆:\n${memoryContext.relevantMemories
+                  .slice(0, 3)
+                  .map((m, i) => `${i + 1}. ${m.content.slice(0, 200)}...`)
+                  .join('\n')}`,
+              }
+            : context;
+          
+          const neuronResult = await system.process(message, enhancedContext);
           
           send('meaning', neuronResult.meaning);
           send('decision', neuronResult.decision);
@@ -120,7 +172,7 @@ export async function POST(request: NextRequest) {
 
           controller.close();
 
-          // 9. 后台异步：保存对话 + 学习
+          // 9. 后台异步：保存对话 + 学习 + 记忆
           engine.saveConversation(
             sid,
             message,
@@ -130,6 +182,25 @@ export async function POST(request: NextRequest) {
           ).catch(() => {});
           
           engine.learnAsync(message, gameResult.allThoughts, gameResult.winner);
+          
+          // 10. 保存对话记忆（异步）
+          if (validUserId) {
+            (async () => {
+              try {
+                // 保存用户消息记忆
+                await memoryService.rememberConversation('user', message, {
+                  topics: memoryContext?.topics,
+                });
+                
+                // 保存助手回复记忆
+                await memoryService.rememberConversation('assistant', fullResponse, {
+                  topics: memoryContext?.topics,
+                });
+              } catch (err) {
+                console.error('Failed to save conversation memory:', err);
+              }
+            })();
+          }
 
         } catch (error) {
           send('error', { message: error instanceof Error ? error.message : '处理失败' });
