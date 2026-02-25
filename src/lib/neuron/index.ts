@@ -27,7 +27,7 @@ export { LatentGameEngine, type InnerThought, type GameResult } from './latent-g
 export { 
   NeuronLinkDynamics, 
   getNeuronLinkDynamics, 
-  getNeuronLinkManager,
+  initializeNeuronLink,
   type SynapseState 
 } from './neuron-link';
 
