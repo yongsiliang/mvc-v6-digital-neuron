@@ -278,11 +278,11 @@ export default function NeuronV3Dashboard() {
               
               <div>
                 <h1 className="text-xl font-bold tracking-tight">
-                  <span className="text-primary">NEURON</span>
+                  <span className="text-primary">数字神经元</span>
                   <span className="text-muted-foreground font-light ml-1">V3</span>
                 </h1>
-                <p className="text-xs text-muted-foreground tracking-widest uppercase">
-                  Predictive Coding · Meaning-Driven · Self-Learning
+                <p className="text-xs text-muted-foreground tracking-wider">
+                  预测编码 · 意义驱动 · 自主学习
                 </p>
               </div>
             </div>
@@ -299,7 +299,7 @@ export default function NeuronV3Dashboard() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold font-mono-nums text-primary">{stats.neuronCount}</div>
-                  <div className="text-xs text-muted-foreground">NEURONS</div>
+                  <div className="text-xs text-muted-foreground">神经元</div>
                 </div>
               </div>
               
@@ -312,7 +312,7 @@ export default function NeuronV3Dashboard() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold font-mono-nums text-primary">{stats.predictionAccuracy.toFixed(1)}%</div>
-                  <div className="text-xs text-muted-foreground">ACCURACY</div>
+                  <div className="text-xs text-muted-foreground">准确率</div>
                 </div>
               </div>
               
@@ -327,7 +327,7 @@ export default function NeuronV3Dashboard() {
                   "w-2 h-2 rounded-full",
                   apiLoading ? "bg-amber-500 animate-pulse" : "bg-primary"
                 )} />
-                {apiLoading ? 'INITIALIZING' : 'ONLINE'}
+                {apiLoading ? '初始化中' : '运行中'}
               </div>
             </div>
           </div>
@@ -340,8 +340,8 @@ export default function NeuronV3Dashboard() {
         <section className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full bg-gradient-to-b from-primary to-primary/30" />
-            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-              System Overview
+            <h2 className="text-sm font-semibold tracking-wider text-muted-foreground">
+              系统状态概览
             </h2>
             <div className="flex-1 h-px bg-gradient-to-r from-primary/30 to-transparent" />
           </div>
@@ -351,11 +351,11 @@ export default function NeuronV3Dashboard() {
         {/* 核心功能展示 */}
         <Tabs defaultValue="network" className="w-full">
           <TabsList className="grid w-full grid-cols-5 h-auto p-1 bg-card/50 border border-primary/20">
-            <TabsTrigger value="network">Network</TabsTrigger>
-            <TabsTrigger value="vsa">Semantic Space</TabsTrigger>
-            <TabsTrigger value="consciousness">Consciousness</TabsTrigger>
-            <TabsTrigger value="planning">Planning</TabsTrigger>
-            <TabsTrigger value="executive">Executive</TabsTrigger>
+            <TabsTrigger value="network">神经网络</TabsTrigger>
+            <TabsTrigger value="vsa">语义空间</TabsTrigger>
+            <TabsTrigger value="consciousness">意识内容</TabsTrigger>
+            <TabsTrigger value="planning">目标计划</TabsTrigger>
+            <TabsTrigger value="executive">执行控制</TabsTrigger>
           </TabsList>
 
           {/* 神经网络标签页 */}
@@ -395,24 +395,24 @@ export default function NeuronV3Dashboard() {
                   <CardHeader>
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      Semantic Operations
+                      语义操作
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                      <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Binding</h4>
-                      <p className="text-sm text-foreground">Concept × Attribute → Composite</p>
-                      <code className="text-xs text-primary/80 font-mono">"red" × "apple" = "red_apple"</code>
+                      <h4 className="text-xs text-muted-foreground mb-2">绑定 (Binding)</h4>
+                      <p className="text-sm text-foreground">概念 × 属性 → 复合概念</p>
+                      <code className="text-xs text-primary/80 font-mono">"红色" × "苹果" = "红苹果"</code>
                     </div>
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                      <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Bundling</h4>
-                      <p className="text-sm text-foreground">Concept + Concept → Set</p>
-                      <code className="text-xs text-primary/80 font-mono">"cat" + "dog" = "pets"</code>
+                      <h4 className="text-xs text-muted-foreground mb-2">捆绑 (Bundling)</h4>
+                      <p className="text-sm text-foreground">概念 + 概念 → 概念集合</p>
+                      <code className="text-xs text-primary/80 font-mono">"猫" + "狗" = "宠物"</code>
                     </div>
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                      <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Unbinding</h4>
-                      <p className="text-sm text-foreground">Composite ÷ Attribute → Original</p>
-                      <code className="text-xs text-primary/80 font-mono">"red_apple" ÷ "red" = "apple"</code>
+                      <h4 className="text-xs text-muted-foreground mb-2">解绑 (Unbinding)</h4>
+                      <p className="text-sm text-foreground">复合概念 ÷ 属性 → 原始概念</p>
+                      <code className="text-xs text-primary/80 font-mono">"红苹果" ÷ "红色" = "苹果"</code>
                     </div>
                   </CardContent>
                 </Card>
@@ -436,16 +436,16 @@ export default function NeuronV3Dashboard() {
                   <CardHeader>
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      Cognitive Modules
+                      认知模块
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {[
-                      { name: 'Perception', status: 'active', strength: 0.85 },
-                      { name: 'Language', status: 'active', strength: 0.78 },
-                      { name: 'Memory', status: 'idle', strength: 0.45 },
-                      { name: 'Emotion', status: 'active', strength: 0.62 },
-                      { name: 'Metacognition', status: 'idle', strength: 0.38 },
+                      { name: '感知模块', status: 'active', strength: 0.85 },
+                      { name: '语言模块', status: 'active', strength: 0.78 },
+                      { name: '记忆模块', status: 'idle', strength: 0.45 },
+                      { name: '情感模块', status: 'active', strength: 0.62 },
+                      { name: '元认知模块', status: 'idle', strength: 0.38 },
                     ].map((module, i) => (
                       <div key={i} className="flex items-center justify-between p-2 rounded-md bg-primary/5 hover:bg-primary/10 transition-colors text-sm">
                         <span className="text-foreground">{module.name}</span>
@@ -491,30 +491,30 @@ export default function NeuronV3Dashboard() {
                   <CardHeader>
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Goal Decomposition
+                      目标分解示例
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
                         <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline" className="text-primary border-primary/30">Main Goal</Badge>
-                          <span className="text-sm font-medium">Understand User Intent</span>
+                          <Badge variant="outline" className="text-primary border-primary/30">主目标</Badge>
+                          <span className="text-sm font-medium">理解用户意图</span>
                         </div>
                         <div className="pl-4 space-y-2 border-l-2 border-primary/20">
                           <div className="flex items-center gap-2 text-sm">
-                            <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 text-xs">Sub-goal</Badge>
-                            <span>Semantic Parsing</span>
+                            <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 text-xs">子目标</Badge>
+                            <span>语义解析</span>
                             <span className="text-xs text-emerald-500">✓</span>
                           </div>
                           <div className="flex items-center gap-2 text-sm">
-                            <Badge variant="outline" className="text-primary border-primary/30 text-xs">Sub-goal</Badge>
-                            <span>Intent Classification</span>
+                            <Badge variant="outline" className="text-primary border-primary/30 text-xs">子目标</Badge>
+                            <span>意图分类</span>
                             <span className="text-xs text-primary animate-pulse">▶</span>
                           </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Badge variant="outline" className="text-xs">Sub-goal</Badge>
-                            <span>Sentiment Analysis</span>
+                            <Badge variant="outline" className="text-xs">子目标</Badge>
+                            <span>情感分析</span>
                           </div>
                         </div>
                       </div>
@@ -545,15 +545,15 @@ export default function NeuronV3Dashboard() {
                   <CardHeader>
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      Attention Mode
+                      注意力模式
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-3 gap-3">
                       {[
-                        { mode: 'focused', label: 'Focused', icon: '🎯', desc: 'Single task priority' },
-                        { mode: 'divided', label: 'Divided', icon: '⚡', desc: 'Parallel processing' },
-                        { mode: 'exploratory', label: 'Explore', icon: '🔍', desc: 'Search new info' },
+                        { mode: 'focused', label: '专注', icon: '🎯', desc: '单一任务高优先级' },
+                        { mode: 'divided', label: '分配', icon: '⚡', desc: '多任务并行处理' },
+                        { mode: 'exploratory', label: '探索', icon: '🔍', desc: '广泛搜索新信息' },
                       ].map((m) => (
                         <div
                           key={m.mode}
@@ -571,13 +571,13 @@ export default function NeuronV3Dashboard() {
                       ))}
                     </div>
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
-                      <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Task Switch History</h4>
+                      <h4 className="text-xs text-muted-foreground mb-2">任务切换历史</h4>
                       <div className="space-y-1">
                         {activityEvents.slice(-3).reverse().map((event, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs">
                             <span className="text-muted-foreground">{event.type}</span>
                             <span className="text-primary">→</span>
-                            <span className="truncate text-foreground">{event.details || 'Processing...'}</span>
+                            <span className="truncate text-foreground">{event.details || '处理中...'}</span>
                           </div>
                         ))}
                       </div>
@@ -613,39 +613,39 @@ export default function NeuronV3Dashboard() {
             <CardHeader>
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                System Architecture
+                系统架构
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-5 gap-4 text-sm">
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                  <h4 className="font-medium text-primary mb-2">Predictive Coding</h4>
+                  <h4 className="font-medium text-primary mb-2">预测编码</h4>
                   <p className="text-muted-foreground text-xs leading-relaxed">
-                    Neurons predict inputs and learn from prediction errors. Surprise drives neuron generation.
+                    神经元主动预测输入，通过预测误差学习。惊讶度驱动新神经元的生成。
                   </p>
                 </div>
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                  <h4 className="font-medium text-emerald-500 mb-2">Reward Learning</h4>
+                  <h4 className="font-medium text-emerald-500 mb-2">奖励学习</h4>
                   <p className="text-muted-foreground text-xs leading-relaxed">
-                    Integrates explicit/implicit/self-eval feedback. TD learning adjusts weights with Hebbian rules.
+                    整合显式/隐式/自评估反馈，通过TD学习调整权重，Hebbian规则强化连接。
                   </p>
                 </div>
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                  <h4 className="font-medium text-primary mb-2">VSA Semantic Space</h4>
+                  <h4 className="font-medium text-primary mb-2">VSA语义空间</h4>
                   <p className="text-muted-foreground text-xs leading-relaxed">
-                    High-dim vectors represent concepts. Algebraic operations enable semantic reasoning.
+                    高维向量表示概念，通过代数运算实现语义推理，赋予系统理解能力。
                   </p>
                 </div>
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                  <h4 className="font-medium text-amber-500 mb-2">Global Workspace</h4>
+                  <h4 className="font-medium text-amber-500 mb-2">全局工作空间</h4>
                   <p className="text-muted-foreground text-xs leading-relaxed">
-                    Cognitive modules compete for consciousness. Broadcasts info across the system.
+                    认知模块竞争进入意识，广播信息到全系统。支持自我意识计算。
                   </p>
                 </div>
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
-                  <h4 className="font-medium text-primary mb-2">Cognitive Coordinator</h4>
+                  <h4 className="font-medium text-primary mb-2">认知协调器</h4>
                   <p className="text-muted-foreground text-xs leading-relaxed">
-                    Coordinates planning & executive control. Implements goal decomposition and attention.
+                    协调计划模块与执行控制，实现目标分解、任务规划与注意力控制。
                   </p>
                 </div>
               </div>
@@ -658,8 +658,8 @@ export default function NeuronV3Dashboard() {
       <footer className="border-t border-primary/10 mt-8 py-6 relative">
         <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none" />
         <div className="container mx-auto px-6 text-center relative">
-          <p className="text-xs text-muted-foreground tracking-widest uppercase">
-            Digital Neuron System V3 · Predictive Coding + VSA Architecture · Autonomous Learning & Consciousness Emergence
+          <p className="text-xs text-muted-foreground tracking-wider">
+            数字神经元系统 V3 · 预测编码 + 向量符号架构 · 支持自主学习与意识涌现
           </p>
         </div>
       </footer>

@@ -160,9 +160,9 @@ export function SystemStatsGrid({ stats, className }: SystemStatsGridProps) {
   return (
     <div className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>
       <StatCard
-        title="Neurons"
+        title="神经元数量"
         value={stats.neuronCount}
-        subtitle="Active predictive units"
+        subtitle="活跃预测单元"
         variant="active"
         icon={
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -172,14 +172,14 @@ export function SystemStatsGrid({ stats, className }: SystemStatsGridProps) {
         }
       />
       <GaugeCard
-        title="Accuracy"
+        title="预测准确率"
         value={stats.predictionAccuracy}
         thresholds={{ warning: 60, success: 85 }}
       />
       <StatCard
-        title="Learning Events"
+        title="学习事件"
         value={stats.learningEvents}
-        subtitle="Total learning cycles"
+        subtitle="总学习次数"
         trend={stats.learningEvents > 0 ? 'up' : 'neutral'}
         icon={
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -188,7 +188,7 @@ export function SystemStatsGrid({ stats, className }: SystemStatsGridProps) {
         }
       />
       <GaugeCard
-        title="Consciousness"
+        title="意识水平"
         value={stats.consciousnessLevel}
         thresholds={{ warning: 30, success: 70 }}
       />
