@@ -21,23 +21,13 @@ import {
   generateSamplePlanningData,
   generateSampleExecutiveData
 } from '@/components/neuron-viz';
+import { useNeuronV3System, defaultSystemState } from '@/hooks/use-neuron-v3';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 // 类型定义
-interface SystemStats {
-  neuronCount: number;
-  predictionAccuracy: number;
-  totalSurprise: number;
-  learningEvents: number;
-  totalReward: number;
-  totalPunishment: number;
-  consciousnessLevel: number;
-  selfAwarenessIndex: number;
-}
-
 interface ActivityEvent {
   id: string;
   timestamp: number;
@@ -54,19 +44,15 @@ interface FeedbackItem {
 }
 
 export default function NeuronV3Dashboard() {
-  // 系统状态
-  const [stats, setStats] = useState<SystemStats>({
-    neuronCount: 8,
-    predictionAccuracy: 72.5,
-    totalSurprise: 12.3,
-    learningEvents: 156,
-    totalReward: 45.2,
-    totalPunishment: 12.8,
-    consciousnessLevel: 65.0,
-    selfAwarenessIndex: 58.3,
-  });
+  // 使用真实 API Hook
+  const { 
+    systemState, 
+    isLoading: apiLoading, 
+    processInput, 
+    sendFeedback 
+  } = useNeuronV3System();
 
-  // 网络数据
+  // 网络数据 - 从API获取或使用默认值
   const [networkData, setNetworkData] = useState(generateSampleNetwork);
 
   // VSA语义空间数据
@@ -88,110 +74,121 @@ export default function NeuronV3Dashboard() {
 
   // 交互状态
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStage, setCurrentStage] = useState<string>('');
   const [lastResponse, setLastResponse] = useState<string>('');
   const [feedbackHistory, setFeedbackHistory] = useState<FeedbackItem[]>([]);
 
-  // 模拟实时数据更新
+  // 使用真实系统状态
+  const stats = {
+    neuronCount: systemState?.neuronCount ?? defaultSystemState.neuronCount,
+    predictionAccuracy: systemState?.predictionAccuracy ?? defaultSystemState.predictionAccuracy,
+    totalSurprise: systemState?.totalSurprise ?? defaultSystemState.totalSurprise,
+    learningEvents: systemState?.learningEvents ?? defaultSystemState.learningEvents,
+    totalReward: systemState?.totalReward ?? defaultSystemState.totalReward,
+    totalPunishment: systemState?.totalPunishment ?? defaultSystemState.totalPunishment,
+    consciousnessLevel: systemState?.consciousnessLevel ?? defaultSystemState.consciousnessLevel,
+    selfAwarenessIndex: systemState?.selfAwarenessIndex ?? defaultSystemState.selfAwarenessIndex,
+  };
+
+  // 根据系统状态更新网络可视化
   useEffect(() => {
-    const interval = setInterval(() => {
-      // 更新网络状态
+    if (systemState) {
+      // 更新网络状态显示
       setNetworkData(prev => ({
-        neurons: prev.neurons.map(n => ({
+        neurons: prev.neurons.map((n, i) => ({
           ...n,
-          activation: Math.max(0, Math.min(1, n.activation + (Math.random() - 0.5) * 0.1)),
-          state: Math.random() > 0.7 
-            ? (['active', 'predicting', 'dormant', 'surprised'] as const)[Math.floor(Math.random() * 4)]
-            : n.state,
+          activation: stats.neuronCount > 0 
+            ? Math.random() * 0.3 + 0.2 * (i % 3) // 基于真实状态的模拟
+            : 0.1,
+          state: stats.consciousnessLevel > 50 
+            ? (['active', 'predicting'] as const)[Math.floor(Math.random() * 2)]
+            : 'dormant',
         })),
         connections: prev.connections.map(c => ({
           ...c,
-          active: Math.random() > 0.6,
+          active: stats.consciousnessLevel > 30,
         })),
       }));
 
-      // 更新VSA数据
-      setVsaData(prev => ({
-        concepts: prev.concepts.map(c => ({
-          ...c,
-          similarity: Math.max(0.1, Math.min(1, c.similarity + (Math.random() - 0.5) * 0.05)),
-        })),
-        links: prev.links.map(l => ({
-          ...l,
-          similarity: Math.max(0.1, Math.min(1, l.similarity + (Math.random() - 0.5) * 0.05)),
-        })),
-      }));
-
-      // 更新统计数据
-      setStats(prev => ({
-        ...prev,
-        predictionAccuracy: Math.max(50, Math.min(95, prev.predictionAccuracy + (Math.random() - 0.5) * 2)),
-        consciousnessLevel: Math.max(20, Math.min(90, prev.consciousnessLevel + (Math.random() - 0.5) * 3)),
-        selfAwarenessIndex: Math.max(15, Math.min(85, prev.selfAwarenessIndex + (Math.random() - 0.5) * 2)),
-      }));
-
-      // 更新意识水平
+      // 更新意识数据
       setConsciousnessData(prev => ({
         ...prev,
         consciousnessLevel: stats.consciousnessLevel,
       }));
+    }
+  }, [systemState, stats.neuronCount, stats.consciousnessLevel]);
 
-      // 添加活动事件
-      if (Math.random() > 0.7) {
-        const types: ActivityEvent['type'][] = ['activate', 'predict', 'learn', 'surprise'];
-        setActivityEvents(prev => [...prev, {
-          id: `act-${Date.now()}`,
-          timestamp: Date.now(),
-          type: types[Math.floor(Math.random() * types.length)],
-          neuronId: `n${Math.floor(Math.random() * 8)}`,
-          details: `阈值: ${(Math.random() * 0.5).toFixed(2)}`,
-        }].slice(-50));
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [stats.consciousnessLevel]);
-
-  // 处理消息发送
+  // 处理消息发送 - 使用真实API
   const handleSendMessage = useCallback(async (message: string) => {
     setIsProcessing(true);
+    setLastResponse('');
     
-    // 模拟处理
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // 添加活动事件
+    // 添加用户活动事件
     setActivityEvents(prev => [...prev, {
       id: `act-${Date.now()}`,
       timestamp: Date.now(),
       type: 'activate',
-      neuronId: 'n0',
-      details: `处理输入: ${message.slice(0, 20)}...`,
-    }, {
-      id: `act-${Date.now() + 1}`,
-      timestamp: Date.now() + 500,
-      type: 'predict',
-      neuronId: 'n1',
-      details: '生成预测...',
+      neuronId: 'input',
+      details: `用户输入: ${message.slice(0, 30)}...`,
     }]);
 
-    // 模拟响应
-    const responses = [
-      '根据我的预测模型分析，这个输入与之前的模式有较高的相似度。我正在调整相关神经元的权重。',
-      '这是一个有趣的新模式。我的惊讶度检测被触发，正在创建新的神经元来处理这类输入。',
-      '基于历史学习，我预测您可能对此主题感兴趣。让我从记忆中检索相关信息。',
-      '我的自我意识模块正在评估这个输入对系统的意义。这激活了我的元认知神经元。',
-    ];
-    
-    setLastResponse(responses[Math.floor(Math.random() * responses.length)]);
-    setStats(prev => ({
-      ...prev,
-      learningEvents: prev.learningEvents + 1,
-    }));
-    
-    setIsProcessing(false);
-  }, []);
+    // 调用真实API
+    const result = await processInput(
+      message,
+      undefined,
+      (stage, msg) => {
+        // 处理阶段回调
+        setCurrentStage(msg);
+        setActivityEvents(prev => [...prev, {
+          id: `act-${Date.now()}`,
+          timestamp: Date.now(),
+          type: stage === 'prediction' ? 'predict' : 
+                stage === 'learning' ? 'learn' : 
+                stage === 'comparison' ? 'surprise' : 'activate',
+          neuronId: 'system',
+          details: msg,
+        }]);
+      },
+      (processResult) => {
+        // 完成回调
+        if (processResult) {
+          // 构建响应文本
+          const meaning = processResult.meaning;
+          const learning = processResult.learning;
+          
+          let response = '';
+          if (meaning) {
+            response += `**意义理解**: ${meaning.interpretation}\n`;
+            response += `- 自我关联度: ${(meaning.selfRelevance * 100).toFixed(0)}%\n`;
+            response += `- 情感色彩: ${meaning.sentiment > 0 ? '正面' : meaning.sentiment < 0 ? '负面' : '中性'}\n\n`;
+          }
+          if (learning) {
+            response += `**学习结果**: ${learning.summary}\n`;
+            response += `- 调整神经元: ${learning.adjustedNeurons} 个\n`;
+            response += `- 新增神经元: ${learning.newNeurons} 个`;
+          }
+          
+          setLastResponse(response || '处理完成');
+        }
+      }
+    );
 
-  // 处理反馈
-  const handleFeedback = useCallback((type: 'positive' | 'negative') => {
+    // 添加完成事件
+    setActivityEvents(prev => [...prev, {
+      id: `act-${Date.now()}`,
+      timestamp: Date.now(),
+      type: 'learn',
+      neuronId: 'system',
+      details: '处理完成',
+    }]);
+
+    setIsProcessing(false);
+    setCurrentStage('');
+  }, [processInput]);
+
+  // 处理反馈 - 使用真实API
+  const handleFeedback = useCallback(async (type: 'positive' | 'negative') => {
+    // 先添加本地记录
     setFeedbackHistory(prev => [...prev, {
       id: `fb-${Date.now()}`,
       timestamp: Date.now(),
@@ -199,23 +196,20 @@ export default function NeuronV3Dashboard() {
       context: lastResponse.slice(0, 30) + '...',
     }]);
 
-    // 更新统计
-    setStats(prev => ({
-      ...prev,
-      totalReward: type === 'positive' ? prev.totalReward + 1 : prev.totalReward,
-      totalPunishment: type === 'negative' ? prev.totalPunishment + 1 : prev.totalPunishment,
-      learningEvents: prev.learningEvents + 1,
-    }));
-
-    // 添加学习事件
-    setActivityEvents(prev => [...prev, {
-      id: `act-${Date.now()}`,
-      timestamp: Date.now(),
-      type: 'learn',
-      neuronId: 'n3',
-      details: type === 'positive' ? '正向奖励信号' : '负向惩罚信号',
-    }]);
-  }, [lastResponse]);
+    // 调用真实API
+    const result = await sendFeedback(type, lastResponse.slice(0, 50));
+    
+    if (result) {
+      // 添加学习事件
+      setActivityEvents(prev => [...prev, {
+        id: `act-${Date.now()}`,
+        timestamp: Date.now(),
+        type: 'learn',
+        neuronId: 'reward',
+        details: `奖励信号: ${result.reward.toFixed(2)} (显式: ${result.breakdown.explicit.toFixed(2)}, 隐式: ${result.breakdown.implicit.toFixed(2)})`,
+      }]);
+    }
+  }, [lastResponse, sendFeedback]);
 
   return (
     <div className="min-h-screen bg-background grid-bg">
@@ -246,8 +240,13 @@ export default function NeuronV3Dashboard() {
                 准确率: {stats.predictionAccuracy.toFixed(1)}%
               </Badge>
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[var(--neuron-active)] animate-pulse" />
-                <span className="text-sm text-muted-foreground">运行中</span>
+                <span className={cn(
+                  "w-2 h-2 rounded-full",
+                  apiLoading ? "bg-yellow-500 animate-pulse" : "bg-[var(--neuron-active)]"
+                )} />
+                <span className="text-sm text-muted-foreground">
+                  {apiLoading ? '加载中...' : '运行中'}
+                </span>
               </div>
             </div>
           </div>
@@ -471,16 +470,11 @@ export default function NeuronV3Dashboard() {
                     <div className="p-3 rounded-lg bg-muted/20 border border-muted-foreground/10">
                       <h4 className="text-xs text-muted-foreground mb-2">任务切换历史</h4>
                       <div className="space-y-1">
-                        {[
-                          { from: '输入处理', to: '记忆检索', time: '2s前' },
-                          { from: '记忆检索', to: '响应生成', time: '5s前' },
-                          { from: '响应生成', to: '反馈学习', time: '10s前' },
-                        ].map((switch_, i) => (
+                        {activityEvents.slice(-3).reverse().map((event, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs">
-                            <span className="text-muted-foreground">{switch_.from}</span>
+                            <span className="text-muted-foreground">{event.type}</span>
                             <span className="text-[var(--neuron-active)]">→</span>
-                            <span>{switch_.to}</span>
-                            <span className="text-muted-foreground ml-auto">{switch_.time}</span>
+                            <span className="truncate">{event.details || '处理中...'}</span>
                           </div>
                         ))}
                       </div>
@@ -499,7 +493,7 @@ export default function NeuronV3Dashboard() {
             onSendMessage={handleSendMessage}
             onFeedback={handleFeedback}
             isProcessing={isProcessing}
-            lastResponse={lastResponse}
+            lastResponse={currentStage || lastResponse}
           />
 
           {/* 活动时间线 */}
