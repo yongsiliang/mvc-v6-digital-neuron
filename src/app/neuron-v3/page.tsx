@@ -4,28 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   SystemStatsGrid, 
   NetworkTopology, 
-  generateSampleNetwork, 
   PredictionMonitor, 
   ActivityTimeline, 
-  generateSamplePredictions, 
-  generateSampleLearningEvents, 
   InteractionPanel, 
   FeedbackHistory,
   VSASpaceVisualization,
-  generateSampleVSAData,
   ConsciousnessPanel,
   ConsciousnessGauge,
-  generateSampleConsciousnessData,
   PlanningPanel,
   ExecutivePanel,
   IntuitionPanel,
-  generateSamplePlanningData,
-  generateSampleExecutiveData,
-  generateSampleIntuition,
-  generateSampleReadiness,
-  generateSampleBackgroundStats,
 } from '@/components/neuron-viz';
-import { useNeuronV3System, defaultSystemState, type NetworkTopologyData, type VSAData, type ConsciousnessData, type PlanningData, type ExecutiveData, type NeuronStatusData, type SelfCognitiveData } from '@/hooks/use-neuron-v3';
+import { useNeuronV3System, defaultSystemState, type NetworkTopologyData, type VSAData, type ConsciousnessData, type PlanningData, type ExecutiveData, type NeuronStatusData, type SelfCognitiveData, type BackgroundData } from '@/hooks/use-neuron-v3';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -60,6 +50,7 @@ export default function NeuronV3Dashboard() {
     fetchConsciousnessData,
     fetchPlanningData,
     fetchExecutiveData,
+    fetchBackgroundData,
     // 实时状态（从 SSE 接收）
     neuronStatus,
     selfCognitive,
@@ -99,9 +90,25 @@ export default function NeuronV3Dashboard() {
     timePressure: 0,
   });
 
-  // 预测和事件
-  const [predictions, setPredictions] = useState(generateSamplePredictions());
-  const [learningEvents, setLearningEvents] = useState(generateSampleLearningEvents());
+  // 预测和事件 - 从 SSE 事件和用户交互中动态收集
+  const [predictions, setPredictions] = useState<Array<{
+    id: string;
+    timestamp: number;
+    neuronId: string;
+    prediction: number;
+    actual: number;
+    error: number;
+    surprise: number;
+  }>>([]);
+  
+  const [learningEvents, setLearningEvents] = useState<Array<{
+    id: string;
+    timestamp: number;
+    type: 'reward' | 'punishment';
+    value: number;
+    source: string;
+  }>>([]);
+  
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([]);
 
   // 交互状态
@@ -112,6 +119,17 @@ export default function NeuronV3Dashboard() {
   
   // 对话历史（用于 LLM 上下文）
   const [chatHistory, setChatHistory] = useState<Array<{ role: string; content: string }>>([]);
+
+  // 后台处理数据（系统1：直觉、准备状态）
+  const [backgroundData, setBackgroundData] = useState<{
+    stats: { patternCount: number; processCount: number; age: number; readinessLevel: number } | null;
+    recentIntuitions: Array<{ type: string; strength: number; confidence: number; timestamp: number }>;
+    readiness: { primedCount: number; predictedNext: string[]; readinessLevel: number } | null;
+  }>({
+    stats: null,
+    recentIntuitions: [],
+    readiness: null,
+  });
 
   // 使用真实系统状态
   const stats = {
@@ -128,12 +146,13 @@ export default function NeuronV3Dashboard() {
   // 定期获取所有可视化数据
   useEffect(() => {
     const fetchAllData = async () => {
-      const [network, vsa, consciousness, planning, executive] = await Promise.all([
+      const [network, vsa, consciousness, planning, executive, background] = await Promise.all([
         fetchNetworkTopology(),
         fetchVSAData(),
         fetchConsciousnessData(),
         fetchPlanningData(),
         fetchExecutiveData(),
+        fetchBackgroundData(),
       ]);
 
       if (network) setNetworkData(network);
@@ -141,6 +160,11 @@ export default function NeuronV3Dashboard() {
       if (consciousness) setConsciousnessData(consciousness);
       if (planning) setPlanningData(planning);
       if (executive) setExecutiveData(executive);
+      if (background) setBackgroundData({
+        stats: background.stats,
+        recentIntuitions: background.recentIntuitions,
+        readiness: background.readiness,
+      });
     };
 
     fetchAllData();
@@ -729,11 +753,27 @@ export default function NeuronV3Dashboard() {
           {/* 反馈历史 */}
           <FeedbackHistory feedback={feedbackHistory} />
           
-          {/* 系统1：直觉处理 */}
+          {/* 系统1：直觉处理 - 使用真实 API 数据 */}
           <IntuitionPanel 
-            intuition={generateSampleIntuition()}
-            readiness={generateSampleReadiness()}
-            stats={generateSampleBackgroundStats()}
+            intuition={backgroundData.recentIntuitions[0] ? {
+              type: backgroundData.recentIntuitions[0].type as 'familiar' | 'novel' | 'coherent' | 'conflict' | 'opportunity' | 'risk',
+              strength: backgroundData.recentIntuitions[0].strength,
+              confidence: backgroundData.recentIntuitions[0].confidence,
+              relatedConcepts: [],
+              timestamp: backgroundData.recentIntuitions[0].timestamp,
+            } : undefined}
+            readiness={backgroundData.readiness ? {
+              readinessLevel: backgroundData.readiness.readinessLevel,
+              primedCount: backgroundData.readiness.primedCount,
+              predictedNext: backgroundData.readiness.predictedNext,
+              timestamp: Date.now(),
+            } : undefined}
+            stats={backgroundData.stats ? {
+              patternCount: backgroundData.stats.patternCount,
+              processCount: backgroundData.stats.processCount,
+              age: backgroundData.stats.age,
+              readinessLevel: backgroundData.stats.readinessLevel,
+            } : undefined}
           />
         </section>
 

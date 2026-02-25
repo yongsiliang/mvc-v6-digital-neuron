@@ -182,6 +182,30 @@ export interface SelfCognitiveData {
 }
 
 /**
+ * 后台处理数据类型
+ */
+export interface BackgroundData {
+  stats: {
+    patternCount: number;
+    processCount: number;
+    age: number;
+    readinessLevel: number;
+  };
+  recentIntuitions: Array<{
+    type: string;
+    strength: number;
+    confidence: number;
+    timestamp: number;
+  }>;
+  readiness: {
+    primedCount: number;
+    predictedNext: string[];
+    readinessLevel: number;
+    timestamp: number;
+  };
+}
+
+/**
  * 神经元V3系统Hook
  */
 export function useNeuronV3System() {
@@ -496,6 +520,24 @@ export function useNeuronV3System() {
     }
   }, []);
 
+  // 获取后台处理数据（系统1：直觉、准备状态）
+  const fetchBackgroundData = useCallback(async (): Promise<BackgroundData | null> => {
+    try {
+      const response = await fetch('/api/neuron-v3/background');
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Failed to fetch background data:', data.error);
+        return null;
+      }
+    } catch (err) {
+      console.error('Background data error:', err);
+      return null;
+    }
+  }, []);
+
   return {
     systemState,
     isLoading,
@@ -513,6 +555,7 @@ export function useNeuronV3System() {
     fetchConsciousnessData,
     fetchPlanningData,
     fetchExecutiveData,
+    fetchBackgroundData,
   };
 }
 
