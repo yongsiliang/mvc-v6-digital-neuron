@@ -1,7 +1,26 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { SystemStatsGrid, NetworkTopology, generateSampleNetwork, PredictionMonitor, ActivityTimeline, generateSamplePredictions, generateSampleLearningEvents, InteractionPanel, FeedbackHistory } from '@/components/neuron-viz';
+import { 
+  SystemStatsGrid, 
+  NetworkTopology, 
+  generateSampleNetwork, 
+  PredictionMonitor, 
+  ActivityTimeline, 
+  generateSamplePredictions, 
+  generateSampleLearningEvents, 
+  InteractionPanel, 
+  FeedbackHistory,
+  VSASpaceVisualization,
+  generateSampleVSAData,
+  ConsciousnessPanel,
+  ConsciousnessGauge,
+  generateSampleConsciousnessData,
+  PlanningPanel,
+  ExecutivePanel,
+  generateSamplePlanningData,
+  generateSampleExecutiveData
+} from '@/components/neuron-viz';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,6 +69,18 @@ export default function NeuronV3Dashboard() {
   // 网络数据
   const [networkData, setNetworkData] = useState(generateSampleNetwork);
 
+  // VSA语义空间数据
+  const [vsaData, setVsaData] = useState(generateSampleVSAData);
+
+  // 意识数据
+  const [consciousnessData, setConsciousnessData] = useState(generateSampleConsciousnessData);
+
+  // 计划数据
+  const [planningData, setPlanningData] = useState(generateSamplePlanningData);
+
+  // 执行控制数据
+  const [executiveData, setExecutiveData] = useState(generateSampleExecutiveData);
+
   // 预测和事件
   const [predictions, setPredictions] = useState(generateSamplePredictions());
   const [learningEvents, setLearningEvents] = useState(generateSampleLearningEvents());
@@ -78,11 +109,30 @@ export default function NeuronV3Dashboard() {
         })),
       }));
 
+      // 更新VSA数据
+      setVsaData(prev => ({
+        concepts: prev.concepts.map(c => ({
+          ...c,
+          similarity: Math.max(0.1, Math.min(1, c.similarity + (Math.random() - 0.5) * 0.05)),
+        })),
+        links: prev.links.map(l => ({
+          ...l,
+          similarity: Math.max(0.1, Math.min(1, l.similarity + (Math.random() - 0.5) * 0.05)),
+        })),
+      }));
+
       // 更新统计数据
       setStats(prev => ({
         ...prev,
         predictionAccuracy: Math.max(50, Math.min(95, prev.predictionAccuracy + (Math.random() - 0.5) * 2)),
         consciousnessLevel: Math.max(20, Math.min(90, prev.consciousnessLevel + (Math.random() - 0.5) * 3)),
+        selfAwarenessIndex: Math.max(15, Math.min(85, prev.selfAwarenessIndex + (Math.random() - 0.5) * 2)),
+      }));
+
+      // 更新意识水平
+      setConsciousnessData(prev => ({
+        ...prev,
+        consciousnessLevel: stats.consciousnessLevel,
       }));
 
       // 添加活动事件
@@ -99,7 +149,7 @@ export default function NeuronV3Dashboard() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [stats.consciousnessLevel]);
 
   // 处理消息发送
   const handleSendMessage = useCallback(async (message: string) => {
@@ -215,27 +265,234 @@ export default function NeuronV3Dashboard() {
           <SystemStatsGrid stats={stats} />
         </section>
 
-        {/* 主要可视化区域 */}
-        <section className="grid lg:grid-cols-3 gap-6">
-          {/* 神经网络拓扑 */}
-          <div className="lg:col-span-2">
-            <NetworkTopology
-              neurons={networkData.neurons}
-              connections={networkData.connections}
-            />
-          </div>
+        {/* 核心功能展示 */}
+        <Tabs defaultValue="network" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 mb-4">
+            <TabsTrigger value="network">神经网络</TabsTrigger>
+            <TabsTrigger value="vsa">语义空间</TabsTrigger>
+            <TabsTrigger value="consciousness">意识内容</TabsTrigger>
+            <TabsTrigger value="planning">目标计划</TabsTrigger>
+            <TabsTrigger value="executive">执行控制</TabsTrigger>
+          </TabsList>
 
-          {/* 右侧面板 */}
-          <div className="space-y-6">
-            {/* 预测误差监控 */}
-            <PredictionMonitor
-              predictions={predictions}
-              learningEvents={learningEvents}
-            />
-          </div>
-        </section>
+          {/* 神经网络标签页 */}
+          <TabsContent value="network" className="space-y-6">
+            <section className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <NetworkTopology
+                  neurons={networkData.neurons}
+                  connections={networkData.connections}
+                />
+              </div>
+              <div className="space-y-6">
+                <PredictionMonitor
+                  predictions={predictions}
+                  learningEvents={learningEvents}
+                />
+                <ConsciousnessGauge
+                  level={stats.consciousnessLevel}
+                  selfAwarenessIndex={stats.selfAwarenessIndex}
+                />
+              </div>
+            </section>
+          </TabsContent>
 
-        {/* 底部区域 */}
+          {/* VSA语义空间标签页 */}
+          <TabsContent value="vsa" className="space-y-6">
+            <section className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <VSASpaceVisualization
+                  concepts={vsaData.concepts}
+                  links={vsaData.links}
+                />
+              </div>
+              <div className="space-y-6">
+                <Card className="glow-card">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[var(--neuron-active)]" />
+                      语义操作
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="p-3 rounded-lg bg-muted/20 border border-muted-foreground/10">
+                      <h4 className="text-xs text-muted-foreground mb-2">绑定 (Binding)</h4>
+                      <p className="text-sm">概念 × 属性 → 复合概念</p>
+                      <code className="text-xs text-[var(--neuron-active)]">"红色" × "苹果" = "红苹果"</code>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/20 border border-muted-foreground/10">
+                      <h4 className="text-xs text-muted-foreground mb-2">捆绑 (Bundling)</h4>
+                      <p className="text-sm">概念 + 概念 → 概念集合</p>
+                      <code className="text-xs text-[var(--neuron-active)]">"猫" + "狗" = "宠物"</code>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/20 border border-muted-foreground/10">
+                      <h4 className="text-xs text-muted-foreground mb-2">解绑 (Unbinding)</h4>
+                      <p className="text-sm">复合概念 ÷ 属性 → 原始概念</p>
+                      <code className="text-xs text-[var(--neuron-active)]">"红苹果" ÷ "红色" = "苹果"</code>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          </TabsContent>
+
+          {/* 意识内容标签页 */}
+          <TabsContent value="consciousness" className="space-y-6">
+            <section className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <ConsciousnessPanel
+                  currentContent={consciousnessData.currentContent}
+                  consciousnessLevel={consciousnessData.consciousnessLevel}
+                  trail={consciousnessData.trail}
+                />
+              </div>
+              <div className="space-y-6">
+                <Card className="glow-card">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[var(--neuron-predicting)]" />
+                      认知模块
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {[
+                      { name: '感知模块', status: 'active', strength: 0.85 },
+                      { name: '语言模块', status: 'active', strength: 0.78 },
+                      { name: '记忆模块', status: 'idle', strength: 0.45 },
+                      { name: '情感模块', status: 'active', strength: 0.62 },
+                      { name: '元认知模块', status: 'idle', strength: 0.38 },
+                    ].map((module, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-md bg-muted/10 text-sm">
+                        <span>{module.name}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${module.status === 'active' ? 'bg-[var(--neuron-active)]' : 'bg-muted-foreground/30'}`}
+                              style={{ width: `${module.strength * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-mono-nums text-muted-foreground">
+                            {(module.strength * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          </TabsContent>
+
+          {/* 目标计划标签页 */}
+          <TabsContent value="planning" className="space-y-6">
+            <section className="grid lg:grid-cols-2 gap-6">
+              <PlanningPanel
+                goals={planningData.goals}
+                activeTasks={planningData.activeTasks}
+                currentPlan={planningData.currentPlan}
+              />
+              <div className="space-y-6">
+                <Card className="glow-card">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[var(--signal-reward)]" />
+                      目标分解示例
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-muted/20 border border-muted-foreground/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="text-[var(--neuron-active)]">主目标</Badge>
+                          <span className="text-sm font-medium">理解用户意图</span>
+                        </div>
+                        <div className="pl-4 space-y-2 border-l-2 border-muted-foreground/20">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Badge variant="outline" className="text-[var(--signal-reward)] text-xs">子目标</Badge>
+                            <span>语义解析</span>
+                            <span className="text-xs text-[var(--signal-reward)]">✓</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Badge variant="outline" className="text-[var(--neuron-active)] text-xs">子目标</Badge>
+                            <span>意图分类</span>
+                            <span className="text-xs text-[var(--neuron-active)] animate-pulse">▶</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">子目标</Badge>
+                            <span>情感分析</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          </TabsContent>
+
+          {/* 执行控制标签页 */}
+          <TabsContent value="executive" className="space-y-6">
+            <section className="grid lg:grid-cols-2 gap-6">
+              <ExecutivePanel
+                focusItems={executiveData.focusItems}
+                currentFocus={executiveData.currentFocus}
+                attentionMode={executiveData.attentionMode}
+              />
+              <div className="space-y-6">
+                <Card className="glow-card">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[var(--neuron-predicting)]" />
+                      注意力模式
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { mode: 'focused', label: '专注', icon: '🎯', desc: '单一任务高优先级' },
+                        { mode: 'divided', label: '分配', icon: '⚡', desc: '多任务并行处理' },
+                        { mode: 'exploratory', label: '探索', icon: '🔍', desc: '广泛搜索新信息' },
+                      ].map((m) => (
+                        <div
+                          key={m.mode}
+                          className={cn(
+                            'p-3 rounded-lg text-center cursor-pointer transition-all',
+                            executiveData.attentionMode === m.mode
+                              ? 'bg-[var(--neuron-active)]/20 border border-[var(--neuron-active)]/50'
+                              : 'bg-muted/20 border border-muted-foreground/10 hover:border-muted-foreground/30'
+                          )}
+                        >
+                          <div className="text-2xl mb-1">{m.icon}</div>
+                          <div className="text-sm font-medium">{m.label}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{m.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/20 border border-muted-foreground/10">
+                      <h4 className="text-xs text-muted-foreground mb-2">任务切换历史</h4>
+                      <div className="space-y-1">
+                        {[
+                          { from: '输入处理', to: '记忆检索', time: '2s前' },
+                          { from: '记忆检索', to: '响应生成', time: '5s前' },
+                          { from: '响应生成', to: '反馈学习', time: '10s前' },
+                        ].map((switch_, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">{switch_.from}</span>
+                            <span className="text-[var(--neuron-active)]">→</span>
+                            <span>{switch_.to}</span>
+                            <span className="text-muted-foreground ml-auto">{switch_.time}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          </TabsContent>
+        </Tabs>
+
+        {/* 底部交互区域 */}
         <section className="grid lg:grid-cols-3 gap-6">
           {/* 交互面板 */}
           <InteractionPanel
@@ -262,7 +519,7 @@ export default function NeuronV3Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid md:grid-cols-4 gap-4 text-sm">
+              <div className="grid md:grid-cols-5 gap-4 text-sm">
                 <div className="p-3 rounded-lg bg-muted/30 border border-muted-foreground/10">
                   <h4 className="font-medium text-[var(--neuron-active)] mb-2">预测编码</h4>
                   <p className="text-muted-foreground text-xs">
@@ -285,6 +542,12 @@ export default function NeuronV3Dashboard() {
                   <h4 className="font-medium text-[var(--neuron-surprised)] mb-2">全局工作空间</h4>
                   <p className="text-muted-foreground text-xs">
                     认知模块竞争进入意识，广播信息到全系统。支持自我意识计算。
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/30 border border-muted-foreground/10">
+                  <h4 className="font-medium text-[var(--neuron-active)] mb-2">认知协调器</h4>
+                  <p className="text-muted-foreground text-xs">
+                    协调计划模块与执行控制，实现目标分解、任务规划与注意力控制。
                   </p>
                 </div>
               </div>
