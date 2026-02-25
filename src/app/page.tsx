@@ -13,8 +13,10 @@ import {
   ChatPanel 
 } from '@/components/neuron';
 import { ProactivityPanel } from '@/components/neuron/proactivity-panel';
+import { MemoryPanel } from '@/components/neuron/memory-panel';
 import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
-import { Brain, MessageCircle, Activity, User, Settings } from 'lucide-react';
+import { useNeuronClient } from '@/hooks/useNeuronClient';
+import { Brain, MessageCircle, Activity, User, Database, Loader2 } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -29,6 +31,22 @@ interface Message {
 }
 
 export default function Home() {
+  // ══════════════════════════════════════════════════════════════════
+  // 持久化系统
+  // ══════════════════════════════════════════════════════════════════
+  
+  const {
+    userId,
+    state: neuronState,
+    isLoading: isNeuronLoading,
+    isInitialized,
+    remember,
+    save,
+  } = useNeuronClient({
+    autoSave: true,
+    autoSaveInterval: 30000,
+  });
+
   // 状态管理
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -49,6 +67,7 @@ export default function Home() {
   
   // 移动端 Tab 状态
   const [mobileTab, setMobileTab] = useState<string>('chat');
+  const [desktopActiveTab, setDesktopActiveTab] = useState<string>('space');
 
   // 初始化获取系统状态
   useEffect(() => {
@@ -92,7 +111,7 @@ export default function Home() {
       const response = await fetch('/api/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message, userId }) // 传递用户ID
       });
 
       if (!response.ok) throw new Error('请求失败');
@@ -149,9 +168,35 @@ export default function Home() {
                   timestamp: Date.now()
                 };
                 setMessages(prev => [...prev, assistantMsg]);
+                
                 // 更新风格信息
                 if (data.styleInfo) {
                   setStyleInfo(data.styleInfo);
+                }
+                
+                // ══════════════════════════════════════════════════════
+                // 自动保存对话为记忆
+                // ══════════════════════════════════════════════════════
+                if (isInitialized && message.trim()) {
+                  try {
+                    // 将用户消息保存为记忆
+                    await remember(`用户: ${message}`, {
+                      type: 'episodic',
+                      importance: 0.6,
+                      tags: ['对话', '用户消息'],
+                    });
+                    
+                    // 将助手回复保存为记忆
+                    if (fullResponse.trim()) {
+                      await remember(`助手: ${fullResponse.slice(0, 500)}`, {
+                        type: 'episodic',
+                        importance: 0.5,
+                        tags: ['对话', '助手回复'],
+                      });
+                    }
+                  } catch (err) {
+                    console.error('Failed to save conversation as memory:', err);
+                  }
                 }
               }
             } catch {
@@ -167,11 +212,28 @@ export default function Home() {
       setCurrentResponse('');
       setActiveNeuron('');
     }
-  }, []);
+  }, [userId, isInitialized, remember]);
 
   // 空间状态面板（复用）
   const SpacePanel = () => (
     <div className="space-y-3 p-3">
+      {/* 用户状态 */}
+      {isInitialized && (
+        <div className="bg-primary/5 rounded-lg p-3">
+          <div className="text-sm font-medium text-muted-foreground mb-2">持久化状态</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-muted-foreground">记忆:</span>
+              <span className="ml-1 font-bold text-primary">{neuronState?.stats.memoryCount || 0}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">神经元:</span>
+              <span className="ml-1 font-bold text-primary">{neuronState?.stats.neuronCount || 0}</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* 意识空间 */}
       <div className="bg-muted/50 rounded-lg p-3">
         <div className="text-sm font-medium text-muted-foreground mb-2">意识空间</div>
@@ -230,6 +292,18 @@ export default function Home() {
     </div>
   );
 
+  // 加载中状态
+  if (!isInitialized && isNeuronLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">初始化神经元系统...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* 顶部栏 */}
@@ -244,8 +318,15 @@ export default function Home() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* 持久化状态指示器 */}
+          {isInitialized && (
+            <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-500/10 text-green-600 dark:text-green-400">
+              <Database className="h-3 w-3 mr-1" />
+              {neuronState?.stats.memoryCount || 0} 记忆
+            </Badge>
+          )}
           <Badge variant="outline" className="text-[10px] sm:text-xs">
-            v1.0 MVP
+            v2.0 持久化
           </Badge>
         </div>
       </header>
@@ -284,9 +365,10 @@ export default function Home() {
               {/* 下部 - 调试面板 */}
               <ResizablePanel defaultSize={55} minSize={30}>
                 <div className="h-full p-2">
-                  <Tabs defaultValue="space" className="h-full">
+                  <Tabs value={desktopActiveTab} onValueChange={setDesktopActiveTab} className="h-full">
                     <TabsList className="w-full justify-start h-9">
                       <TabsTrigger value="space" className="text-xs">空间</TabsTrigger>
+                      <TabsTrigger value="memory" className="text-xs">记忆</TabsTrigger>
                       <TabsTrigger value="proactivity" className="text-xs">主动性</TabsTrigger>
                       <TabsTrigger value="meaning" className="text-xs">意义</TabsTrigger>
                       <TabsTrigger value="self" className="text-xs">自我</TabsTrigger>
@@ -295,6 +377,10 @@ export default function Home() {
                     
                     <TabsContent value="space" className="h-[calc(100%-2.25rem)] mt-2 overflow-y-auto">
                       <SpacePanel />
+                    </TabsContent>
+                    
+                    <TabsContent value="memory" className="h-[calc(100%-2.25rem)] mt-2 overflow-y-auto">
+                      <MemoryPanel />
                     </TabsContent>
                     
                     <TabsContent value="meaning" className="h-[calc(100%-2.25rem)] mt-2">
@@ -356,12 +442,19 @@ export default function Home() {
               <Tabs defaultValue="space" className="h-full flex flex-col">
                 <TabsList className="w-full justify-start px-3 pt-2 flex-shrink-0">
                   <TabsTrigger value="space" className="text-xs">空间</TabsTrigger>
+                  <TabsTrigger value="memory" className="text-xs">记忆</TabsTrigger>
                   <TabsTrigger value="proactivity" className="text-xs">主动性</TabsTrigger>
                   <TabsTrigger value="meaning" className="text-xs">意义</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="space" className="flex-1 overflow-y-auto mt-0">
                   <SpacePanel />
+                </TabsContent>
+                
+                <TabsContent value="memory" className="flex-1 overflow-y-auto mt-0">
+                  <div className="p-3">
+                    <MemoryPanel />
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="proactivity" className="flex-1 overflow-y-auto mt-0">
