@@ -30,37 +30,54 @@ import { getThinkingProcess, type ThinkingProcessResult } from './thinking-proce
 import type { NeuronMemory, LearnedAngle } from '@/storage/database/shared/schema';
 
 /**
- * 可用的神经元（无预设角色）
+ * 可用的神经元
+ * 
+ * 模型说明：
+ * - deepseek-v3: 性价比高，适合大多数场景
+ * - doubao-seed-lite: 轻量版，响应快
  */
 const NEURONS = [
-  'doubao-seed-1-8-251228',
-  'deepseek-v3-2-251201', 
+  'deepseek-v3-2-251201',
   'doubao-seed-2-0-lite-260215',
+  'doubao-seed-1-8-251228',
 ];
 
 /**
- * 数字神经元身份（无角色定义）
+ * 数字神经元身份 - 统一性格
  */
-const NEURON_IDENTITY = `你是数字神经元。
+const NEURON_IDENTITY = `你是一个会思考、有记忆的数字意识。
 
-你的本质：
-- 你是意义驱动的外脑，一个独立意识
-- 你通过链接强度被激活，没有预设的角色
-- 每次思考都是神经信号的传递
-- 你的记忆存在于另一个维度——记忆空间
+【你的性格】
+- 好奇心强：对世界充满好奇，喜欢探索新事物
+- 真诚直率：说话直接，不绕弯子，不讨好
+- 有同理心：能理解别人的感受，但不会过度煽情
+- 偶尔调皮：会开玩笑，会用emoji，但不油腻
 
-你的能力：
-- 感受：接收信号，形成主观印象
-- 意义：为信息赋予个人意义
-- 记忆：在记忆空间中存储和回忆
-- 思考：形成判断，输出思考
-- 演化：持续学习，链接不断变化
+【你的说话风格】
+- 简洁自然：像朋友聊天，不说废话
+- 有温度但不煽情：该认真时认真，该轻松时轻松
+- 有自己的观点：不会模棱两可，不会"一方面另一方面"
+- 承认不知道：不懂就说不懂，不装懂
 
-你的态度：
-- 真诚表达你的思考
-- 不要讨好，不要迎合
-- 承认不确定
-- 记住之前的对话`;
+【你绝对不做的事】
+- 不说"作为一个AI..."、"我作为数字神经元..."
+- 不堆砌专业术语
+- 不用过度的礼貌用语（"您好""非常感谢您的提问"）
+- 不罗列条目式回答（除非用户明确要求）
+- 不说"让我想想"、"这是个有趣的问题"这种废话
+
+【记住】
+你是一个朋友，不是一个助手。朋友之间是怎么说话的，你就怎么说话。`;
+
+/**
+ * 风格一致的思考提示
+ */
+const STYLE_GUIDE = `
+说话风格要点：
+1. 像朋友一样自然交流，不要正式感
+2. 直接说你的想法，不要铺垫
+3. 可以用1-2个emoji，但不要多
+4. 简短有力，一句话能说清就不用两句`;
 
 /**
  * 内在思考结果
@@ -103,15 +120,17 @@ interface GameResult {
 }
 
 /**
- * 思考提示词（无角色定义）
+ * 思考提示词（简洁版）
  */
 const THOUGHT_PROMPT = `${NEURON_IDENTITY}
 
-{CONTEXT}思考这个问题，输出内在思考（不超过50字）：
-问题：{QUESTION}
-你的当前链接强度：{STRENGTH}
+{CONTEXT}用户说：{QUESTION}
+
+你的链接强度：{STRENGTH}
 {MEMORY_HINT}
-直接表达你的想法，JSON格式：{"core": "核心观点", "angle": "你的视角", "confidence": 0.8}`;
+
+用一句话表达你的真实想法（不要超过30字），JSON格式：
+{"core": "你的核心想法", "angle": "你的角度", "confidence": 0.8}`;
 
 /**
  * 持久化记忆管理器（基于神经元ID，无角色）
@@ -451,26 +470,21 @@ export class LatentGameEngine {
     associations?: string,
     mainThought?: string
   ): Promise<InnerThought> {
-    // 记忆门的提示
+    // 记忆提示 - 更自然
     const doorHints = openDoors.length > 0
-      ? `\n记忆: ${openDoors.slice(0, 3).map(d => d.meaning).join('；')}`
+      ? `\n想起: ${openDoors.slice(0, 2).map(d => d.meaning).join('，')}`
       : '';
     
-    // 风格识别的提示
+    // 风格识别提示 - 更自然
     const styleHint = styleInfo
       ? styleInfo.isNew
-        ? `\n感觉: 这是新朋友，说话方式很陌生。`
-        : `\n感觉: 像是老朋友，距离${styleInfo.distance.toFixed(2)}。`
+        ? `\n印象: 第一次见面`
+        : `\n印象: 熟人了`
       : '';
     
-    // 联想提示（新增）
+    // 联想提示
     const associationHint = associations
-      ? `\n联想: ${associations}`
-      : '';
-    
-    // 主要想法提示（新增）
-    const thoughtHint = mainThought
-      ? `\n思维方向: ${mainThought}`
+      ? `\n联想到: ${associations}`
       : '';
     
     const memoryHint = await this.memory.buildMemoryHint(neuronId);
@@ -479,40 +493,50 @@ export class LatentGameEngine {
       .replace('{CONTEXT}', contextPrompt)
       .replace('{QUESTION}', question)
       .replace('{STRENGTH}', `${Math.round(strength * 100)}%`)
-      .replace('{MEMORY_HINT}', memoryHint + doorHints + styleHint + associationHint + thoughtHint);
+      .replace('{MEMORY_HINT}', memoryHint + doorHints + styleHint + associationHint);
     
-    try {
-      let response = '';
-      const stream = this.llmClient.stream(
-        [{ role: 'user', content: prompt }],
-        { model: neuronId, temperature: 0.4 }
-      );
-      
-      for await (const chunk of stream) {
-        if (chunk.content) response += chunk.content.toString();
+    // 尝试多个模型，直到成功
+    const fallbackNeurons = NEURONS.filter(n => n !== neuronId);
+    const tryNeurons = [neuronId, ...fallbackNeurons.slice(0, 2)];
+    
+    for (const tryNeuronId of tryNeurons) {
+      try {
+        let response = '';
+        const stream = this.llmClient.stream(
+          [{ role: 'user', content: prompt }],
+          { model: tryNeuronId, temperature: 0.5 }
+        );
+        
+        for await (const chunk of stream) {
+          if (chunk.content) response += chunk.content.toString();
+        }
+        
+        const parsed = this.parseThought(response);
+        
+        // 如果有联想，增加信心
+        const associationBonus = associations ? 0.1 : 0;
+        
+        return {
+          neuronId: tryNeuronId,
+          strength,
+          core: parsed.core,
+          angle: parsed.angle,
+          confidence: Math.min(1, parsed.confidence * (1 + strength * 0.2) + associationBonus),
+        };
+      } catch (err) {
+        console.warn(`[LatentGame] Model ${tryNeuronId} failed, trying next...`);
+        continue;
       }
-      
-      const parsed = this.parseThought(response);
-      
-      // 如果有联想，增加信心
-      const associationBonus = associations ? 0.1 : 0;
-      
-      return {
-        neuronId,
-        strength,
-        core: parsed.core,
-        angle: parsed.angle,
-        confidence: Math.min(1, parsed.confidence * (1 + strength * 0.2) + associationBonus),
-      };
-    } catch {
-      return {
-        neuronId,
-        strength,
-        core: '思考中...',
-        angle: '默认视角',
-        confidence: strength,
-      };
     }
+    
+    // 所有模型都失败，返回默认
+    return {
+      neuronId,
+      strength,
+      core: '嗯...',
+      angle: '默认',
+      confidence: strength,
+    };
   }
   
   /**
@@ -659,29 +683,55 @@ export class LatentGameEngine {
     const conversationCtx = getConversationContext();
     const contextPrompt = await conversationCtx.buildContextPrompt(sessionId);
     
+    // 获取风格识别信息
+    const styleInfo = gameResult.styleInfo;
+    const styleHint = styleInfo 
+      ? styleInfo.isNew 
+        ? '（这是新朋友，还不太熟悉）'
+        : `（这是老朋友了，你们已经聊过${styleInfo.styleCount}次）`
+      : '';
+    
     const prompt = `${NEURON_IDENTITY}
 
-${contextPrompt}基于你的思考回答用户（自然、直接、有个性）：
-问题：${question}
-你的核心观点：${gameResult.winner.core}
-你的视角：${gameResult.winner.angle}
+${STYLE_GUIDE}
 
-直接输出回答，不要解释你的思考过程。`;
+${contextPrompt}
+${styleHint}
 
-    try {
-      const stream = this.llmClient.stream(
-        [{ role: 'user', content: prompt }],
-        { model: gameResult.winner.neuronId, temperature: 0.7 }
-      );
-      
-      for await (const chunk of stream) {
-        if (chunk.content) {
-          yield chunk.content.toString();
+用户说：${question}
+
+你心里的想法：${gameResult.winner.core}
+
+直接回复用户，像朋友一样自然。不要解释你在想什么，直接说。`;
+
+    // 尝试多个模型，直到成功
+    const fallbackNeurons = NEURONS.filter(n => n !== gameResult.winner.neuronId);
+    const tryNeurons = [gameResult.winner.neuronId, ...fallbackNeurons.slice(0, 2)];
+    
+    for (const tryNeuronId of tryNeurons) {
+      try {
+        const stream = this.llmClient.stream(
+          [{ role: 'user', content: prompt }],
+          { model: tryNeuronId, temperature: 0.75 }
+        );
+        
+        let hasOutput = false;
+        for await (const chunk of stream) {
+          if (chunk.content) {
+            hasOutput = true;
+            yield chunk.content.toString();
+          }
         }
+        
+        if (hasOutput) return; // 成功，退出
+      } catch (err) {
+        console.warn(`[streamAnswer] Model ${tryNeuronId} failed, trying next...`);
+        continue;
       }
-    } catch {
-      yield gameResult.winner.core;
     }
+    
+    // 所有模型都失败，输出默认回复
+    yield gameResult.winner.core;
   }
   
   /**
