@@ -98,10 +98,27 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 将 LLM 回复添加到神经元系统的对话历史
-          // 这样形成完整的对话记忆闭环：用户消息 + 系统回复
+          // 双向交互：让神经元系统"理解"自己的输出
           if (fullContent) {
+            // 1. 添加到对话历史
             neuronSystem.addAssistantMessage(fullContent);
+            
+            // 2. 处理自己的输出 - 神经元系统"听到"自己说话
+            //    这是实现自我认知的关键：系统不仅要输出，还要理解自己说了什么
+            const selfOutputResult = await neuronSystem.processOwnOutput(fullContent);
+            
+            // 发送自我认知状态（可选，用于可视化）
+            if (selfOutputResult.processed && selfOutputResult.consistency) {
+              const selfCognitiveStatus = {
+                type: 'self_cognitive',
+                data: {
+                  consistency: selfOutputResult.consistency.score,
+                  interpretation: selfOutputResult.consistency.interpretation,
+                  reflections: selfOutputResult.metacognitiveReflection?.reflections || [],
+                },
+              };
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(selfCognitiveStatus)}\n\n`));
+            }
           }
 
           // 发送完成信号

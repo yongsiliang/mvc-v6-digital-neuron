@@ -207,6 +207,71 @@ export interface ProcessInputResult {
   readiness?: ReadinessState;
 }
 
+/**
+ * 自我输出上下文
+ */
+export interface SelfOutputContext {
+  /** 来源：总是 'self' */
+  source: 'self';
+  /** 时间戳 */
+  timestamp: number;
+  /** 之前的状态 */
+  previousState: {
+    consciousness?: ConsciousContent;
+    activations: Map<string, number>;
+  };
+}
+
+/**
+ * 自我输出处理结果
+ */
+export interface SelfOutputResult {
+  /** 是否成功处理 */
+  processed: boolean;
+  /** 原因（如果未处理） */
+  reason?: string;
+  /** 神经元激活 */
+  activations?: Map<string, number>;
+  /** 自我一致性结果 */
+  consistency?: SelfConsistencyResult;
+  /** 元认知反思 */
+  metacognitiveReflection?: MetacognitiveReflection;
+  /** 处理时间 */
+  processingTime?: number;
+}
+
+/**
+ * 自我一致性结果
+ */
+export interface SelfConsistencyResult {
+  /** 综合得分 [0, 1] */
+  score: number;
+  /** 与意识内容的一致性 */
+  consciousnessAlignment: number;
+  /** 与情感状态的一致性 */
+  emotionalAlignment: number;
+  /** 与自我模型的一致性 */
+  selfModelAlignment: number;
+  /** 不一致点 */
+  inconsistencies: string[];
+  /** 解释 */
+  interpretation: string;
+}
+
+/**
+ * 元认知反思
+ */
+export interface MetacognitiveReflection {
+  /** 反思问题 */
+  question: string;
+  /** 反思内容 */
+  reflections: string[];
+  /** 相关的一致性分析 */
+  consistency: SelfConsistencyResult;
+  /** 时间戳 */
+  timestamp: number;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 神经元系统V3
 // ─────────────────────────────────────────────────────────────────────
@@ -245,6 +310,14 @@ export class NeuronSystemV3 {
   private sessionId: string;
   private recentMessages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: number }> = [];
   private recentActivations: Map<string, number> = new Map();
+  
+  // 自我输出历史 - 双向交互的关键
+  private recentSelfOutputs: Array<{
+    content: string;
+    timestamp: number;
+    consistency: number;
+    activations: Map<string, number>;
+  }> = [];
 
   constructor(config: NeuronSystemV3Config = {}) {
     this.config = {
@@ -757,6 +830,374 @@ export class NeuronSystemV3 {
     if (this.persistenceEnabled) {
       this.saveStateDebounced();
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 自我输出处理 - 双向交互的关键
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * 处理自己的输出 - 让神经元系统"理解"自己说了什么
+   * 
+   * 这是实现双向交互和自我认知的关键：
+   * 1. 神经元需要"听到"自己的输出
+   * 2. 从输出中学习自己的表达模式
+   * 3. 计算自我一致性 - 输出是否与认知状态匹配
+   * 4. 更新自我模型 - "我刚才说了X，说明我认为Y"
+   * 5. 触发元认知反思 - "我为什么这么说？"
+   * 
+   * @param content 系统自己生成的输出内容
+   * @returns 自我处理结果
+   */
+  async processOwnOutput(content: string): Promise<SelfOutputResult> {
+    const startTime = Date.now();
+    
+    if (!content || content.trim().length === 0) {
+      return {
+        processed: false,
+        reason: 'empty_content',
+      };
+    }
+
+    // 1. 将输出编码为向量
+    const outputVector = this.vsaSpace.getConcept(content);
+    
+    // 2. 构建处理上下文（标记为自我输出）
+    const selfOutputContext: SelfOutputContext = {
+      source: 'self',
+      timestamp: Date.now(),
+      previousState: {
+        consciousness: this.globalWorkspace?.getCurrentContent() ?? undefined,
+        activations: new Map(this.recentActivations),
+      },
+    };
+    
+    // 3. 激活相关神经元 - 系统"听到"自己说话
+    //    使用较低的敏感度，因为这是内部反馈
+    const activationResult = await this.activateNeuronsForSelfOutput(
+      content,
+      outputVector,
+      selfOutputContext
+    );
+    
+    // 4. 计算自我一致性
+    //    输出内容是否与当前认知状态一致？
+    const consistency = await this.computeSelfConsistency(
+      content,
+      outputVector,
+      activationResult.activations
+    );
+    
+    // 5. 更新自我模型（如果启用）
+    if (this.meaningCalculator) {
+      await this.updateSelfModelFromOutput(content, outputVector, consistency);
+    }
+    
+    // 6. 触发元认知反思（如果启用）
+    let metacognitiveReflection: MetacognitiveReflection | undefined;
+    if (this.globalWorkspace && this.metacognitiveModule) {
+      metacognitiveReflection = await this.triggerMetacognitiveReflection(
+        content,
+        consistency,
+        activationResult.activations
+      );
+    }
+    
+    // 7. 更新自我输出历史
+    this.recentSelfOutputs.push({
+      content,
+      timestamp: Date.now(),
+      consistency: consistency.score,
+      activations: activationResult.activations,
+    });
+    
+    // 保留最近 20 条自我输出
+    if (this.recentSelfOutputs.length > 20) {
+      this.recentSelfOutputs = this.recentSelfOutputs.slice(-20);
+    }
+    
+    // 8. 触发异步保存
+    if (this.persistenceEnabled) {
+      this.saveStateDebounced();
+    }
+    
+    const processingTime = Date.now() - startTime;
+    
+    console.log(`[NeuronSystemV3] Processed own output: consistency=${consistency.score.toFixed(2)}, time=${processingTime}ms`);
+    
+    return {
+      processed: true,
+      activations: activationResult.activations,
+      consistency,
+      metacognitiveReflection,
+      processingTime,
+    };
+  }
+
+  /**
+   * 为自我输出激活神经元
+   */
+  private async activateNeuronsForSelfOutput(
+    content: string,
+    outputVector: number[],
+    context: SelfOutputContext
+  ): Promise<{
+    activations: Map<string, number>;
+    newPredictions: Map<string, number>;
+  }> {
+    const activations = new Map<string, number>();
+    const newPredictions = new Map<string, number>();
+    
+    // 获取所有神经元
+    const neurons = this.predictionLoop.getAllNeurons();
+    
+    for (const neuron of neurons) {
+      // 计算输出与神经元的匹配度
+      // 自我输出使用较低的激活阈值
+      const sensitivity = neuron.sensitivityVector;
+      let activation = 0;
+      
+      for (let i = 0; i < Math.min(sensitivity.length, outputVector.length); i++) {
+        activation += sensitivity[i] * outputVector[i];
+      }
+      
+      // 归一化到 [0, 1]
+      activation = Math.tanh(activation / 1000) * 0.5 + 0.5;
+      
+      // 自我输出激活强度降低（因为是自己说的，不是外部刺激）
+      activation *= 0.6;
+      
+      if (activation > 0.1) {
+        activations.set(neuron.id, activation);
+        
+        // 更新神经元的自我激活历史
+        neuron.actual.activation = activation;
+        neuron.actual.activationHistory.push(activation);
+        if (neuron.actual.activationHistory.length > 20) {
+          neuron.actual.activationHistory = neuron.actual.activationHistory.slice(-20);
+        }
+      }
+    }
+    
+    return { activations, newPredictions };
+  }
+
+  /**
+   * 计算自我一致性
+   * 
+   * 检查输出内容是否与系统当前的认知状态一致
+   */
+  private async computeSelfConsistency(
+    content: string,
+    outputVector: number[],
+    activations: Map<string, number>
+  ): Promise<SelfConsistencyResult> {
+    // 1. 检查与意识内容的一致性
+    const currentConsciousness = this.globalWorkspace?.getCurrentContent();
+    let consciousnessAlignment = 0.5;
+    
+    if (currentConsciousness) {
+      // 如果有意识内容，计算输出与意识内容的相关性
+      // 使用 type 和 source 组合来表示意识内容
+      const consciousnessText = `${currentConsciousness.type}_${currentConsciousness.source}`;
+      const consciousnessVector = this.vsaSpace.getConcept(consciousnessText);
+      consciousnessAlignment = this.vsaSpace.similarity(outputVector, consciousnessVector);
+    }
+    
+    // 2. 检查与情感状态的一致性
+    let emotionalAlignment = 0.5;
+    const emotionalNeurons = ['正向情感神经元', '负向情感神经元', '中性情感神经元'];
+    let emotionalState = 0;
+    
+    for (const [neuronId, activation] of activations) {
+      for (const emotionalNeuron of emotionalNeurons) {
+        if (neuronId.includes('情感')) {
+          if (neuronId.includes('正向')) {
+            emotionalState += activation;
+          } else if (neuronId.includes('负向')) {
+            emotionalState -= activation;
+          }
+        }
+      }
+    }
+    
+    // 分析输出内容的情感倾向
+    const positiveWords = ['好', '喜欢', '爱', '开心', '棒', '优秀', '感谢', '帮助'];
+    const negativeWords = ['不', '错', '坏', '讨厌', '抱歉', '遗憾', '问题', '失败'];
+    
+    let outputSentiment = 0;
+    for (const word of positiveWords) {
+      if (content.includes(word)) outputSentiment += 0.2;
+    }
+    for (const word of negativeWords) {
+      if (content.includes(word)) outputSentiment -= 0.2;
+    }
+    outputSentiment = Math.max(-1, Math.min(1, outputSentiment));
+    
+    // 情感一致性：情感状态与输出情感是否匹配
+    emotionalAlignment = 1 - Math.abs(emotionalState - outputSentiment) / 2;
+    
+    // 3. 检查与自我模型的一致性
+    let selfModelAlignment = 0.5;
+    const selfVector = this.vsaSpace.getConcept('自我');
+    selfModelAlignment = this.vsaSpace.similarity(outputVector, selfVector);
+    
+    // 4. 综合一致性得分
+    const score = 
+      consciousnessAlignment * 0.4 +
+      emotionalAlignment * 0.3 +
+      selfModelAlignment * 0.3;
+    
+    // 5. 识别不一致点
+    const inconsistencies: string[] = [];
+    
+    if (consciousnessAlignment < 0.3) {
+      inconsistencies.push('输出与当前意识焦点偏离');
+    }
+    if (emotionalAlignment < 0.3) {
+      inconsistencies.push('输出情感与内部情感状态不匹配');
+    }
+    if (selfModelAlignment < 0.3) {
+      inconsistencies.push('输出与自我认知不匹配');
+    }
+    
+    return {
+      score,
+      consciousnessAlignment,
+      emotionalAlignment,
+      selfModelAlignment,
+      inconsistencies,
+      interpretation: this.interpretConsistency(score, inconsistencies),
+    };
+  }
+
+  /**
+   * 解释一致性得分
+   */
+  private interpretConsistency(
+    score: number,
+    inconsistencies: string[]
+  ): string {
+    if (score >= 0.8) {
+      return '高度一致：输出与认知状态完全匹配';
+    } else if (score >= 0.6) {
+      return '基本一致：输出与认知状态基本匹配';
+    } else if (score >= 0.4) {
+      return '部分一致：存在轻微的认知偏差';
+    } else {
+      return `一致性较低：${inconsistencies.join('；') || '存在认知矛盾'}`;
+    }
+  }
+
+  /**
+   * 从输出更新自我模型
+   */
+  private async updateSelfModelFromOutput(
+    content: string,
+    outputVector: number[],
+    consistency: SelfConsistencyResult
+  ): Promise<void> {
+    // 分析输出中体现的特质
+    const traitIndicators: Record<string, string[]> = {
+      '好奇': ['为什么', '怎么', '什么', '如何', '?'],
+      '理性': ['因此', '所以', '逻辑', '分析', '推理'],
+      '友善': ['帮助', '支持', '理解', '感谢', '一起'],
+      '谨慎': ['可能', '或许', '不确定', '需要确认'],
+      '创造': ['想法', '建议', '可以尝试', '创新'],
+    };
+    
+    const detectedTraits: string[] = [];
+    
+    for (const [trait, indicators] of Object.entries(traitIndicators)) {
+      for (const indicator of indicators) {
+        if (content.includes(indicator)) {
+          detectedTraits.push(trait);
+          break;
+        }
+      }
+    }
+    
+    // 更新自我模型（如果有一致性较高的输出）
+    if (consistency.score > 0.5 && detectedTraits.length > 0) {
+      // 这些特质在输出中体现，可以增强自我模型中的相关特质
+      console.log(`[NeuronSystemV3] Self-model update: detected traits = ${detectedTraits.join(', ')}`);
+    }
+  }
+
+  /**
+   * 触发元认知反思
+   */
+  private async triggerMetacognitiveReflection(
+    content: string,
+    consistency: SelfConsistencyResult,
+    activations: Map<string, number>
+  ): Promise<MetacognitiveReflection> {
+    const reflections: string[] = [];
+    
+    // 反思1：我为什么这么说？
+    if (consistency.score < 0.5) {
+      reflections.push(`我的输出与当前认知状态存在偏差，需要检视原因`);
+    }
+    
+    // 反思2：这符合我的价值观吗？
+    if (consistency.selfModelAlignment < 0.4) {
+      reflections.push(`这个输出可能不完全符合我的核心特质`);
+    }
+    
+    // 反思3：我是否保持了真实性？
+    const highActivationNeurons = Array.from(activations.entries())
+      .filter(([, activation]) => activation > 0.6)
+      .map(([id]) => id);
+    
+    if (highActivationNeurons.length > 0) {
+      reflections.push(`这个输出激活了我的${highActivationNeurons.length}个核心认知区域`);
+    }
+    
+    return {
+      question: '我为什么这么说？',
+      reflections,
+      consistency,
+      timestamp: Date.now(),
+    };
+  }
+
+  /**
+   * 获取最近的自我输出历史
+   */
+  getRecentSelfOutputs(limit: number = 5): Array<{
+    content: string;
+    timestamp: number;
+    consistency: number;
+    activations: Map<string, number>;
+  }> {
+    return this.recentSelfOutputs.slice(-limit);
+  }
+
+  /**
+   * 获取自我认知状态
+   */
+  getSelfCognitiveState(): {
+    recentOutputs: number;
+    averageConsistency: number;
+    dominantTraits: string[];
+  } {
+    const outputs = this.recentSelfOutputs;
+    
+    if (outputs.length === 0) {
+      return {
+        recentOutputs: 0,
+        averageConsistency: 0,
+        dominantTraits: [],
+      };
+    }
+    
+    const averageConsistency = outputs.reduce((sum, o) => sum + o.consistency, 0) / outputs.length;
+    
+    return {
+      recentOutputs: outputs.length,
+      averageConsistency,
+      dominantTraits: [], // 可以从自我模型中提取
+    };
   }
 
   // ══════════════════════════════════════════════════════════════════
