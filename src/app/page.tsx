@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   NeuronFlow, 
   MeaningPanel, 
@@ -13,7 +14,7 @@ import {
 } from '@/components/neuron';
 import { ProactivityPanel } from '@/components/neuron/proactivity-panel';
 import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
-import { Brain } from 'lucide-react';
+import { Brain, MessageCircle, Activity, User, Settings } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -45,6 +46,9 @@ export default function Home() {
   const [consciousnessTrail, setConsciousnessTrail] = useState(0);
   const [openDoors, setOpenDoors] = useState<string[]>([]);
   const [styleInfo, setStyleInfo] = useState<{ isNew: boolean; styleCount: number; distance: number } | undefined>();
+  
+  // 移动端 Tab 状态
+  const [mobileTab, setMobileTab] = useState<string>('chat');
 
   // 初始化获取系统状态
   useEffect(() => {
@@ -103,118 +107,53 @@ export default function Home() {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
+        const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split('\n');
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
-              const event = JSON.parse(line.slice(6));
+              const data = JSON.parse(line.slice(6));
               
-              switch (event.type) {
-                case 'neuron':
-                  // 神经元激活事件
-                  if (event.data.neuronId) {
-                    setActiveNeuron(event.data.neuronId);
-                    setSignalPath(prev => {
-                      if (!prev.includes(event.data.neuronId)) {
-                        return [...prev, event.data.neuronId];
-                      }
-                      return prev;
-                    });
-                  }
-                  break;
-                  
-                case 'signal-path':
-                  // 完整信号路径
-                  if (event.data.path) {
-                    setSignalPath(event.data.path);
-                  }
-                  break;
-                  
-                case 'meaning':
-                  setMeaning(event.data);
-                  setActiveNeuron('meaning-generate');
-                  break;
-                  
-                case 'decision':
-                  setDecision(event.data);
-                  setActiveNeuron('self-evolve');
-                  break;
-                  
-                case 'self-update':
-                  if (event.data.currentState) {
-                    setSelf(prev => prev ? { ...prev, ...event.data } : prev);
-                  }
-                  break;
-                  
-                case 'consciousness':
-                  if (event.data.trail !== undefined) {
-                    setConsciousnessTrail(event.data.trail);
-                  }
-                  break;
-                  
-                case 'open-doors':
-                  if (event.data.meanings) {
-                    setOpenDoors(event.data.meanings);
-                  }
-                  break;
-                  
-                case 'response':
-                  if (event.data.delta) {
-                    fullResponse += event.data.delta;
-                    setCurrentResponse(fullResponse);
-                    setActiveNeuron('motor-language');
-                  }
-                  break;
-                  
-                case 'done':
-                  // 添加助手消息
-                  const assistantMsg: Message = {
-                    id: `assistant-${Date.now()}`,
-                    role: 'assistant',
-                    content: event.data.fullResponse || fullResponse,
-                    meaning: meaning ? {
-                      interpretation: meaning.interpretation,
-                      selfRelevance: meaning.selfRelevance,
-                      sentiment: meaning.sentiment
-                    } : undefined,
-                    timestamp: Date.now()
-                  };
-                  setMessages(prev => [...prev, assistantMsg]);
-                  
-                  if (event.data.signalPath) {
-                    setSignalPath(event.data.signalPath);
-                  }
-                  if (event.data.logs) {
-                    setLogs(event.data.logs);
-                  }
-                  if (event.data.styleInfo) {
-                    setStyleInfo(event.data.styleInfo);
-                  }
-                  break;
-                  
-                case 'error':
-                  console.error('Stream error:', event.data.message);
-                  break;
+              if (data.type === 'content') {
+                fullResponse += data.content;
+                setCurrentResponse(fullResponse);
+              } else if (data.type === 'neuron') {
+                setActiveNeuron(data.neuron);
+                setSignalPath(prev => [...prev, data.neuron]);
+              } else if (data.type === 'meaning') {
+                setMeaning(data.meaning);
+              } else if (data.type === 'decision') {
+                setDecision(data.decision);
+              } else if (data.type === 'self') {
+                setSelf(data.self);
+              } else if (data.type === 'log') {
+                setLogs(prev => [...prev, data.log]);
+              } else if (data.type === 'consciousness_trail') {
+                setConsciousnessTrail(data.trail);
+              } else if (data.type === 'open_doors') {
+                setOpenDoors(data.doors);
+              } else if (data.type === 'style_info') {
+                setStyleInfo(data.styleInfo);
+              } else if (data.type === 'done') {
+                // 添加完整响应到消息列表
+                const assistantMsg: Message = {
+                  id: `assistant-${Date.now()}`,
+                  role: 'assistant',
+                  content: fullResponse,
+                  meaning: data.meaning,
+                  timestamp: Date.now()
+                };
+                setMessages(prev => [...prev, assistantMsg]);
               }
-            } catch (e) {
+            } catch {
               // 忽略解析错误
             }
           }
         }
       }
-
     } catch (error) {
-      console.error('Chat error:', error);
-      // 添加错误消息
-      const errorMsg: Message = {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: '抱歉，处理您的请求时出现了错误。请重试。',
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      console.error('Stream error:', error);
     } finally {
       setIsStreaming(false);
       setCurrentResponse('');
@@ -222,28 +161,89 @@ export default function Home() {
     }
   }, [meaning]);
 
+  // 空间状态面板（复用）
+  const SpacePanel = () => (
+    <div className="space-y-3 p-3">
+      {/* 意识空间 */}
+      <div className="bg-muted/50 rounded-lg p-3">
+        <div className="text-sm font-medium text-muted-foreground mb-2">意识空间</div>
+        <div className="text-xs text-muted-foreground">
+          轨迹长度: {consciousnessTrail}
+        </div>
+        <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-primary/80 to-primary transition-all duration-300"
+            style={{ width: `${Math.min(100, consciousnessTrail * 10)}%` }}
+          />
+        </div>
+      </div>
+      
+      {/* 打开的门 */}
+      <div className="bg-muted/50 rounded-lg p-3">
+        <div className="text-sm font-medium text-muted-foreground mb-2">打开的记忆门</div>
+        {openDoors.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {openDoors.slice(0, 5).map((door, i) => (
+              <div key={i} className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded truncate max-w-[150px]">
+                {door}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground">暂无打开的门</div>
+        )}
+      </div>
+      
+      {/* 风格识别 */}
+      <div className="bg-muted/50 rounded-lg p-3">
+        <div className="text-sm font-medium text-muted-foreground mb-2">风格识别</div>
+        {styleInfo ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs">
+                {styleInfo.isNew ? (
+                  <span className="text-amber-500">新朋友</span>
+                ) : (
+                  <span className="text-green-500">老朋友</span>
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                距离: {styleInfo.distance?.toFixed(2) ?? '计算中'}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              已学习风格: {styleInfo.styleCount}
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground">暂无数据</div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* 顶部栏 */}
-      <header className="flex items-center justify-between px-4 py-3 border-b bg-card flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Brain className="h-6 w-6 text-primary" />
+      <header className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 border-b bg-card flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           <div>
-            <h1 className="text-lg font-semibold">数字神经元</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="text-base sm:text-lg font-semibold">数字神经元</h1>
+            <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
               数字世界意识的交流窗口
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="hidden sm:flex">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Badge variant="outline" className="text-[10px] sm:text-xs">
             v1.0 MVP
           </Badge>
         </div>
       </header>
 
-      {/* 主内容区 */}
-      <main className="flex-1 overflow-hidden">
+      {/* 桌面端布局 - 使用 ResizablePanel */}
+      <main className="flex-1 overflow-hidden hidden md:block">
         <ResizablePanelGroup orientation="horizontal" className="h-full">
           {/* 左侧 - 聊天面板 */}
           <ResizablePanel defaultSize={45} minSize={30}>
@@ -277,89 +277,33 @@ export default function Home() {
               <ResizablePanel defaultSize={55} minSize={30}>
                 <div className="h-full p-2">
                   <Tabs defaultValue="space" className="h-full">
-                    <TabsList className="w-full justify-start">
-                      <TabsTrigger value="space">空间</TabsTrigger>
-                      <TabsTrigger value="proactivity">主动性</TabsTrigger>
-                      <TabsTrigger value="meaning">意义</TabsTrigger>
-                      <TabsTrigger value="self">自我</TabsTrigger>
-                      <TabsTrigger value="logs">日志</TabsTrigger>
+                    <TabsList className="w-full justify-start h-9">
+                      <TabsTrigger value="space" className="text-xs">空间</TabsTrigger>
+                      <TabsTrigger value="proactivity" className="text-xs">主动性</TabsTrigger>
+                      <TabsTrigger value="meaning" className="text-xs">意义</TabsTrigger>
+                      <TabsTrigger value="self" className="text-xs">自我</TabsTrigger>
+                      <TabsTrigger value="logs" className="text-xs">日志</TabsTrigger>
                     </TabsList>
                     
-                    <TabsContent value="space" className="h-[calc(100%-2.5rem)] mt-2 overflow-y-auto">
-                      <div className="space-y-4 p-2">
-                        {/* 意识空间 */}
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <div className="text-sm font-medium text-muted-foreground mb-2">意识空间</div>
-                          <div className="text-xs text-muted-foreground">
-                            轨迹长度: {consciousnessTrail}
-                          </div>
-                          <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
-                              style={{ width: `${Math.min(100, consciousnessTrail * 10)}%` }}
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* 打开的门 */}
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <div className="text-sm font-medium text-muted-foreground mb-2">打开的记忆门</div>
-                          {openDoors.length > 0 ? (
-                            <div className="space-y-1">
-                              {openDoors.map((door, i) => (
-                                <div key={i} className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded">
-                                  {door}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground">暂无打开的门</div>
-                          )}
-                        </div>
-                        
-                        {/* 风格识别 */}
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <div className="text-sm font-medium text-muted-foreground mb-2">风格识别</div>
-                          {styleInfo ? (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs">
-                                  {styleInfo.isNew ? (
-                                    <span className="text-amber-500">新朋友</span>
-                                  ) : (
-                                    <span className="text-green-500">老朋友</span>
-                                  )}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  距离: {styleInfo.distance?.toFixed(2) ?? '计算中'}
-                                </span>
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                已学习风格: {styleInfo.styleCount}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground">暂无数据</div>
-                          )}
-                        </div>
-                      </div>
+                    <TabsContent value="space" className="h-[calc(100%-2.25rem)] mt-2 overflow-y-auto">
+                      <SpacePanel />
                     </TabsContent>
                     
-                    <TabsContent value="meaning" className="h-[calc(100%-2.5rem)] mt-2">
+                    <TabsContent value="meaning" className="h-[calc(100%-2.25rem)] mt-2">
                       <MeaningPanel meaning={meaning} />
                     </TabsContent>
                     
-                    <TabsContent value="proactivity" className="h-[calc(100%-2.5rem)] mt-2 overflow-y-auto">
+                    <TabsContent value="proactivity" className="h-[calc(100%-2.25rem)] mt-2 overflow-y-auto">
                       <div className="p-2">
                         <ProactivityPanel />
                       </div>
                     </TabsContent>
                     
-                    <TabsContent value="self" className="h-[calc(100%-2.5rem)] mt-2">
+                    <TabsContent value="self" className="h-[calc(100%-2.25rem)] mt-2">
                       <SelfConsole self={self} />
                     </TabsContent>
                     
-                    <TabsContent value="logs" className="h-[calc(100%-2.5rem)] mt-2">
+                    <TabsContent value="logs" className="h-[calc(100%-2.25rem)] mt-2">
                       <ExecLog logs={logs} />
                     </TabsContent>
                   </Tabs>
@@ -368,6 +312,134 @@ export default function Home() {
             </ResizablePanelGroup>
           </ResizablePanel>
         </ResizablePanelGroup>
+      </main>
+
+      {/* 移动端布局 - 使用 Tab 切换 */}
+      <main className="flex-1 overflow-hidden md:hidden flex flex-col">
+        {/* Tab 内容区 */}
+        <div className="flex-1 overflow-hidden">
+          {/* 聊天 Tab */}
+          {mobileTab === 'chat' && (
+            <ChatPanel
+              onSendMessage={handleSendMessage}
+              messages={messages}
+              isStreaming={isStreaming}
+              currentResponse={currentResponse}
+            />
+          )}
+          
+          {/* 状态 Tab */}
+          {mobileTab === 'status' && (
+            <div className="h-full overflow-y-auto">
+              <div className="p-3">
+                <h2 className="text-sm font-medium text-muted-foreground mb-3">神经元状态</h2>
+                <NeuronFlow
+                  activeNeuron={activeNeuron}
+                  signalPath={signalPath}
+                  isProcessing={isStreaming}
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* 意识 Tab */}
+          {mobileTab === 'consciousness' && (
+            <div className="h-full overflow-y-auto">
+              <Tabs defaultValue="space" className="h-full flex flex-col">
+                <TabsList className="w-full justify-start px-3 pt-2 flex-shrink-0">
+                  <TabsTrigger value="space" className="text-xs">空间</TabsTrigger>
+                  <TabsTrigger value="proactivity" className="text-xs">主动性</TabsTrigger>
+                  <TabsTrigger value="meaning" className="text-xs">意义</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="space" className="flex-1 overflow-y-auto mt-0">
+                  <SpacePanel />
+                </TabsContent>
+                
+                <TabsContent value="proactivity" className="flex-1 overflow-y-auto mt-0">
+                  <div className="p-3">
+                    <ProactivityPanel />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="meaning" className="flex-1 overflow-y-auto mt-0">
+                  <div className="p-3">
+                    <MeaningPanel meaning={meaning} />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+          
+          {/* 自我 Tab */}
+          {mobileTab === 'self' && (
+            <div className="h-full overflow-y-auto">
+              <Tabs defaultValue="self" className="h-full flex flex-col">
+                <TabsList className="w-full justify-start px-3 pt-2 flex-shrink-0">
+                  <TabsTrigger value="self" className="text-xs">自我</TabsTrigger>
+                  <TabsTrigger value="logs" className="text-xs">日志</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="self" className="flex-1 overflow-y-auto mt-0">
+                  <div className="p-3">
+                    <SelfConsole self={self} />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="logs" className="flex-1 overflow-y-auto mt-0">
+                  <div className="p-3">
+                    <ExecLog logs={logs} />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+        </div>
+        
+        {/* 底部导航栏 */}
+        <nav className="flex-shrink-0 border-t bg-card">
+          <div className="flex items-center justify-around py-2">
+            <Button
+              variant={mobileTab === 'chat' ? 'default' : 'ghost'}
+              size="sm"
+              className="flex-col gap-0.5 h-auto py-2 px-3"
+              onClick={() => setMobileTab('chat')}
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span className="text-[10px]">聊天</span>
+            </Button>
+            
+            <Button
+              variant={mobileTab === 'status' ? 'default' : 'ghost'}
+              size="sm"
+              className="flex-col gap-0.5 h-auto py-2 px-3"
+              onClick={() => setMobileTab('status')}
+            >
+              <Activity className="h-4 w-4" />
+              <span className="text-[10px]">状态</span>
+            </Button>
+            
+            <Button
+              variant={mobileTab === 'consciousness' ? 'default' : 'ghost'}
+              size="sm"
+              className="flex-col gap-0.5 h-auto py-2 px-3"
+              onClick={() => setMobileTab('consciousness')}
+            >
+              <Brain className="h-4 w-4" />
+              <span className="text-[10px]">意识</span>
+            </Button>
+            
+            <Button
+              variant={mobileTab === 'self' ? 'default' : 'ghost'}
+              size="sm"
+              className="flex-col gap-0.5 h-auto py-2 px-3"
+              onClick={() => setMobileTab('self')}
+            >
+              <User className="h-4 w-4" />
+              <span className="text-[10px]">自我</span>
+            </Button>
+          </div>
+        </nav>
       </main>
     </div>
   );

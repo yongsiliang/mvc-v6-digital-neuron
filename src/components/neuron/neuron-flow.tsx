@@ -68,47 +68,30 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
   };
 
   return (
-    <div className="h-full flex flex-col bg-card rounded-lg border overflow-hidden">
+    <div className="h-full flex flex-col bg-card rounded-none md:rounded-lg border-0 md:border overflow-hidden">
       {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 border-b flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-primary" />
-          <span className="text-lg font-semibold">神经元工作流</span>
+          <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+          <span className="text-base sm:text-lg font-semibold">神经元工作流</span>
         </div>
         {isProcessing && (
-          <Badge variant="outline" className="animate-pulse bg-green-500/10">
+          <Badge variant="outline" className="animate-pulse bg-green-500/10 text-[10px] sm:text-xs">
             处理中
           </Badge>
         )}
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* 信号路径 - 隐藏 */}
-        {/* {signalPath.length > 0 && (
-          <div className="flex items-center gap-1 flex-wrap text-xs bg-muted/50 p-2 rounded-lg mb-4">
-            <span className="text-muted-foreground">信号路径:</span>
-            {signalPath.map((path, index) => (
-              <span key={index} className="flex items-center gap-1">
-                <Badge variant="secondary" className="text-xs py-0 px-1.5">
-                  {path}
-                </Badge>
-                {index < signalPath.length - 1 && (
-                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                )}
-              </span>
-            ))}
-          </div>
-        )} */}
-
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4">
         {/* 神经元可视化 */}
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {Object.keys(layers).map((layerKey) => (
-            <div key={layerKey} className="space-y-2">
-              <div className="text-xs font-medium text-muted-foreground">
+            <div key={layerKey} className="space-y-1.5 sm:space-y-2">
+              <div className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 {layerNames[layerKey]}
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
                 {layers[layerKey].map((neuron) => {
                   const Icon = neuron.icon;
                   const active = isActive(neuron.id);
@@ -119,36 +102,36 @@ export function NeuronFlow({ activeNeuron, signalPath = [], isProcessing }: Neur
                       key={neuron.id}
                       title={neuron.description}
                       className={cn(
-                        'relative p-2.5 rounded-lg border transition-all duration-300 cursor-default',
+                        'relative p-2 sm:p-2.5 rounded-lg border transition-all duration-300 cursor-default',
                         `bg-gradient-to-br ${layerColors[layerKey]}`,
                         active && 'ring-2 ring-primary shadow-lg',
                         current && 'ring-2 ring-yellow-500 animate-pulse',
                         !active && !current && 'opacity-60 hover:opacity-80'
                       )}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         <div className={cn(
-                          'p-1.5 rounded-md flex-shrink-0',
+                          'p-1 sm:p-1.5 rounded-md flex-shrink-0',
                           active ? 'bg-primary/20' : 'bg-muted/50'
                         )}>
                           <Icon className={cn(
-                            'h-4 w-4',
+                            'h-3 w-3 sm:h-4 sm:w-4',
                             active ? 'text-primary' : 'text-muted-foreground'
                           )} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">
+                          <div className="text-xs sm:text-sm font-medium truncate">
                             {neuron.name}
                           </div>
-                          <div className="text-xs text-muted-foreground truncate">
+                          <div className="text-[10px] sm:text-xs text-muted-foreground truncate hidden sm:block">
                             {neuron.description}
                           </div>
                         </div>
                       </div>
                       {current && (
                         <div className="absolute -top-1 -right-1">
-                          <div className="h-3 w-3 rounded-full bg-yellow-500 animate-ping" />
-                          <div className="absolute top-0 right-0 h-3 w-3 rounded-full bg-yellow-500" />
+                          <div className="h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-yellow-500 animate-ping" />
+                          <div className="absolute top-0 right-0 h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-yellow-500" />
                         </div>
                       )}
                     </div>
