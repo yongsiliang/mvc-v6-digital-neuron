@@ -21,7 +21,7 @@ import {
   generateSamplePlanningData,
   generateSampleExecutiveData
 } from '@/components/neuron-viz';
-import { useNeuronV3System, defaultSystemState } from '@/hooks/use-neuron-v3';
+import { useNeuronV3System, defaultSystemState, type NetworkTopologyData, type VSAData, type ConsciousnessData, type PlanningData, type ExecutiveData } from '@/hooks/use-neuron-v3';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -49,23 +49,44 @@ export default function NeuronV3Dashboard() {
     systemState, 
     isLoading: apiLoading, 
     processInput, 
-    sendFeedback 
+    sendFeedback,
+    fetchNetworkTopology,
+    fetchVSAData,
+    fetchConsciousnessData,
+    fetchPlanningData,
+    fetchExecutiveData,
   } = useNeuronV3System();
 
   // 网络数据 - 从API获取或使用默认值
-  const [networkData, setNetworkData] = useState(generateSampleNetwork);
+  const [networkData, setNetworkData] = useState<NetworkTopologyData>({ neurons: [], connections: [] });
 
   // VSA语义空间数据
-  const [vsaData, setVsaData] = useState(generateSampleVSAData);
+  const [vsaData, setVsaData] = useState<VSAData>({ concepts: [], links: [] });
 
   // 意识数据
-  const [consciousnessData, setConsciousnessData] = useState(generateSampleConsciousnessData);
+  const [consciousnessData, setConsciousnessData] = useState<ConsciousnessData>({
+    currentContent: null,
+    consciousnessLevel: 0,
+    selfAwarenessIndex: 0,
+    streamCoherence: 0,
+    trail: [],
+  });
 
   // 计划数据
-  const [planningData, setPlanningData] = useState(generateSamplePlanningData);
+  const [planningData, setPlanningData] = useState<PlanningData>({
+    goals: [],
+    activeGoal: null,
+  });
 
   // 执行控制数据
-  const [executiveData, setExecutiveData] = useState(generateSampleExecutiveData);
+  const [executiveData, setExecutiveData] = useState<ExecutiveData>({
+    attentionMode: 'diffuse',
+    currentFocus: '等待输入',
+    attentionAllocation: [],
+    tasks: [],
+    attentionSpotlight: [],
+    timePressure: 0,
+  });
 
   // 预测和事件
   const [predictions, setPredictions] = useState(generateSamplePredictions());
@@ -90,33 +111,40 @@ export default function NeuronV3Dashboard() {
     selfAwarenessIndex: systemState?.selfAwarenessIndex ?? defaultSystemState.selfAwarenessIndex,
   };
 
+  // 定期获取所有可视化数据
+  useEffect(() => {
+    const fetchAllData = async () => {
+      const [network, vsa, consciousness, planning, executive] = await Promise.all([
+        fetchNetworkTopology(),
+        fetchVSAData(),
+        fetchConsciousnessData(),
+        fetchPlanningData(),
+        fetchExecutiveData(),
+      ]);
+
+      if (network) setNetworkData(network);
+      if (vsa) setVsaData(vsa);
+      if (consciousness) setConsciousnessData(consciousness);
+      if (planning) setPlanningData(planning);
+      if (executive) setExecutiveData(executive);
+    };
+
+    fetchAllData();
+    const interval = setInterval(fetchAllData, 3000);
+    return () => clearInterval(interval);
+  }, [fetchNetworkTopology, fetchVSAData, fetchConsciousnessData, fetchPlanningData, fetchExecutiveData]);
+
   // 根据系统状态更新网络可视化
   useEffect(() => {
     if (systemState) {
-      // 更新网络状态显示
-      setNetworkData(prev => ({
-        neurons: prev.neurons.map((n, i) => ({
-          ...n,
-          activation: stats.neuronCount > 0 
-            ? Math.random() * 0.3 + 0.2 * (i % 3) // 基于真实状态的模拟
-            : 0.1,
-          state: stats.consciousnessLevel > 50 
-            ? (['active', 'predicting'] as const)[Math.floor(Math.random() * 2)]
-            : 'dormant',
-        })),
-        connections: prev.connections.map(c => ({
-          ...c,
-          active: stats.consciousnessLevel > 30,
-        })),
-      }));
-
       // 更新意识数据
       setConsciousnessData(prev => ({
         ...prev,
         consciousnessLevel: stats.consciousnessLevel,
+        selfAwarenessIndex: stats.selfAwarenessIndex,
       }));
     }
-  }, [systemState, stats.neuronCount, stats.consciousnessLevel]);
+  }, [systemState, stats.consciousnessLevel, stats.selfAwarenessIndex]);
 
   // 处理消息发送 - 使用真实API
   const handleSendMessage = useCallback(async (message: string) => {
@@ -386,9 +414,18 @@ export default function NeuronV3Dashboard() {
           <TabsContent value="planning" className="space-y-6">
             <section className="grid lg:grid-cols-2 gap-6">
               <PlanningPanel
-                goals={planningData.goals}
-                activeTasks={planningData.activeTasks}
-                currentPlan={planningData.currentPlan}
+                goals={planningData.goals.map(g => ({
+                  id: g.id,
+                  description: g.description,
+                  priority: g.priority,
+                  progress: g.progress,
+                  subGoals: [],
+                  status: g.status === 'in_progress' ? 'active' : 
+                          g.status === 'completed' ? 'completed' : 'active',
+                  createdAt: Date.now(),
+                }))}
+                activeTasks={[]}
+                currentPlan={null}
               />
               <div className="space-y-6">
                 <Card className="glow-card">
@@ -433,9 +470,15 @@ export default function NeuronV3Dashboard() {
           <TabsContent value="executive" className="space-y-6">
             <section className="grid lg:grid-cols-2 gap-6">
               <ExecutivePanel
-                focusItems={executiveData.focusItems}
+                focusItems={executiveData.attentionAllocation.map((a, i) => ({
+                  id: `focus-${i}`,
+                  type: a.module,
+                  priority: a.allocation,
+                  attention: a.allocation,
+                }))}
                 currentFocus={executiveData.currentFocus}
-                attentionMode={executiveData.attentionMode}
+                attentionMode={executiveData.attentionMode === 'focus' ? 'focused' : 
+                               executiveData.attentionMode === 'switching' ? 'divided' : 'exploratory'}
               />
               <div className="space-y-6">
                 <Card className="glow-card">

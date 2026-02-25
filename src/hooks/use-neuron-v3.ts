@@ -41,6 +41,115 @@ export interface ProcessResult {
 }
 
 /**
+ * 网络拓扑数据类型
+ */
+export interface NetworkTopologyData {
+  neurons: Array<{
+    id: string;
+    label: string;
+    role: string;
+    x: number;
+    y: number;
+    activation: number;
+    predictionError: number;
+    state: 'active' | 'predicting' | 'surprised' | 'dormant';
+  }>;
+  connections: Array<{
+    from: string;
+    to: string;
+    weight: number;
+    active: boolean;
+  }>;
+}
+
+/**
+ * VSA语义空间数据类型
+ */
+export interface VSAData {
+  concepts: Array<{
+    name: string;
+    x: number;
+    y: number;
+    vector: number[];
+    similarity: number;
+    category: 'core' | 'learned' | 'temporary';
+  }>;
+  links: Array<{
+    from: string;
+    to: string;
+    similarity: number;
+  }>;
+}
+
+/**
+ * 意识内容数据类型
+ */
+export interface ConsciousnessData {
+  currentContent: {
+    id: string;
+    type: 'perceptual' | 'semantic' | 'emotional' | 'memory' | 'thought' | 'motor' | 'metacognitive';
+    data: unknown;
+    source: string;
+    enteredAt: number;
+    duration: number;
+    strength: number;
+    broadcast: boolean;
+    relatedIds: string[];
+  } | null;
+  consciousnessLevel: number;
+  selfAwarenessIndex: number;
+  streamCoherence: number;
+  trail: Array<{
+    contentId: string;
+    timestamp: number;
+    type: 'perceptual' | 'semantic' | 'emotional' | 'memory' | 'thought' | 'motor' | 'metacognitive';
+    summary: string;
+    strength: number;
+    duration: number;
+  }>;
+}
+
+/**
+ * 计划数据类型
+ */
+export interface PlanningData {
+  goals: Array<{
+    id: string;
+    description: string;
+    priority: number;
+    progress: number;
+    status: string;
+    subGoals: string[];
+  }>;
+  activeGoal: {
+    id: string;
+    description: string;
+    priority: number;
+  } | null;
+}
+
+/**
+ * 执行控制数据类型
+ */
+export interface ExecutiveData {
+  attentionMode: 'focus' | 'diffuse' | 'switching';
+  currentFocus: string;
+  attentionAllocation: Array<{
+    module: string;
+    allocation: number;
+  }>;
+  tasks: Array<{
+    id: string;
+    description: string;
+    priority: number;
+    urgency: number;
+    status: string;
+  }>;
+  attentionSpotlight: string[];
+  timePressure: number;
+}
+
+/**
  * 反馈结果类型
  */
 export interface FeedbackResult {
@@ -259,6 +368,96 @@ export function useNeuronV3System() {
     }
   }, [fetchSystemState]);
 
+  // 获取网络拓扑数据
+  const fetchNetworkTopology = useCallback(async (): Promise<NetworkTopologyData | null> => {
+    try {
+      const response = await fetch('/api/neuron-v3/network');
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Failed to fetch network topology:', data.error);
+        return null;
+      }
+    } catch (err) {
+      console.error('Network topology error:', err);
+      return null;
+    }
+  }, []);
+
+  // 获取VSA语义空间数据
+  const fetchVSAData = useCallback(async (): Promise<VSAData | null> => {
+    try {
+      const response = await fetch('/api/neuron-v3/vsa');
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Failed to fetch VSA data:', data.error);
+        return null;
+      }
+    } catch (err) {
+      console.error('VSA data error:', err);
+      return null;
+    }
+  }, []);
+
+  // 获取意识内容数据
+  const fetchConsciousnessData = useCallback(async (): Promise<ConsciousnessData | null> => {
+    try {
+      const response = await fetch('/api/neuron-v3/consciousness');
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Failed to fetch consciousness data:', data.error);
+        return null;
+      }
+    } catch (err) {
+      console.error('Consciousness data error:', err);
+      return null;
+    }
+  }, []);
+
+  // 获取计划数据
+  const fetchPlanningData = useCallback(async (): Promise<PlanningData | null> => {
+    try {
+      const response = await fetch('/api/neuron-v3/planning');
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Failed to fetch planning data:', data.error);
+        return null;
+      }
+    } catch (err) {
+      console.error('Planning data error:', err);
+      return null;
+    }
+  }, []);
+
+  // 获取执行控制数据
+  const fetchExecutiveData = useCallback(async (): Promise<ExecutiveData | null> => {
+    try {
+      const response = await fetch('/api/neuron-v3/executive');
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.data;
+      } else {
+        console.error('Failed to fetch executive data:', data.error);
+        return null;
+      }
+    } catch (err) {
+      console.error('Executive data error:', err);
+      return null;
+    }
+  }, []);
+
   return {
     systemState,
     isLoading,
@@ -267,6 +466,11 @@ export function useNeuronV3System() {
     processInput,
     sendFeedback,
     chat,
+    fetchNetworkTopology,
+    fetchVSAData,
+    fetchConsciousnessData,
+    fetchPlanningData,
+    fetchExecutiveData,
   };
 }
 

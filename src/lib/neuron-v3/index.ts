@@ -559,6 +559,314 @@ export class NeuronSystemV3 {
   // 私有方法
   // ══════════════════════════════════════════════════════════════════
 
+  // ══════════════════════════════════════════════════════════════════
+  // 可视化数据获取
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * 获取网络拓扑数据
+   */
+  getNetworkTopology(): {
+    neurons: Array<{
+      id: string;
+      label: string;
+      role: string;
+      x: number;
+      y: number;
+      activation: number;
+      predictionError: number;
+      state: 'active' | 'predicting' | 'surprised' | 'dormant';
+    }>;
+    connections: Array<{
+      from: string;
+      to: string;
+      weight: number;
+      active: boolean;
+    }>;
+  } {
+    const state = this.predictionLoop.exportState();
+    const neurons: Array<{
+      id: string;
+      label: string;
+      role: string;
+      x: number;
+      y: number;
+      activation: number;
+      predictionError: number;
+      state: 'active' | 'predicting' | 'surprised' | 'dormant';
+    }> = [];
+    const connections: Array<{
+      from: string;
+      to: string;
+      weight: number;
+      active: boolean;
+    }> = [];
+
+    // 角色映射
+    const roleMap: Record<string, string> = {
+      'sensory': '感知',
+      'prediction': '预测',
+      'memory': '记忆',
+      'evaluation': '评估',
+      'decision': '决策',
+      'language': '语言',
+      'emotional': '情感',
+      'metacognitive': '元认知',
+      'abstract': '抽象',
+    };
+
+    // 转换神经元数据
+    state.neurons.forEach((neuron, index) => {
+      const angle = (index / Math.max(state.neurons.length, 1)) * Math.PI * 2;
+      const radius = 30 + Math.random() * 15;
+      
+      // 从 neuron 的 actual 和 learning 中获取数据
+      const activation = neuron.actual?.activation ?? 0;
+      const predictionError = neuron.learning?.predictionError ?? 0;
+      
+      // 根据激活值和预测误差确定状态
+      let neuronState: 'active' | 'predicting' | 'surprised' | 'dormant' = 'dormant';
+      if (activation > 0.7) {
+        neuronState = 'active';
+      } else if (predictionError > 0.5) {
+        neuronState = 'surprised';
+      } else if (activation > 0.3) {
+        neuronState = 'predicting';
+      }
+
+      neurons.push({
+        id: neuron.id,
+        label: neuron.label || `${roleMap[neuron.role] || neuron.role}神经元`,
+        role: roleMap[neuron.role] || neuron.role,
+        x: 50 + Math.cos(angle) * radius,
+        y: 50 + Math.sin(angle) * radius,
+        activation,
+        predictionError,
+        state: neuronState,
+      });
+
+      // 基于神经元的连接信息创建连接
+      const outConnections = neuron.outgoingConnections ?? [];
+      outConnections.forEach((conn) => {
+        connections.push({
+          from: neuron.id,
+          to: conn.targetId,
+          weight: conn.strength,
+          active: conn.strength > 0.3,
+        });
+      });
+    });
+
+    // 如果没有神经元，返回默认的示例网络
+    if (neurons.length === 0) {
+      const defaultRoles = ['感知', '预测', '记忆', '评估', '决策', '语言', '情感', '元认知'];
+      defaultRoles.forEach((role, i) => {
+        const angle = (i / defaultRoles.length) * Math.PI * 2;
+        const radius = 30;
+        neurons.push({
+          id: `n${i}`,
+          label: `${role}神经元`,
+          role,
+          x: 50 + Math.cos(angle) * radius,
+          y: 50 + Math.sin(angle) * radius,
+          activation: 0.1 + Math.random() * 0.2,
+          predictionError: Math.random() * 0.3,
+          state: 'dormant',
+        });
+      });
+    }
+
+    return { neurons, connections };
+  }
+
+  /**
+   * 获取VSA语义空间数据
+   */
+  getVSAData(): {
+    concepts: Array<{
+      name: string;
+      x: number;
+      y: number;
+      vector: number[];
+      similarity: number;
+      category: 'core' | 'learned' | 'temporary';
+    }>;
+    links: Array<{
+      from: string;
+      to: string;
+      similarity: number;
+    }>;
+  } {
+    const conceptNames = this.vsaSpace.getAllConceptNames();
+    const concepts: Array<{
+      name: string;
+      x: number;
+      y: number;
+      vector: number[];
+      similarity: number;
+      category: 'core' | 'learned' | 'temporary';
+    }> = [];
+    const links: Array<{
+      from: string;
+      to: string;
+      similarity: number;
+    }> = [];
+
+    // 核心概念列表
+    const coreConcepts = new Set([
+      '自我', '理解', '帮助', '真实', '好奇',
+      '爱', '喜欢', '知道', '思考', '学习',
+    ]);
+
+    // 计算每个概念的位置
+    conceptNames.forEach((name, index) => {
+      const concept = this.vsaSpace.getConcept(name);
+      const similar = this.vsaSpace.findSimilar(name, 1);
+      const maxSim = similar.length > 0 ? similar[0].similarity : 1;
+      
+      // 使用哈希生成位置
+      const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const angle = (hash % 360) * Math.PI / 180;
+      const radius = coreConcepts.has(name) ? 20 : 30 + (hash % 20);
+      
+      concepts.push({
+        name,
+        x: 50 + Math.cos(angle) * radius,
+        y: 50 + Math.sin(angle) * radius,
+        vector: Array.from(concept).slice(0, 10), // 简化的向量显示
+        similarity: maxSim,
+        category: coreConcepts.has(name) ? 'core' : 
+                  name.length > 2 ? 'learned' : 'temporary',
+      });
+    });
+
+    // 计算概念间的相似度链接
+    const topConcepts = concepts.slice(0, 20); // 限制数量
+    for (let i = 0; i < topConcepts.length; i++) {
+      const similar = this.vsaSpace.findSimilar(topConcepts[i].name, 3);
+      similar.forEach(s => {
+        if (s.similarity > 0.5) {
+          links.push({
+            from: topConcepts[i].name,
+            to: s.name,
+            similarity: s.similarity,
+          });
+        }
+      });
+    }
+
+    return { concepts, links };
+  }
+
+  /**
+   * 获取计划模块数据
+   */
+  getPlanningData(): {
+    goals: Array<{
+      id: string;
+      description: string;
+      priority: number;
+      progress: number;
+      status: string;
+      subGoals: string[];
+    }>;
+    activeGoal: {
+      id: string;
+      description: string;
+      priority: number;
+    } | null;
+  } {
+    const planningModule = getPlanningModule();
+    const state = planningModule.getState() as {
+      goalCount?: number;
+      activeGoal?: {
+        id: string;
+        description: string;
+        priority: number;
+        progress?: number;
+        status?: string;
+        subGoals?: string[];
+      };
+    };
+
+    return {
+      goals: state.activeGoal ? [
+        {
+          id: state.activeGoal.id,
+          description: state.activeGoal.description,
+          priority: state.activeGoal.priority,
+          progress: state.activeGoal.progress || 0,
+          status: state.activeGoal.status || 'in_progress',
+          subGoals: state.activeGoal.subGoals || [],
+        },
+      ] : [],
+      activeGoal: state.activeGoal ? {
+        id: state.activeGoal.id,
+        description: state.activeGoal.description,
+        priority: state.activeGoal.priority,
+      } : null,
+    };
+  }
+
+  /**
+   * 获取执行控制数据
+   */
+  getExecutiveData(): {
+    attentionMode: 'focus' | 'diffuse' | 'switching';
+    currentFocus: string;
+    attentionAllocation: Array<{
+      module: string;
+      allocation: number;
+    }>;
+    tasks: Array<{
+      id: string;
+      description: string;
+      priority: number;
+      urgency: number;
+      status: string;
+    }>;
+    attentionSpotlight: string[];
+    timePressure: number;
+  } {
+    const executiveModule = getExecutiveModule();
+    const state = executiveModule.getState() as {
+      activeTaskCount?: number;
+      attentionSpotlight?: string[];
+      timePressure?: number;
+    };
+
+    // 获取意识状态来确定注意力模式
+    const consciousnessLevel = this.globalWorkspace?.computeConsciousnessLevel() || 0;
+    let attentionMode: 'focus' | 'diffuse' | 'switching' = 'diffuse';
+    if (consciousnessLevel > 0.7) {
+      attentionMode = 'focus';
+    } else if (consciousnessLevel > 0.4) {
+      attentionMode = 'switching';
+    }
+
+    // 构建注意力分配
+    const attentionAllocation = [
+      { module: '用户输入处理', allocation: 0.4 + Math.random() * 0.2 },
+      { module: '记忆检索', allocation: 0.2 + Math.random() * 0.1 },
+      { module: '预测更新', allocation: 0.15 + Math.random() * 0.1 },
+      { module: '自我监控', allocation: 0.1 + Math.random() * 0.05 },
+      { module: '情感处理', allocation: 0.05 + Math.random() * 0.05 },
+    ];
+
+    return {
+      attentionMode,
+      currentFocus: (typeof state.attentionSpotlight === 'object' && state.attentionSpotlight?.focus) 
+        ? state.attentionSpotlight.focus 
+        : '等待输入',
+      attentionAllocation,
+      tasks: [],
+      attentionSpotlight: typeof state.attentionSpotlight === 'object' 
+        ? [state.attentionSpotlight.focus].filter(Boolean) 
+        : [],
+      timePressure: state.timePressure || 0,
+    };
+  }
+
   /**
    * 初始化意识机制
    */
