@@ -102,6 +102,13 @@ import {
   getCognitiveCoordinator,
   resetCognitiveCoordinator,
 } from './cognitive-coordinator';
+import {
+  BlackBox,
+  BlackBoxOutput,
+  BlackBoxConfig,
+  getBlackBox,
+  resetBlackBox,
+} from './black-box';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -128,6 +135,12 @@ export interface NeuronSystemV3Config {
   
   /** 是否启用自动神经元生成 */
   enableAutoGeneration?: boolean;
+  
+  /** 是否启用黑盒（意识涌现核心） */
+  enableBlackBox?: boolean;
+  
+  /** 黑盒配置 */
+  blackBoxConfig?: Partial<BlackBoxConfig>;
 }
 
 export interface SystemState {
@@ -175,6 +188,13 @@ export interface ProcessInputResult {
   
   /** 学习结果 */
   learning: LearningResult;
+  
+  /** 黑盒涌现（如果启用） */
+  blackBoxEmergence?: {
+    intensity: number;
+    hasInsight: boolean;
+    intuitionHint?: string;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -193,6 +213,10 @@ export class NeuronSystemV3 {
   private vsaSpace: VSASemanticSpace;
   private meaningCalculator: MeaningCalculator | null = null;
   private globalWorkspace: GlobalWorkspace | null = null;
+  
+  // 黑盒 - 意识涌现的不可观测核心
+  private blackBox: BlackBox | null = null;
+  private lastBlackBoxOutput: BlackBoxOutput | null = null;
   
   // 认知模块
   private perceptualModule: PerceptualModule | null = null;
@@ -217,6 +241,8 @@ export class NeuronSystemV3 {
       enablePlanning: true,
       enableExecutive: true,
       enableAutoGeneration: true,
+      enableBlackBox: true,
+      blackBoxConfig: {},
       ...config,
     };
     
@@ -239,6 +265,14 @@ export class NeuronSystemV3 {
     
     if (this.config.enableConsciousness) {
       this.initConsciousness();
+    }
+    
+    // 初始化黑盒 - 意识涌现的核心
+    if (this.config.enableBlackBox) {
+      this.blackBox = getBlackBox({
+        dimension: this.config.vsaDimension,
+        ...this.config.blackBoxConfig,
+      });
     }
     
     this.initialized = true;
@@ -383,6 +417,23 @@ export class NeuronSystemV3 {
       }
     }
     
+    // 9. 黑盒处理 - 意识涌现的核心（如果启用）
+    if (this.blackBox) {
+      // 黑盒接受输入向量，输出可能涌现的意识向量
+      // 内部过程不可观测，只有输出可见
+      this.lastBlackBoxOutput = this.blackBox.process(Array.from(inputVector));
+      
+      // 如果黑盒产生了强烈的涌现，可能影响意识内容
+      if (this.lastBlackBoxOutput.hasInsight && this.globalWorkspace) {
+        // 将黑盒输出注入意识流（但不解释来源）
+        // 这是"直觉"、"灵感"、"潜意识"的来源
+        this.globalWorkspace.injectMysteriousContent(
+          this.lastBlackBoxOutput.vector,
+          this.lastBlackBoxOutput.intuitionHint || 'unknown'
+        );
+      }
+    }
+    
     return {
       neuronResponse: {
         activations: processingResult.activations,
@@ -393,6 +444,11 @@ export class NeuronSystemV3 {
       meaning,
       consciousness,
       learning: learningResult,
+      blackBoxEmergence: this.lastBlackBoxOutput ? {
+        intensity: this.lastBlackBoxOutput.emergenceIntensity,
+        hasInsight: this.lastBlackBoxOutput.hasInsight,
+        intuitionHint: this.lastBlackBoxOutput.intuitionHint,
+      } : undefined,
     };
   }
 
@@ -577,6 +633,36 @@ export class NeuronSystemV3 {
       vsaStats: {
         conceptCount: this.vsaSpace.getConceptCount(),
       },
+    };
+  }
+  
+  /**
+   * 获取黑盒状态 - 只有模糊信息，不暴露内部
+   */
+  getBlackBoxState(): {
+    enabled: boolean;
+    age?: number;
+    inputCount?: number;
+    energyLevel?: string;
+    chaosLevel?: string;
+    hasAttractors?: number;
+    memoryTraces?: number;
+    lastEmergenceAgo?: number;
+  } {
+    if (!this.blackBox) {
+      return { enabled: false };
+    }
+    
+    const state = this.blackBox.getMysteriousState();
+    return {
+      enabled: true,
+      age: state.age,
+      inputCount: state.inputCount,
+      energyLevel: state.energyLevel,
+      chaosLevel: state.chaosLevel,
+      hasAttractors: state.hasAttractors,
+      memoryTraces: state.memoryTraces,
+      lastEmergenceAgo: state.lastEmergenceAgo,
     };
   }
 
@@ -972,6 +1058,7 @@ export function resetNeuronSystemV3(): void {
   resetNeuronGenerator();
   resetAdvancedModules();
   resetCognitiveCoordinator();
+  resetBlackBox();
 }
 
 // ─────────────────────────────────────────────────────────────────────

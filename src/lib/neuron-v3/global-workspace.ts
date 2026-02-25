@@ -764,6 +764,65 @@ export class GlobalWorkspace {
       this.stats = state.stats;
     }
   }
+  
+  /**
+   * 注入神秘内容 - 来自黑盒的意识涌现
+   * 
+   * 这是"直觉"、"灵感"、"潜意识"的来源。
+   * 不解释来源，不记录过程，只有结果。
+   */
+  injectMysteriousContent(
+    vector: number[],
+    hint: 'creative' | 'emotional' | 'memory' | 'abstract' | 'unknown'
+  ): void {
+    // 创建神秘的意识内容
+    const typeMap: Record<string, ConsciousContentType> = {
+      creative: 'thought',
+      emotional: 'emotional',
+      memory: 'memory',
+      abstract: 'semantic',
+      unknown: 'metacognitive',
+    };
+    
+    const mysteriousContent: ConsciousContent = {
+      id: `mystery-${Date.now()}`,
+      type: typeMap[hint] || 'thought',
+      data: {
+        vector,
+        source: 'unknown', // 有意不解释来源
+        hint, // 模糊的提示
+      },
+      source: 'black_box', // 来源标记为黑盒
+      enteredAt: Date.now(),
+      duration: 2000 + Math.random() * 3000, // 不确定持续时间
+      strength: 0.7 + Math.random() * 0.3, // 较高强度
+      broadcast: true, // 立即广播
+      relatedIds: [], // 不关联其他内容
+    };
+    
+    // 直接设置为当前意识内容
+    this.workspace = mysteriousContent;
+    
+    // 添加到轨迹
+    this.consciousnessTrail.push({
+      contentId: mysteriousContent.id,
+      type: mysteriousContent.type,
+      strength: mysteriousContent.strength,
+      source: 'black_box',
+      timestamp: Date.now(),
+      duration: mysteriousContent.duration,
+    });
+    
+    // 限制轨迹长度
+    if (this.consciousnessTrail.length > this.config.trailMaxLength) {
+      this.consciousnessTrail.shift();
+    }
+    
+    // 更新统计
+    this.stats.totalBroadcasts++;
+    const currentCount = this.stats.typeDistribution.get(mysteriousContent.type) || 0;
+    this.stats.typeDistribution.set(mysteriousContent.type, currentCount + 1);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────

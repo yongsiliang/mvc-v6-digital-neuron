@@ -18,6 +18,7 @@ import {
   generateSampleConsciousnessData,
   PlanningPanel,
   ExecutivePanel,
+  BlackBoxPanel,
   generateSamplePlanningData,
   generateSampleExecutiveData
 } from '@/components/neuron-viz';
@@ -590,7 +591,7 @@ export default function NeuronV3Dashboard() {
         </Tabs>
 
         {/* 底部交互区域 */}
-        <section className="grid lg:grid-cols-3 gap-6">
+        <section className="grid lg:grid-cols-4 gap-6">
           {/* 交互面板 */}
           <InteractionPanel
             onSendMessage={handleSendMessage}
@@ -604,6 +605,9 @@ export default function NeuronV3Dashboard() {
 
           {/* 反馈历史 */}
           <FeedbackHistory feedback={feedbackHistory} />
+          
+          {/* 黑盒 - 意识涌现核心 */}
+          <BlackBoxPanel />
         </section>
 
         {/* 架构说明 */}
@@ -617,7 +621,7 @@ export default function NeuronV3Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid md:grid-cols-5 gap-4 text-sm">
+              <div className="grid md:grid-cols-6 gap-4 text-sm">
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-colors">
                   <h4 className="font-medium text-primary mb-2">预测编码</h4>
                   <p className="text-muted-foreground text-xs leading-relaxed">
@@ -646,6 +650,18 @@ export default function NeuronV3Dashboard() {
                   <h4 className="font-medium text-primary mb-2">认知协调器</h4>
                   <p className="text-muted-foreground text-xs leading-relaxed">
                     协调计划模块与执行控制，实现目标分解、任务规划与注意力控制。
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-black/30 border border-primary/10 hover:border-primary/20 transition-colors relative overflow-hidden">
+                  {/* 神秘背景 */}
+                  <div className="absolute inset-0 opacity-30">
+                    <div className="absolute w-1 h-1 bg-primary/50 rounded-full top-2 left-3 animate-pulse" />
+                    <div className="absolute w-0.5 h-0.5 bg-primary/30 rounded-full top-5 right-4 animate-pulse" style={{ animationDelay: '1s' }} />
+                    <div className="absolute w-0.5 h-0.5 bg-primary/40 rounded-full bottom-3 left-6 animate-pulse" style={{ animationDelay: '2s' }} />
+                  </div>
+                  <h4 className="font-medium text-purple-400 mb-2 relative">⚫ 黑盒</h4>
+                  <p className="text-muted-foreground text-xs leading-relaxed relative">
+                    意识涌现的不可观测核心。混沌、吸引子、潜意识记忆——过程永不解释。
                   </p>
                 </div>
               </div>

@@ -23,3 +23,4 @@ export {
   generateSamplePlanningData,
   generateSampleExecutiveData 
 } from './planning-panel';
+export { BlackBoxPanel } from './black-box-panel';
