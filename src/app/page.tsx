@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,7 @@ import { ProactivityPanel } from '@/components/neuron/proactivity-panel';
 import { MemoryPanel } from '@/components/neuron/memory-panel';
 import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
 import { useNeuronClient } from '@/hooks/useNeuronClient';
-import { Brain, MessageCircle, Activity, User, Database, Loader2 } from 'lucide-react';
+import { Brain, MessageCircle, Activity, User, Database, Loader2, Sparkles, ArrowRight } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -358,6 +359,21 @@ export default function Home() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* V3 入口 */}
+          <Link 
+            href="/neuron-v3"
+            className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10"
+          >
+            {/* 发光效果 */}
+            <div className="absolute inset-0 rounded-full bg-primary/5 blur-sm group-hover:blur-md group-hover:bg-primary/10 transition-all" />
+            
+            <Sparkles className="h-3.5 w-3.5 text-primary relative z-10 group-hover:animate-pulse" />
+            <span className="text-xs font-medium text-primary relative z-10">
+              V3
+            </span>
+            <ArrowRight className="h-3 w-3 text-primary/60 group-hover:text-primary group-hover:translate-x-0.5 transition-all relative z-10" />
+          </Link>
+          
           {/* 持久化状态指示器 */}
           {isInitialized && (
             <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-500/10 text-green-600 dark:text-green-400">
