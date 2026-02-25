@@ -124,6 +124,17 @@ export type {
   AuthAdapter,
 } from './auth';
 
+// 记忆集成
+export {
+  MemoryIntegrationService,
+  createMemoryIntegrationService,
+} from './memory-integration';
+export type {
+  ConversationMemory,
+  MemoryContext,
+  MemoryIntegrationConfig,
+} from './memory-integration';
+
 // 元层
 export { MetaLayer, createMetaLayer } from './meta-layer';
 

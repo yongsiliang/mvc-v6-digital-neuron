@@ -7,6 +7,7 @@
  * - 提供统一的 API 调用接口
  * - 处理加载状态和错误
  * - 支持自动保存
+ * - 集成记忆服务（对话记忆、上下文回忆）
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -20,6 +21,12 @@ import {
   UserInfo,
   UserPreferences,
 } from '@/lib/neuron-v2/auth';
+import {
+  MemoryIntegrationService,
+  createMemoryIntegrationService,
+  MemoryContext,
+  ConversationMemory,
+} from '@/lib/neuron-v2/memory-integration';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -358,6 +365,74 @@ export function useNeuronClient(options: UseNeuronClientOptions = {}) {
   }, []);
 
   // ─────────────────────────────────────────────────────────────────
+  // 记忆集成服务
+  // ─────────────────────────────────────────────────────────────────
+
+  const memoryIntegrationRef = useRef<MemoryIntegrationService | null>(null);
+
+  // 初始化记忆集成服务
+  useEffect(() => {
+    if (userId) {
+      memoryIntegrationRef.current = createMemoryIntegrationService({
+        maxRelevantMemories: 5,
+        importanceThreshold: 0.3,
+      });
+      memoryIntegrationRef.current.setUserId(userId);
+    }
+  }, [userId]);
+
+  /**
+   * 记住对话（增强版）
+   * 
+   * 自动提取关键点、主题、情感，并计算重要性
+   */
+  const rememberConversation = useCallback(async (
+    role: 'user' | 'assistant',
+    content: string,
+    context?: {
+      previousMessages?: Array<{ role: string; content: string }>;
+      topics?: string[];
+    }
+  ): Promise<ConversationMemory | null> => {
+    if (!memoryIntegrationRef.current) return null;
+    
+    try {
+      return await memoryIntegrationRef.current.rememberConversation(role, content, context);
+    } catch (err) {
+      console.error('Failed to remember conversation:', err);
+      return null;
+    }
+  }, []);
+
+  /**
+   * 回忆对话上下文
+   * 
+   * 获取与当前输入相关的历史记忆，用于增强对话
+   */
+  const recallConversationContext = useCallback(async (
+    query: string
+  ): Promise<MemoryContext | null> => {
+    if (!memoryIntegrationRef.current) return null;
+    
+    try {
+      return await memoryIntegrationRef.current.recallRelevantMemories(query);
+    } catch (err) {
+      console.error('Failed to recall context:', err);
+      return null;
+    }
+  }, []);
+
+  /**
+   * 构建对话上下文提示
+   * 
+   * 将记忆上下文转换为可用的提示文本
+   */
+  const buildContextPrompt = useCallback((context: MemoryContext): string => {
+    if (!memoryIntegrationRef.current) return '';
+    return memoryIntegrationRef.current.buildContextPrompt(context);
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────
   // 返回
   // ─────────────────────────────────────────────────────────────────
 
@@ -370,7 +445,7 @@ export function useNeuronClient(options: UseNeuronClientOptions = {}) {
     error,
     isInitialized,
     
-    // 方法
+    // 基础方法
     initialize,
     remember,
     recall,
@@ -378,6 +453,11 @@ export function useNeuronClient(options: UseNeuronClientOptions = {}) {
     getMemories,
     save,
     updateState,
+    
+    // 记忆集成方法（新增）
+    rememberConversation,
+    recallConversationContext,
+    buildContextPrompt,
     
     // 清除错误
     clearError: () => setError(null),
