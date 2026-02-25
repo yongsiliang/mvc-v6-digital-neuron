@@ -229,6 +229,9 @@ export class NeuronSystemV3 {
     this.feedbackCollector = getFeedbackCollector();
     this.rewardLearner = getRewardLearner(this.predictionLoop, this.config.learningConfig);
     
+    // 初始化默认神经元
+    this.initDefaultNeurons();
+    
     // 初始化可选组件
     if (this.config.enableMeaningCalculation) {
       this.meaningCalculator = getMeaningCalculator();
@@ -239,6 +242,33 @@ export class NeuronSystemV3 {
     }
     
     this.initialized = true;
+  }
+
+  /**
+   * 初始化默认神经元
+   */
+  private initDefaultNeurons(): void {
+    const defaultRoles: Array<{ role: NeuronRole; label: string; receptiveField: string }> = [
+      { role: 'sensory', label: '感知神经元', receptiveField: '处理外部输入信号' },
+      { role: 'semantic', label: '语义神经元', receptiveField: '处理语言理解和概念' },
+      { role: 'episodic', label: '情景神经元', receptiveField: '存储和检索历史事件' },
+      { role: 'emotional', label: '情感神经元', receptiveField: '处理情感和情绪' },
+      { role: 'abstract', label: '抽象神经元', receptiveField: '处理高级抽象概念' },
+      { role: 'motor', label: '运动神经元', receptiveField: '生成输出响应' },
+      { role: 'metacognitive', label: '元认知神经元', receptiveField: '监控和调节认知过程' },
+    ];
+
+    for (const config of defaultRoles) {
+      const neuron = createPredictiveNeuron(this.userId, {
+        label: config.label,
+        role: config.role,
+        sensitivityVector: this.vsaSpace.getConcept(config.receptiveField),
+        receptiveField: config.receptiveField,
+        creationReason: '系统初始化默认神经元',
+        level: 1,
+      });
+      this.predictionLoop.addNeuron(neuron);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -831,7 +861,11 @@ export class NeuronSystemV3 {
     const executiveModule = getExecutiveModule();
     const state = executiveModule.getState() as {
       activeTaskCount?: number;
-      attentionSpotlight?: string[];
+      attentionSpotlight?: {
+        focus: string;
+        intensity: number;
+        spread: number;
+      };
       timePressure?: number;
     };
 
@@ -855,14 +889,10 @@ export class NeuronSystemV3 {
 
     return {
       attentionMode,
-      currentFocus: (typeof state.attentionSpotlight === 'object' && state.attentionSpotlight?.focus) 
-        ? state.attentionSpotlight.focus 
-        : '等待输入',
+      currentFocus: state.attentionSpotlight?.focus || '等待输入',
       attentionAllocation,
       tasks: [],
-      attentionSpotlight: typeof state.attentionSpotlight === 'object' 
-        ? [state.attentionSpotlight.focus].filter(Boolean) 
-        : [],
+      attentionSpotlight: state.attentionSpotlight?.focus ? [state.attentionSpotlight.focus] : [],
       timePressure: state.timePressure || 0,
     };
   }

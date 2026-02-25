@@ -608,6 +608,14 @@ export class PredictionLoop {
   }
 
   /**
+   * 添加神经元
+   */
+  addNeuron(neuron: PredictiveNeuron): void {
+    this.neurons.set(neuron.id, neuron);
+    this.stats.neuronsCreated++;
+  }
+
+  /**
    * 获取所有神经元
    */
   getAllNeurons(): PredictiveNeuron[] {
