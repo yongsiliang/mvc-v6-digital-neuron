@@ -108,6 +108,22 @@ export {
   createDatabaseInterface,
 } from './db-operations';
 
+// 认证
+export {
+  getOrCreateUserId,
+  getUserInfo,
+  getUserPreferences,
+  updateUserPreferences,
+  clearUserData,
+  getUserIdFromRequest,
+  isValidUserId,
+} from './auth';
+export type {
+  UserInfo,
+  UserPreferences,
+  AuthAdapter,
+} from './auth';
+
 // 元层
 export { MetaLayer, createMetaLayer } from './meta-layer';
 
