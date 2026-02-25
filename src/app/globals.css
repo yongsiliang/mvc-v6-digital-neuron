@@ -89,68 +89,71 @@
 }
 
 .dark {
-  --background: oklch(0.13 0.028 261.692);
-  --foreground: oklch(0.985 0.002 247.839);
-  --card: oklch(0.21 0.034 264.665);
-  --card-foreground: oklch(0.985 0.002 247.839);
-  --popover: oklch(0.21 0.034 264.665);
-  --popover-foreground: oklch(0.985 0.002 247.839);
-  --primary: oklch(0.70 0.12 183);
-  --primary-foreground: oklch(0.28 0.04 193);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.278 0.033 256.848);
-  --muted-foreground: oklch(0.707 0.022 261.325);
-  --accent: oklch(0.278 0.033 256.848);
-  --accent-foreground: oklch(0.985 0.002 247.839);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.85 0.13 181);
-  --chart-2: oklch(0.78 0.13 182);
-  --chart-3: oklch(0.70 0.12 183);
-  --chart-4: oklch(0.60 0.10 185);
-  --chart-5: oklch(0.51 0.09 186);
-  --sidebar: oklch(0.21 0.034 264.665);
-  --sidebar-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-primary: oklch(0.78 0.13 182);
-  --sidebar-primary-foreground: oklch(0.28 0.04 193);
-  --sidebar-accent: oklch(0.278 0.033 256.848);
-  --sidebar-accent-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --background: oklch(0.08 0.02 275);           /* 深紫黑背景 */
+  --foreground: oklch(0.95 0.01 275);           /* 浅灰白文字 */
+  --card: oklch(0.12 0.03 275);                 /* 卡片背景 - 深紫 */
+  --card-foreground: oklch(0.95 0.01 275);
+  --popover: oklch(0.12 0.03 275);
+  --popover-foreground: oklch(0.95 0.01 275);
+  --primary: oklch(0.65 0.20 285);              /* 主色 - 霓虹紫 */
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.20 0.04 280);
+  --secondary-foreground: oklch(0.90 0.02 275);
+  --muted: oklch(0.18 0.03 280);
+  --muted-foreground: oklch(0.65 0.05 275);
+  --accent: oklch(0.65 0.20 285);               /* 强调色 - 紫色 */
+  --accent-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.65 0.22 20);
+  --border: oklch(0.30 0.05 280);               /* 边框 - 紫灰 */
+  --input: oklch(0.20 0.04 280);
+  --ring: oklch(0.65 0.20 285 / 50%);
+  --chart-1: oklch(0.70 0.20 285);              /* 紫色 */
+  --chart-2: oklch(0.65 0.18 320);              /* 粉紫 */
+  --chart-3: oklch(0.60 0.15 260);              /* 蓝紫 */
+  --chart-4: oklch(0.55 0.12 240);              /* 蓝色 */
+  --chart-5: oklch(0.50 0.10 220);              /* 青蓝 */
+  --sidebar: oklch(0.10 0.025 275);
+  --sidebar-foreground: oklch(0.95 0.01 275);
+  --sidebar-primary: oklch(0.65 0.20 285);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.20 0.04 280);
+  --sidebar-accent-foreground: oklch(0.95 0.01 275);
+  --sidebar-border: oklch(0.25 0.04 280);
+  --sidebar-ring: oklch(0.65 0.20 285 / 40%);
 }
 
 @custom-variant dark (&:is(.dark *));
 
 /* ═══════════════════════════════════════════════════════════════════════
-   数字神经元系统 - 专用样式变量
+   数字神经元系统 - 专用样式变量 (科技紫主题)
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* 神经元状态颜色 */
-  --neuron-active: oklch(0.85 0.13 181);      /* 活跃态 - 青绿发光 */
-  --neuron-dormant: oklch(0.40 0.05 185);     /* 休眠态 - 暗淡青绿 */
-  --neuron-predicting: oklch(0.75 0.15 85);   /* 预测态 - 琥珀色 */
-  --neuron-surprised: oklch(0.70 0.18 25);    /* 惊讶态 - 珊瑚色 */
+  /* 神经元状态颜色 - 紫色科技风 */
+  --neuron-active: oklch(0.70 0.22 285);        /* 活跃态 - 霓虹紫 */
+  --neuron-dormant: oklch(0.35 0.08 280);       /* 休眠态 - 暗紫 */
+  --neuron-predicting: oklch(0.75 0.18 320);    /* 预测态 - 粉紫 */
+  --neuron-surprised: oklch(0.70 0.20 350);     /* 惊讶态 - 玫红 */
   
   /* 信号颜色 */
-  --signal-reward: oklch(0.78 0.14 85);       /* 奖励信号 - 琥珀金 */
-  --signal-error: oklch(0.65 0.20 25);        /* 误差信号 - 珊瑚红 */
-  --signal-learning: oklch(0.75 0.12 260);    /* 学习信号 - 柔和紫 */
+  --signal-reward: oklch(0.75 0.18 165);        /* 奖励信号 - 青绿 */
+  --signal-error: oklch(0.65 0.22 20);          /* 误差信号 - 珊瑚红 */
+  --signal-learning: oklch(0.70 0.20 285);      /* 学习信号 - 紫色 */
   
-  /* 发光效果 */
-  --glow-teal: 0 0 20px oklch(0.85 0.13 181 / 0.5);
-  --glow-amber: 0 0 20px oklch(0.78 0.14 85 / 0.5);
-  --glow-coral: 0 0 20px oklch(0.70 0.18 25 / 0.5);
+  /* 发光效果 - 霓虹风格 */
+  --glow-teal: 0 0 30px oklch(0.70 0.22 285 / 0.6), 0 0 60px oklch(0.70 0.22 285 / 0.3);
+  --glow-amber: 0 0 30px oklch(0.75 0.18 320 / 0.6), 0 0 60px oklch(0.75 0.18 320 / 0.3);
+  --glow-coral: 0 0 30px oklch(0.70 0.20 350 / 0.6), 0 0 60px oklch(0.70 0.20 350 / 0.3);
+  --glow-purple: 0 0 40px oklch(0.65 0.24 285 / 0.5), 0 0 80px oklch(0.65 0.24 285 / 0.2);
   
-  /* 网格背景 */
-  --grid-color: oklch(0.30 0.02 185 / 0.15);
+  /* 网格背景 - 紫色调 */
+  --grid-color: oklch(0.25 0.06 280 / 0.3);
+  
+  /* 扫描线效果 */
+  --scanline-color: oklch(0.50 0.15 285 / 0.1);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   神经元动画
+/* 神经元动画
    ═══════════════════════════════════════════════════════════════════════ */
 
 @keyframes pulse-glow {
@@ -160,7 +163,7 @@
   }
   50% {
     opacity: 1;
-    filter: brightness(1.2);
+    filter: brightness(1.3);
   }
 }
 
@@ -170,8 +173,8 @@
     box-shadow: 0 0 0 0 var(--neuron-active);
   }
   50% {
-    transform: scale(1.15);
-    box-shadow: 0 0 20px 5px var(--neuron-active);
+    transform: scale(1.2);
+    box-shadow: 0 0 40px 10px var(--neuron-active);
   }
   100% {
     transform: scale(1);
@@ -207,8 +210,103 @@
   }
 }
 
+/* 科技感新增动画 */
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+/* Tailwind 扩展动画 */
+.animate-scan {
+  animation: scanline 8s linear infinite;
+}
+
+.animate-glitch {
+  animation: glitch 2s ease-in-out infinite;
+}
+
+.animate-hologram {
+  animation: hologram 3s ease-in-out infinite;
+}
+
+.animate-data-stream {
+  animation: data-stream 2s linear infinite;
+}
+
+@keyframes glitch {
+  0%, 90%, 100% {
+    transform: translate(0);
+    opacity: 1;
+  }
+  91% {
+    transform: translate(-2px, 1px);
+    opacity: 0.8;
+  }
+  92% {
+    transform: translate(2px, -1px);
+    opacity: 0.9;
+  }
+  93% {
+    transform: translate(-1px, 2px);
+    opacity: 0.8;
+  }
+}
+
+@keyframes data-stream {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes hologram {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1) hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.95;
+    filter: brightness(1.1) hue-rotate(5deg);
+  }
+}
+
+@keyframes border-glow {
+  0%, 100% {
+    border-color: oklch(0.50 0.18 285 / 0.5);
+    box-shadow: 0 0 20px oklch(0.50 0.18 285 / 0.2);
+  }
+  50% {
+    border-color: oklch(0.65 0.22 285 / 0.8);
+    box-shadow: 0 0 30px oklch(0.65 0.22 285 / 0.4);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes rotate-glow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
-   神经元组件样式
+   神经元组件样式 - 科技紫主题
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* 神经元节点 */
@@ -219,7 +317,7 @@
 
 .neuron-node.active {
   animation: neuron-fire 0.6s ease-out;
-  box-shadow: var(--glow-teal);
+  box-shadow: var(--glow-purple);
 }
 
 .neuron-node.predicting {
@@ -246,17 +344,35 @@
   animation: signal-flow 1s ease-in-out;
 }
 
-/* 发光卡片 */
+/* 发光卡片 - 科技风格 */
 .glow-card {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, 
+    oklch(0.12 0.04 280 / 0.9), 
+    oklch(0.15 0.05 285 / 0.8));
+  border: 1px solid oklch(0.35 0.12 285 / 0.5);
   border-radius: var(--radius);
   transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.glow-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    oklch(0.70 0.22 285 / 0.8), 
+    transparent);
 }
 
 .glow-card:hover {
-  border-color: var(--neuron-active);
-  box-shadow: var(--glow-teal);
+  border-color: oklch(0.55 0.18 285 / 0.8);
+  box-shadow: var(--glow-purple);
+  transform: translateY(-2px);
 }
 
 /* 脉冲背景 */
@@ -264,12 +380,95 @@
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
-/* 网格背景 */
+/* 网格背景 - 科技风格 */
 .grid-bg {
+  background-color: oklch(0.08 0.02 275);
   background-image: 
     linear-gradient(var(--grid-color) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, oklch(0.15 0.08 285 / 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, oklch(0.12 0.06 320 / 0.2) 0%, transparent 40%);
+  background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
+}
+
+/* 扫描线效果 */
+.scanline-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--scanline-color) 50%,
+    transparent 100%
+  );
+  background-size: 100% 4px;
+  animation: scanline 8s linear infinite;
+  opacity: 0.3;
+  z-index: 9999;
+}
+
+/* 全息效果 */
+.hologram-effect {
+  animation: hologram 4s ease-in-out infinite;
+}
+
+/* 边框发光 */
+.border-glow {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+/* 浮动效果 */
+.float-effect {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* 数据流动背景 */
+.data-flow-bg {
+  background: linear-gradient(
+    45deg,
+    oklch(0.10 0.03 280 / 0.8),
+    oklch(0.15 0.06 285 / 0.6),
+    oklch(0.10 0.03 280 / 0.8)
+  );
+  background-size: 200% 200%;
+  animation: data-stream 10s linear infinite;
+}
+
+/* 霓虹文字 */
+.neon-text {
+  text-shadow: 
+    0 0 10px oklch(0.70 0.22 285 / 0.8),
+    0 0 20px oklch(0.70 0.22 285 / 0.6),
+    0 0 40px oklch(0.70 0.22 285 / 0.4);
+}
+
+/* 科技按钮 */
+.tech-button {
+  position: relative;
+  background: linear-gradient(135deg, 
+    oklch(0.20 0.08 280), 
+    oklch(0.25 0.10 285));
+  border: 1px solid oklch(0.45 0.15 285 / 0.6);
+  transition: all 0.3s ease;
+}
+
+.tech-button:hover {
+  border-color: oklch(0.60 0.20 285);
+  box-shadow: var(--glow-purple);
+}
+
+.tech-button::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: oklch(0.70 0.22 285);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
