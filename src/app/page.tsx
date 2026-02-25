@@ -113,38 +113,46 @@ export default function Home() {
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.slice(6));
+              const parsed = JSON.parse(line.slice(6));
+              const type = parsed.type;
+              const data = parsed.data;
               
-              if (data.type === 'content') {
-                fullResponse += data.content;
+              if (type === 'response') {
+                fullResponse += data.delta;
                 setCurrentResponse(fullResponse);
-              } else if (data.type === 'neuron') {
-                setActiveNeuron(data.neuron);
-                setSignalPath(prev => [...prev, data.neuron]);
-              } else if (data.type === 'meaning') {
-                setMeaning(data.meaning);
-              } else if (data.type === 'decision') {
-                setDecision(data.decision);
-              } else if (data.type === 'self') {
-                setSelf(data.self);
-              } else if (data.type === 'log') {
-                setLogs(prev => [...prev, data.log]);
-              } else if (data.type === 'consciousness_trail') {
+              } else if (type === 'neuron') {
+                setActiveNeuron(data.neuronId);
+                setSignalPath(prev => [...prev, data.neuronId]);
+              } else if (type === 'meaning') {
+                setMeaning(data);
+              } else if (type === 'decision') {
+                setDecision(data);
+              } else if (type === 'self') {
+                setSelf(data);
+              } else if (type === 'log') {
+                setLogs(prev => [...prev, data]);
+              } else if (type === 'consciousness') {
                 setConsciousnessTrail(data.trail);
-              } else if (data.type === 'open_doors') {
-                setOpenDoors(data.doors);
-              } else if (data.type === 'style_info') {
-                setStyleInfo(data.styleInfo);
-              } else if (data.type === 'done') {
+              } else if (type === 'open-doors') {
+                setOpenDoors(data.meanings || []);
+              } else if (type === 'done') {
                 // 添加完整响应到消息列表
                 const assistantMsg: Message = {
                   id: `assistant-${Date.now()}`,
                   role: 'assistant',
                   content: fullResponse,
-                  meaning: data.meaning,
+                  meaning: data.styleInfo ? {
+                    interpretation: '',
+                    selfRelevance: 0.5,
+                    sentiment: 'neutral'
+                  } : undefined,
                   timestamp: Date.now()
                 };
                 setMessages(prev => [...prev, assistantMsg]);
+                // 更新风格信息
+                if (data.styleInfo) {
+                  setStyleInfo(data.styleInfo);
+                }
               }
             } catch {
               // 忽略解析错误
@@ -159,7 +167,7 @@ export default function Home() {
       setCurrentResponse('');
       setActiveNeuron('');
     }
-  }, [meaning]);
+  }, []);
 
   // 空间状态面板（复用）
   const SpacePanel = () => (
