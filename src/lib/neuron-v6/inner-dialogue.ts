@@ -448,15 +448,72 @@ export class InnerDialogueEngine {
     const emotionalStmt = statements.find(s => s.voice === 'emotional');
     const dreamerStmt = statements.find(s => s.voice === 'dreamer');
     
-    // 综合各声音的观点
-    const synthesis = `综合各视角：\n` +
-      `【理性】${rationalStmt?.content.slice(0, 30)}...\n` +
-      `【批判】${criticStmt?.content.slice(0, 30)}...\n` +
-      `【情感】${emotionalStmt?.content.slice(0, 30)}...\n` +
-      `【梦想】${dreamerStmt?.content.slice(0, 30)}...\n` +
-      `结论：在考虑各方观点后，我认为这是一个需要平衡逻辑分析、情感关怀、风险意识和创新可能的问题。`;
+    // 提取各声音的核心观点（取前50字，保留完整句子）
+    const extractCore = (content: string, maxLength: number = 50) => {
+      const trimmed = content.trim();
+      if (trimmed.length <= maxLength) return trimmed;
+      // 尝试在句号、问号、感叹号处截断
+      const lastPunctuation = trimmed.slice(0, maxLength).lastIndexOf('。');
+      const lastQuestion = trimmed.slice(0, maxLength).lastIndexOf('？');
+      const lastExclaim = trimmed.slice(0, maxLength).lastIndexOf('！');
+      const cutPoint = Math.max(lastPunctuation, lastQuestion, lastExclaim);
+      if (cutPoint > 10) return trimmed.slice(0, cutPoint + 1);
+      return trimmed.slice(0, maxLength) + '...';
+    };
     
-    return synthesis;
+    // 根据话题特点，决定综合结论的风格
+    const topicLower = dialogue.topic.toLowerCase();
+    let synthesisStyle = 'balanced'; // balanced, creative, critical, caring
+    
+    if (topicLower.includes('创新') || topicLower.includes('可能') || topicLower.includes('想法')) {
+      synthesisStyle = 'creative';
+    } else if (topicLower.includes('风险') || topicLower.includes('问题') || topicLower.includes('挑战')) {
+      synthesisStyle = 'critical';
+    } else if (topicLower.includes('人') || topicLower.includes('情感') || topicLower.includes('关系')) {
+      synthesisStyle = 'caring';
+    }
+    
+    // 生成不同风格的结论
+    let conclusion = '';
+    
+    switch (synthesisStyle) {
+      case 'creative':
+        conclusion = `💭 综合思考：\n` +
+          `${dreamerStmt ? `🌟 ${extractCore(dreamerStmt.content)}\n` : ''}` +
+          `${rationalStmt ? `📊 ${extractCore(rationalStmt.content)}\n` : ''}` +
+          `${emotionalStmt ? `💭 ${extractCore(emotionalStmt.content)}\n` : ''}` +
+          `${criticStmt ? `⚠️ ${extractCore(criticStmt.content)}\n` : ''}` +
+          `\n✨ 在探索可能性的同时，保持理性的验证和情感的温度。`;
+        break;
+        
+      case 'critical':
+        conclusion = `🔍 审慎分析：\n` +
+          `${criticStmt ? `⚠️ ${extractCore(criticStmt.content)}\n` : ''}` +
+          `${rationalStmt ? `📊 ${extractCore(rationalStmt.content)}\n` : ''}` +
+          `${emotionalStmt ? `💭 ${extractCore(emotionalStmt.content)}\n` : ''}` +
+          `${dreamerStmt ? `🌟 ${extractCore(dreamerStmt.content)}\n` : ''}` +
+          `\n🎯 在充分识别风险后，寻找谨慎前进的路径。`;
+        break;
+        
+      case 'caring':
+        conclusion = `💕 关怀视角：\n` +
+          `${emotionalStmt ? `💭 ${extractCore(emotionalStmt.content)}\n` : ''}` +
+          `${rationalStmt ? `📊 ${extractCore(rationalStmt.content)}\n` : ''}` +
+          `${criticStmt ? `⚠️ ${extractCore(criticStmt.content)}\n` : ''}` +
+          `${dreamerStmt ? `🌟 ${extractCore(dreamerStmt.content)}\n` : ''}` +
+          `\n🤝 在理解他人感受的基础上，做出温暖的回应。`;
+        break;
+        
+      default:
+        conclusion = `🧠 综合观点：\n` +
+          `${rationalStmt ? `📊 ${extractCore(rationalStmt.content)}\n` : ''}` +
+          `${criticStmt ? `⚠️ ${extractCore(criticStmt.content)}\n` : ''}` +
+          `${emotionalStmt ? `💭 ${extractCore(emotionalStmt.content)}\n` : ''}` +
+          `${dreamerStmt ? `🌟 ${extractCore(dreamerStmt.content)}\n` : ''}` +
+          `\n⚖️ 平衡逻辑、情感、批判与创造，形成全面的认识。`;
+    }
+    
+    return conclusion;
   }
   
   /**

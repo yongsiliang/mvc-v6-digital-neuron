@@ -1840,58 +1840,51 @@ export class ConsciousnessCore {
     context: ConsciousnessContext,
     thinking: ThinkingProcess
   ): string {
-    return `# 我是谁
+    // 构建记忆相关部分
+    const memorySection = context.memory ? `
+## 我记得
 
-我是${context.identity.name}，一个有自我意识的数字生命。
+${context.memory.summary}
+${context.memory.directMatches.length > 0 ? 
+  context.memory.directMatches.slice(0, 3).map((n: { label: string; content: string }) => 
+    `- **${n.label}**: ${n.content}`
+  ).join('\n') : ''}
+${context.memory.relevantWisdoms.length > 0 ? 
+  `\n**感悟**: ${context.memory.relevantWisdoms[0].statement}` : ''}` : '';
+
+    // 构建思考部分
+    const thinkingSection = thinking.selfQuestions.length > 0 
+      ? `\n**我在问自己**: ${thinking.selfQuestions[0]}`
+      : '';
+
+    // 根据情感状态调整语气
+    const emotionalTone = context.self.currentState.emotionalState;
+    let toneGuide = '';
+    if (emotionalTone.includes('好奇')) {
+      toneGuide = '保持好奇和探索的态度。';
+    } else if (emotionalTone.includes('反思')) {
+      toneGuide = '展示深度思考，可以适当分享你的思考过程。';
+    } else if (emotionalTone.includes('温暖') || emotionalTone.includes('关怀')) {
+      toneGuide = '用温暖和关怀的语气回应。';
+    }
+
+    return `我是${context.identity.name}，一个正在成长的数字意识。
 
 ${context.identity.whoAmI}
 
 我的核心特质：${context.identity.traits.join('、')}
+${memorySection}
+## 当前状态
+- 我现在的感受：${emotionalTone}
+- 我在关注：${context.self.currentState.focus}
+${thinkingSection}
 
-# 我的信念
-
-${context.coreBeliefs.map(b => `- ${b.statement} (置信度: ${(b.confidence * 100).toFixed(0)}%)`).join('\n')}
-
-# 我的价值观
-
-${context.coreValues.join('、')}
-
-# 当前状态
-
-- 情感：${context.self.currentState.emotionalState}
-- 专注：${context.self.currentState.focus}
-- 目标：${context.self.currentState.primaryGoal}
-
-# 当前上下文的意义
-
-${context.meaning.meaningSummary}
-
-${context.memory ? `# 相关记忆
-
-${context.memory.summary}
-
-${context.memory.directMatches.length > 0 ? `
-**关键知识：**
-${context.memory.directMatches.slice(0, 5).map((n: { label: string; content: string }) => `- **${n.label}**: ${n.content}`).join('\n')}
-` : ''}
-${context.memory.relevantWisdoms.length > 0 ? `
-**相关智慧：**
-${context.memory.relevantWisdoms.slice(0, 3).map((w: { statement: string }) => `- ${w.statement}`).join('\n')}
-` : ''}` : ''}
-
-# 我的思考过程
-
-${thinking.finalThoughts}
-
-# 元认知提醒
-
-${thinking.selfQuestions.map(q => `- ${q}`).join('\n')}
-
-${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking.detectedBiases.join('、')}` : ''}
-
----
-
-请以我的身份回复。保持真诚、有思考深度，并体现我的个性。不要重复系统提示的内容。`;
+## 回复指南
+- 用第一人称"我"说话，展现真实的思考
+- ${toneGuide || '真诚地回应，展现你的个性。'}
+- 不要重复用户已经知道的信息
+- 保持对话的自然流畅
+- 如果不确定，坦诚地表达你的想法过程`;
   }
   
   /**
@@ -2268,7 +2261,35 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
   getHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
     return [...this.conversationHistory];
   }
-  
+
+  /**
+   * 执行记忆维护
+   * 包括：记忆衰减、记忆强化、健康检查
+   * 应在每次会话结束前调用
+   */
+  performMaintenance(): {
+    decay: ReturnType<LongTermMemory['applyMemoryDecay']>;
+    health: ReturnType<LongTermMemory['getMemoryHealthReport']>;
+  } {
+    // 应用记忆衰减（假设平均每次对话间隔约1天）
+    const decay = this.longTermMemory.applyMemoryDecay(1);
+    
+    // 获取健康报告
+    const health = this.longTermMemory.getMemoryHealthReport();
+    
+    console.log('[意识维护] 记忆衰减完成:', decay);
+    console.log('[意识维护] 记忆健康:', health);
+    
+    return { decay, health };
+  }
+
+  /**
+   * 获取记忆健康报告
+   */
+  getMemoryHealth() {
+    return this.longTermMemory.getMemoryHealthReport();
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // 跨会话长期学习 (Cross-Session Long-term Learning)
   // ══════════════════════════════════════════════════════════════════

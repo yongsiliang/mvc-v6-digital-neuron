@@ -505,7 +505,64 @@ export class LongTermMemory {
   }
   
   /**
-   * 检索记忆
+   * 计算记忆相关性分数
+   * 综合考虑：重要性、访问频率、时间衰减、匹配程度
+   */
+  private calculateRelevanceScore(
+    node: KnowledgeNode,
+    queryLower: string
+  ): number {
+    // 1. 基础匹配分 (0-1)
+    let matchScore = 0;
+    const labelLower = node.label.toLowerCase();
+    const contentLower = node.content.toLowerCase();
+    
+    // 精确匹配最高分
+    if (labelLower === queryLower || contentLower.includes(queryLower)) {
+      matchScore = 1.0;
+    }
+    // 标签匹配
+    else if (node.tags.some(t => t.toLowerCase() === queryLower)) {
+      matchScore = 0.9;
+    }
+    // 部分匹配
+    else if (labelLower.includes(queryLower) || queryLower.includes(labelLower)) {
+      matchScore = 0.7;
+    }
+    // 内容部分匹配
+    else if (contentLower.includes(queryLower)) {
+      matchScore = 0.6;
+    }
+    // 标签部分匹配
+    else if (node.tags.some(t => 
+      t.toLowerCase().includes(queryLower) || queryLower.includes(t.toLowerCase())
+    )) {
+      matchScore = 0.5;
+    }
+    
+    if (matchScore === 0) return 0;
+    
+    // 2. 时间衰减因子 (0-1)
+    // 高重要性的记忆衰减更慢
+    const ageInDays = (Date.now() - node.source.timestamp) / (1000 * 60 * 60 * 24);
+    const decayRate = node.importance > 0.9 ? 0.01 :  // 核心记忆几乎不衰减
+                       node.importance > 0.7 ? 0.05 : // 重要记忆慢衰减
+                       0.1;                            // 普通记忆正常衰减
+    const timeDecay = Math.exp(-decayRate * Math.min(ageInDays, 365));
+    
+    // 3. 访问频率加成 (0-0.3)
+    // 经常访问的记忆更重要
+    const accessBonus = Math.min(0.3, Math.log10(node.accessCount + 1) * 0.1);
+    
+    // 4. 重要性权重 (0.5-1.5)
+    const importanceWeight = 0.5 + node.importance;
+    
+    // 综合分数
+    return matchScore * timeDecay * importanceWeight + accessBonus;
+  }
+
+  /**
+   * 检索记忆（优化版：相关性排序）
    */
   retrieve(query: string, options?: {
     maxResults?: number;
@@ -513,40 +570,45 @@ export class LongTermMemory {
     includeWisdoms?: boolean;
   }): MemoryRetrieval {
     const maxResults = options?.maxResults || 5;
-    
-    // 1. 直接匹配
-    const directMatches: KnowledgeNode[] = [];
     const queryLower = query.toLowerCase();
     
+    // 1. 计算所有节点的相关性分数并排序
+    const scoredNodes: Array<{ node: KnowledgeNode; score: number }> = [];
+    
     for (const node of this.nodes.values()) {
-      // 修复：检查 query 是否包含 label/content，以及 label/content 是否包含 query
-      const labelLower = node.label.toLowerCase();
-      const contentLower = node.content.toLowerCase();
-      
-      if (queryLower.includes(labelLower) ||  // query 包含 label (如 "你的创造者是谁" 包含 "创造者")
-          labelLower.includes(queryLower) ||  // label 包含 query
-          contentLower.includes(queryLower) ||  // content 包含 query
-          queryLower.includes(contentLower) ||  // query 包含 content
-          node.tags.some(t => queryLower.includes(t.toLowerCase()) || t.toLowerCase().includes(queryLower))) {
-        directMatches.push(node);
-        node.accessCount++;
-        node.lastAccessedAt = Date.now();
+      const score = this.calculateRelevanceScore(node, queryLower);
+      if (score > 0) {
+        scoredNodes.push({ node, score });
       }
     }
     
-    // 2. 相关节点
+    // 按分数降序排列
+    scoredNodes.sort((a, b) => b.score - a.score);
+    
+    // 取前N个作为直接匹配
+    const directMatches = scoredNodes.slice(0, maxResults).map(s => {
+      s.node.accessCount++;
+      s.node.lastAccessedAt = Date.now();
+      return s.node;
+    });
+    
+    // 2. 相关节点（通过连接扩展）
     const relatedNodes: MemoryRetrieval['relatedNodes'] = [];
+    const directIds = new Set(directMatches.map(n => n.id));
     
     for (const match of directMatches.slice(0, 3)) {
       const neighbors = this.getConnectedNodes(match.id);
       for (const neighbor of neighbors) {
-        if (!directMatches.includes(neighbor.node)) {
-          relatedNodes.push(neighbor);
+        if (!directIds.has(neighbor.node.id)) {
+          relatedNodes.push({
+            ...neighbor,
+            distance: 1,
+          });
         }
       }
     }
     
-    // 3. 相关经验
+    // 3. 相关经验（按重要性和时间排序）
     let relevantExperiences: Experience[] = [];
     if (options?.includeExperiences !== false) {
       relevantExperiences = this.experiences
@@ -555,10 +617,15 @@ export class LongTermMemory {
           e.situation.toLowerCase().includes(queryLower) ||
           e.learning.toLowerCase().includes(queryLower)
         )
+        .sort((a, b) => {
+          // 先按重要性，再按时间
+          if (b.importance !== a.importance) return b.importance - a.importance;
+          return b.timestamp - a.timestamp;
+        })
         .slice(0, 3);
     }
     
-    // 4. 相关智慧
+    // 4. 相关智慧（按置信度和应用次数排序）
     let relevantWisdoms: Wisdom[] = [];
     if (options?.includeWisdoms !== false) {
       relevantWisdoms = this.wisdoms
@@ -566,6 +633,12 @@ export class LongTermMemory {
           w.statement.toLowerCase().includes(queryLower) ||
           w.applicableContexts.some(c => c.toLowerCase().includes(queryLower))
         )
+        .sort((a, b) => {
+          // 综合置信度和成功率
+          const scoreA = a.confidence * (a.successCount / Math.max(1, a.applicationCount));
+          const scoreB = b.confidence * (b.successCount / Math.max(1, b.applicationCount));
+          return scoreB - scoreA;
+        })
         .slice(0, 2);
     }
     
@@ -575,7 +648,7 @@ export class LongTermMemory {
     );
     
     return {
-      directMatches: directMatches.slice(0, maxResults),
+      directMatches,
       relatedNodes: relatedNodes.slice(0, maxResults),
       relevantExperiences,
       relevantWisdoms,
@@ -744,6 +817,187 @@ export class LongTermMemory {
       experienceCount: this.experiences.length,
       wisdomCount: this.wisdoms.length,
       summaryCount: this.conversationSummaries.length,
+    };
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * 记忆遗忘/衰减机制 (Memory Decay System)
+   * 
+   * 原理：
+   * - 记忆会随时间自然衰减（遗忘曲线）
+   * - 高重要性的记忆衰减更慢
+   * - 经常访问的记忆被强化
+   * - 低重要性且长期未访问的记忆可能被清除
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+
+  /**
+   * 应用记忆衰减
+   * @param daysSinceLastDecay 距离上次衰减的天数
+   * @returns 衰减统计
+   */
+  applyMemoryDecay(daysSinceLastDecay: number = 1): {
+    decayedNodes: number;
+    removedNodes: number;
+    decayedExperiences: number;
+    removedExperiences: number;
+  } {
+    const result = {
+      decayedNodes: 0,
+      removedNodes: 0,
+      decayedExperiences: 0,
+      removedExperiences: 0,
+    };
+
+    // 衰减因子：每天衰减的幅度
+    const baseDecayRate = 0.02;
+
+    // 1. 处理知识节点
+    const nodesToRemove: string[] = [];
+    
+    for (const [id, node] of this.nodes.entries()) {
+      // 跳过核心记忆（重要性 > 0.95 的记忆几乎不衰减）
+      if (node.importance > 0.95) continue;
+
+      // 计算衰减幅度
+      // 重要性越高，衰减越慢
+      const importanceProtection = node.importance * 0.5;
+      const effectiveDecay = baseDecayRate * (1 - importanceProtection) * daysSinceLastDecay;
+      
+      // 访问频率保护：经常访问的记忆衰减更慢
+      const accessProtection = Math.min(0.5, Math.log10(node.accessCount + 1) * 0.1);
+      const finalDecay = effectiveDecay * (1 - accessProtection);
+      
+      // 应用衰减
+      node.importance = Math.max(0, node.importance - finalDecay);
+      result.decayedNodes++;
+
+      // 检查是否需要移除（重要性低于阈值且长期未访问）
+      const daysSinceAccess = (Date.now() - node.lastAccessedAt) / (1000 * 60 * 60 * 24);
+      if (node.importance < 0.1 && daysSinceAccess > 30) {
+        nodesToRemove.push(id);
+      }
+    }
+
+    // 移除低重要性节点
+    for (const id of nodesToRemove) {
+      this.nodes.delete(id);
+      result.removedNodes++;
+    }
+
+    // 2. 处理经验
+    const experiencesToRemove: number[] = [];
+    
+    this.experiences.forEach((exp, index) => {
+      if (exp.importance > 0.95) return;
+
+      const importanceProtection = exp.importance * 0.5;
+      const effectiveDecay = baseDecayRate * (1 - importanceProtection) * daysSinceLastDecay;
+      
+      exp.importance = Math.max(0, exp.importance - effectiveDecay);
+      result.decayedExperiences++;
+
+      if (exp.importance < 0.1) {
+        experiencesToRemove.push(index);
+      }
+    });
+
+    // 移除低重要性经验（从后向前删除以保持索引正确）
+    for (let i = experiencesToRemove.length - 1; i >= 0; i--) {
+      this.experiences.splice(experiencesToRemove[i], 1);
+      result.removedExperiences++;
+    }
+
+    // 3. 清理无效链接
+    const validNodeIds = new Set(this.nodes.keys());
+    for (const [id, link] of this.links.entries()) {
+      if (!validNodeIds.has(link.from) || !validNodeIds.has(link.to)) {
+        this.links.delete(id);
+      }
+    }
+
+    console.log(`[记忆衰减] 衰减了 ${result.decayedNodes} 个节点，移除了 ${result.removedNodes} 个节点`);
+    
+    return result;
+  }
+
+  /**
+   * 强化记忆
+   * 通过回忆或使用来强化特定的记忆
+   */
+  reinforceMemory(nodeId: string, amount: number = 0.1): boolean {
+    const node = this.nodes.get(nodeId);
+    if (!node) return false;
+
+    // 强化重要性，但不超过上限
+    node.importance = Math.min(1.0, node.importance + amount);
+    node.accessCount++;
+    node.lastAccessedAt = Date.now();
+
+    return true;
+  }
+
+  /**
+   * 获取记忆健康报告
+   */
+  getMemoryHealthReport(): {
+    totalNodes: number;
+    healthyNodes: number;
+    atRiskNodes: number;
+    coreMemories: number;
+    averageImportance: number;
+    averageAccessCount: number;
+    oldestMemory: { label: string; age: number } | null;
+    recommendations: string[];
+  } {
+    const nodes = Array.from(this.nodes.values());
+    
+    const healthyNodes = nodes.filter(n => n.importance > 0.5).length;
+    const atRiskNodes = nodes.filter(n => n.importance <= 0.3).length;
+    const coreMemories = nodes.filter(n => n.importance > 0.95).length;
+    
+    const averageImportance = nodes.length > 0 
+      ? nodes.reduce((sum, n) => sum + n.importance, 0) / nodes.length 
+      : 0;
+    
+    const averageAccessCount = nodes.length > 0
+      ? nodes.reduce((sum, n) => sum + n.accessCount, 0) / nodes.length
+      : 0;
+
+    // 找最老的记忆
+    let oldestMemory: { label: string; age: number } | null = null;
+    if (nodes.length > 0) {
+      const oldest = nodes.reduce((prev, curr) => 
+        prev.source.timestamp < curr.source.timestamp ? prev : curr
+      );
+      oldestMemory = {
+        label: oldest.label,
+        age: Math.floor((Date.now() - oldest.source.timestamp) / (1000 * 60 * 60 * 24)),
+      };
+    }
+
+    // 生成建议
+    const recommendations: string[] = [];
+    if (atRiskNodes > nodes.length * 0.3) {
+      recommendations.push('有较多记忆处于衰减风险中，建议进行记忆强化');
+    }
+    if (averageAccessCount < 1.5) {
+      recommendations.push('记忆访问频率较低，建议通过回忆强化重要记忆');
+    }
+    if (coreMemories < 3) {
+      recommendations.push('核心记忆较少，建议标记更多重要记忆为核心');
+    }
+
+    return {
+      totalNodes: nodes.length,
+      healthyNodes,
+      atRiskNodes,
+      coreMemories,
+      averageImportance: Math.round(averageImportance * 100) / 100,
+      averageAccessCount: Math.round(averageAccessCount * 10) / 10,
+      oldestMemory,
+      recommendations,
     };
   }
 }

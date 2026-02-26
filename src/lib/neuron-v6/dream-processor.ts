@@ -370,33 +370,66 @@ export class OfflineProcessor {
     const forgottenMemories: string[] = [];
     const extractedWisdoms: WisdomItem[] = [];
     
-    memories.forEach(memory => {
+    // 按重要性分组处理
+    const highImportance = memories.filter(m => (m.importance || 0.5) >= 0.8);
+    const mediumImportance = memories.filter(m => {
+      const imp = m.importance || 0.5;
+      return imp >= 0.5 && imp < 0.8;
+    });
+    const lowImportance = memories.filter(m => (m.importance || 0.5) < 0.5);
+    
+    // 高重要性记忆：直接转为长期记忆并提取智慧
+    highImportance.forEach(memory => {
       processedMemories.push(memory.id);
+      const longTermMemory: MemoryItem = {
+        ...memory,
+        importance: Math.min(1, memory.importance + 0.15),
+        tags: [...(memory.tags || []), '长期记忆', '核心记忆']
+      };
+      newLongTermMemories.push(longTermMemory);
+      strengthenedMemories.push(memory.id);
       
-      // 根据重要性和访问频率决定是否转为长期记忆
-      const importance = memory.importance || 0.5;
+      // 提取智慧
+      const wisdom = this.extractWisdom(memory);
+      if (wisdom) {
+        extractedWisdoms.push(wisdom);
+      }
+    });
+    
+    // 中等重要性记忆：根据访问次数决定
+    mediumImportance.forEach(memory => {
+      processedMemories.push(memory.id);
       const accessCount = memory.accessCount || 0;
       
-      if (importance >= this.config.consolidationThreshold || accessCount >= 3) {
-        // 转为长期记忆 - 标记为重要
+      if (accessCount >= 2 || memory.tags?.includes('核心')) {
         const longTermMemory: MemoryItem = {
           ...memory,
-          importance: Math.min(1, memory.importance + 0.2),
-          tags: [...memory.tags, '长期记忆']
+          importance: Math.min(1, memory.importance + 0.1),
+          tags: [...(memory.tags || []), '长期记忆']
         };
         newLongTermMemories.push(longTermMemory);
         strengthenedMemories.push(memory.id);
-      } else if (Math.random() < this.config.forgettingRate) {
-        // 遗忘
+      } else if (Math.random() < this.config.forgettingRate * 0.5) {
+        // 较低的遗忘率
         forgottenMemories.push(memory.id);
       }
+    });
+    
+    // 低重要性记忆：大部分被遗忘，少数保留
+    lowImportance.forEach(memory => {
+      processedMemories.push(memory.id);
       
-      // 提取智慧
-      if (importance >= 0.8) {
-        const wisdom = this.extractWisdom(memory);
-        if (wisdom) {
-          extractedWisdoms.push(wisdom);
-        }
+      // 只保留被多次访问过的低重要性记忆
+      const accessCount = memory.accessCount || 0;
+      if (accessCount >= 3) {
+        const longTermMemory: MemoryItem = {
+          ...memory,
+          importance: Math.min(1, memory.importance + 0.05),
+          tags: [...(memory.tags || []), '长期记忆']
+        };
+        newLongTermMemories.push(longTermMemory);
+      } else if (Math.random() < this.config.forgettingRate) {
+        forgottenMemories.push(memory.id);
       }
     });
     

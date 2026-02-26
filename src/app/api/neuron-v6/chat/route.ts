@@ -293,9 +293,14 @@ export async function POST(request: NextRequest) {
           send('learning', result.learning);
           
           // ═══════════════════════════════════════════════════════════
-          // 第三步：保存状态
+          // 第三步：记忆维护与状态保存
           // ═══════════════════════════════════════════════════════════
           
+          // 执行记忆维护（衰减、强化）
+          const maintenance = core.performMaintenance();
+          console.log('[V6] 记忆维护完成:', maintenance.decay);
+          
+          // 获取并保存状态
           const state = core.getPersistedState();
           await PersistenceManagerV6.save(state);
           console.log('[V6] 状态已保存');
