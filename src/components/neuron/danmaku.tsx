@@ -26,7 +26,7 @@ interface DanmakuItemProps {
 // ─────────────────────────────────────────────────────────────────────
 
 function DanmakuItem({ message, onComplete, topPosition, duration }: DanmakuItemProps) {
-  const [position, setPosition] = useState(100); // 从右边开始
+  const [position, setPosition] = useState(-20); // 从右边屏幕外开始
   
   // 获取图标
   const getIcon = () => {
@@ -65,9 +65,10 @@ function DanmakuItem({ message, onComplete, topPosition, duration }: DanmakuItem
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = elapsed / duration;
-      const newPosition = 100 - progress * (100 + 50); // 从100%到-50%
+      // 从-20%（右边屏幕外）移动到120%（左边屏幕外）
+      const newPosition = -20 + progress * (120 + 20);
       
-      if (newPosition < -50) {
+      if (newPosition > 120) {
         onComplete(message.id);
       } else {
         setPosition(newPosition);
@@ -81,11 +82,10 @@ function DanmakuItem({ message, onComplete, topPosition, duration }: DanmakuItem
   
   return (
     <div
-      className="fixed z-40 flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-sm shadow-lg transition-opacity"
+      className={`fixed z-[100] flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-sm shadow-lg transition-opacity pointer-events-none ${getBgStyle()}`}
       style={{
         top: `${topPosition}px`,
-        right: `${position}%`,
-        transform: 'translateX(0)',
+        left: `${position}%`,
       }}
     >
       <div className="flex items-center gap-2">
