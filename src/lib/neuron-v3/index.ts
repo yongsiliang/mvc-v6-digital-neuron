@@ -1885,3 +1885,12 @@ export * from './neuron-generator';
 export * from './advanced-modules';
 export * from './cognitive-coordinator';
 export * from './persistence';
+
+// ─────────────────────────────────────────────────────────────────────
+// AGI意识架构组件
+// ─────────────────────────────────────────────────────────────────────
+
+export * from './self-core';
+export * from './hebbian-network';
+export * from './yin-yang-bridge';
+export * from './consciousness-agi';

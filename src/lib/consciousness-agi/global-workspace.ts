@@ -523,7 +523,7 @@ export class GlobalWorkspace {
     
     // 3. 广播
     let broadcast: GlobalBroadcast | null = null;
-    if (competition.winner.source !== 'empty') {
+    if (competition.winner && competition.winner.strength > 0) {
       broadcast = await this.broadcast(competition.winner);
     }
     
