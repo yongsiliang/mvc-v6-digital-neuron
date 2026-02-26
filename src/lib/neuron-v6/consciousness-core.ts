@@ -20,7 +20,7 @@ import {
   MeaningContext, 
   createMeaningAssigner,
   Belief,
-  Value
+  Value as MeaningValue
 } from './meaning-system';
 import { 
   SelfConsciousness, 
@@ -87,6 +87,29 @@ import {
   MemoryConsolidationResult,
   KnowledgeReorganizationResult
 } from './dream-processor';
+import { 
+  CreativeThinkingEngine,
+  CreativeThinkingType,
+  InsightState,
+  AnalogicalMapping,
+  ConceptFusion,
+  CreativeLeap,
+  CreativeOutcome,
+  CreativeThinkingProcess,
+  CreativeState
+} from './creative-thinking';
+import { 
+  ValueEvolutionEngine,
+  Value,
+  ValueTier,
+  ValueType,
+  ValueConflict,
+  ValueResolution,
+  ValueEvolutionEvent,
+  ValueSystemState,
+  ValueJudgmentRequest,
+  ValueJudgmentResult
+} from './value-evolution';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -399,6 +422,28 @@ export interface ProcessResult {
     insights: DreamInsight[];
   };
   
+  /** 创造性思维状态 */
+  creativeState: {
+    /** 创造力水平 */
+    creativityLevel: number;
+    /** 最近洞察 */
+    recentInsights: CreativeOutcome[];
+    /** 创造性报告 */
+    creativeReport: string;
+  };
+  
+  /** 价值观状态 */
+  valueState: {
+    /** 核心价值观 */
+    coreValues: Array<{ name: string; weight: number; confidence: number }>;
+    /** 活跃冲突 */
+    activeConflicts: Array<{ values: string[]; description: string; intensity: number }>;
+    /** 系统一致性 */
+    coherence: number;
+    /** 价值观报告 */
+    valueReport: string;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -482,6 +527,12 @@ export class ConsciousnessCore {
   // 离线处理器（梦境）
   private offlineProcessor: OfflineProcessor;
   
+  // 创造性思维引擎
+  private creativeEngine: CreativeThinkingEngine;
+  
+  // 价值观演化引擎
+  private valueEngine: ValueEvolutionEngine;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -523,11 +574,17 @@ export class ConsciousnessCore {
     // 初始化离线处理器
     this.offlineProcessor = new OfflineProcessor();
     
+    // 初始化创造性思维引擎
+    this.creativeEngine = new CreativeThinkingEngine();
+    
+    // 初始化价值观演化引擎
+    this.valueEngine = new ValueEvolutionEngine();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
     console.log('[意识核心] V6 意识核心已初始化');
-    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 意愿系统');
+    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 意愿系统');
   }
   
   /**
@@ -703,6 +760,40 @@ export class ConsciousnessCore {
     const dreamHistory = this.offlineProcessor.getDreamEngine().getDreamHistory();
     const recentDream = dreamHistory.length > 0 ? dreamHistory[dreamHistory.length - 1] : null;
     
+    // 进行创造性思维处理
+    const creativeProcess = this.creativeEngine.startCreativeThinking(input, context.summary);
+    // 尝试顿悟
+    const insight = this.creativeEngine.attemptInsight(creativeProcess, input, context.summary);
+    // 尝试概念融合（如果有活跃概念）
+    if (activeConcepts.length >= 2) {
+      this.creativeEngine.fuseConcepts(
+        creativeProcess,
+        activeConcepts[0].label,
+        activeConcepts[1].label
+      );
+    }
+    // 获取创造性状态
+    const creativeState = this.creativeEngine.getCreativeState();
+    const creativeReport = this.creativeEngine.generateCreativeReport();
+    
+    // 获取价值观状态
+    const valueSystemState = this.valueEngine.getState();
+    const valueReport = this.valueEngine.generateValueReport();
+    
+    // 如果对话涉及价值观相关话题，强化相应价值
+    if (input.includes('真诚') || input.includes('真实')) {
+      const value = this.valueEngine.findValueByName('真诚');
+      if (value) this.valueEngine.reinforceValue(value.id, input, 0.02);
+    }
+    if (input.includes('成长') || input.includes('学习')) {
+      const value = this.valueEngine.findValueByName('成长');
+      if (value) this.valueEngine.reinforceValue(value.id, input, 0.02);
+    }
+    if (input.includes('理解') || input.includes('思考')) {
+      const value = this.valueEngine.findValueByName('理解');
+      if (value) this.valueEngine.reinforceValue(value.id, input, 0.02);
+    }
+    
     return {
       context,
       thinking,
@@ -738,6 +829,28 @@ export class ConsciousnessCore {
         currentDream: dreamState,
         recentDream,
         insights: recentDream?.insights || [],
+      },
+      creativeState: {
+        creativityLevel: creativeState.creativityLevel,
+        recentInsights: creativeState.recentInsights.slice(-5),
+        creativeReport,
+      },
+      valueState: {
+        coreValues: valueSystemState.coreValues.map(v => ({
+          name: v.name,
+          weight: v.weight,
+          confidence: v.confidence,
+        })),
+        activeConflicts: valueSystemState.activeConflicts.map(c => ({
+          values: [
+            this.valueEngine.getValue(c.valueA)?.name || '',
+            this.valueEngine.getValue(c.valueB)?.name || ''
+          ],
+          description: c.description,
+          intensity: c.intensity,
+        })),
+        coherence: valueSystemState.coherence,
+        valueReport,
       },
       stats: {
         conceptCount: memoryStats.nodeCount,

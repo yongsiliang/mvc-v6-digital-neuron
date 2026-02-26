@@ -230,6 +230,26 @@ export async function POST(request: NextRequest) {
             })),
           });
           
+          // 发送创造性思维状态
+          send('creative', {
+            creativityLevel: result.creativeState.creativityLevel,
+            recentInsights: result.creativeState.recentInsights.map(i => ({
+              type: i.type,
+              content: i.content.slice(0, 60),
+              novelty: i.novelty,
+              worthExpressing: i.worthExpressing,
+            })),
+            creativeReport: result.creativeState.creativeReport,
+          });
+          
+          // 发送价值观状态
+          send('value', {
+            coreValues: result.valueState.coreValues,
+            activeConflicts: result.valueState.activeConflicts,
+            coherence: result.valueState.coherence,
+            valueReport: result.valueState.valueReport,
+          });
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           

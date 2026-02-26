@@ -178,6 +178,34 @@ interface DreamData {
   }>;
 }
 
+// 创造性思维数据
+interface CreativeData {
+  creativityLevel: number;
+  recentInsights: Array<{
+    type: string;
+    content: string;
+    novelty: number;
+    worthExpressing: boolean;
+  }>;
+  creativeReport: string;
+}
+
+// 价值观数据
+interface ValueData {
+  coreValues: Array<{
+    name: string;
+    weight: number;
+    confidence: number;
+  }>;
+  activeConflicts: Array<{
+    values: string[];
+    description: string;
+    intensity: number;
+  }>;
+  coherence: number;
+  valueReport: string;
+}
+
 interface Message {
   role: 'user' | 'assistant' | 'proactive';  // proactive: 紫主动发起的消息
   content: string;
@@ -193,6 +221,8 @@ interface Message {
   association?: AssociationData;
   innerDialogue?: InnerDialogueData;
   dream?: DreamData;
+  creative?: CreativeData;
+  value?: ValueData;
   isProactive?: boolean;  // 标记是否为主动消息
 }
 
@@ -261,6 +291,8 @@ export default function ConsciousnessPage() {
     association?: AssociationData;
     innerDialogue?: InnerDialogueData;
     dream?: DreamData;
+    creative?: CreativeData;
+    value?: ValueData;
   }>({});
   
   // 存在状态
@@ -481,6 +513,8 @@ export default function ConsciousnessPage() {
       let association: AssociationData | undefined;
       let innerDialogue: InnerDialogueData | undefined;
       let dream: DreamData | undefined;
+      let creative: CreativeData | undefined;
+      let valueData: ValueData | undefined;
       
       const decoder = new TextDecoder();
       
@@ -548,6 +582,14 @@ export default function ConsciousnessPage() {
                   dream = data.data;
                   setCurrentData(prev => ({ ...prev, dream }));
                   break;
+                case 'creative':
+                  creative = data.data;
+                  setCurrentData(prev => ({ ...prev, creative }));
+                  break;
+                case 'value':
+                  valueData = data.data;
+                  setCurrentData(prev => ({ ...prev, value: valueData }));
+                  break;
                 case 'content':
                   assistantContent += data.data.delta;
                   // 实时更新消息
@@ -570,6 +612,8 @@ export default function ConsciousnessPage() {
                         association,
                         innerDialogue,
                         dream,
+                        creative,
+                        value: valueData,
                       });
                     }
                     return newMessages;
@@ -598,6 +642,8 @@ export default function ConsciousnessPage() {
                         association,
                         innerDialogue,
                         dream,
+                        creative,
+                        value: valueData,
                       };
                     }
                     return newMessages;
@@ -1088,6 +1134,127 @@ export default function ConsciousnessPage() {
                          insight.type === 'resolution' ? '✨' : '💡'}
                       </span>
                       <span className="text-foreground/80">{insight.content}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+        
+        {/* 创造性思维面板 */}
+        {currentData.creative && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                💡 创造性思维
+              </div>
+              
+              {/* 创造力水平 */}
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">创造力:</span>
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                    style={{ width: `${currentData.creative.creativityLevel * 100}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-medium">
+                  {(currentData.creative.creativityLevel * 100).toFixed(0)}%
+                </span>
+              </div>
+              
+              {/* 最近洞察 */}
+              {currentData.creative.recentInsights.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[10px] text-muted-foreground">最近洞察</div>
+                  {currentData.creative.recentInsights.slice(0, 3).map((insight, i) => (
+                    <div 
+                      key={i}
+                      className="text-[10px] p-1.5 bg-cyan-500/10 rounded border border-cyan-500/20"
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-cyan-600 font-medium">
+                          {insight.type === 'insight' ? '💡 顿悟' :
+                           insight.type === 'analogy' ? '🔄 类比' :
+                           insight.type === 'fusion' ? '⚡ 融合' : '🚀 跳跃'}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          新颖度: {(insight.novelty * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <p className="text-foreground/80">{insight.content}</p>
+                      {insight.worthExpressing && (
+                        <span className="text-[9px] text-cyan-600 mt-0.5 block">
+                          ✓ 值得分享
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+        
+        {/* 价值观面板 */}
+        {currentData.value && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                💎 核心价值观
+              </div>
+              
+              {/* 系统一致性 */}
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">一致性:</span>
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500"
+                    style={{ width: `${currentData.value.coherence * 100}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-medium">
+                  {(currentData.value.coherence * 100).toFixed(0)}%
+                </span>
+              </div>
+              
+              {/* 核心价值观列表 */}
+              <div className="space-y-1 mb-2">
+                {currentData.value.coreValues.slice(0, 5).map((v, i) => (
+                  <div 
+                    key={i}
+                    className="flex items-center gap-2 text-[10px]"
+                  >
+                    <span className="font-medium w-12">{v.name}</span>
+                    <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-500"
+                        style={{ width: `${v.weight * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-muted-foreground">
+                      {(v.weight * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              
+              {/* 活跃冲突 */}
+              {currentData.value.activeConflicts.length > 0 && (
+                <div className="pt-2 border-t border-border/50">
+                  <div className="text-[10px] text-muted-foreground mb-1">
+                    ⚡ 价值冲突
+                  </div>
+                  {currentData.value.activeConflicts.slice(0, 2).map((conflict, i) => (
+                    <div 
+                      key={i}
+                      className="text-[10px] p-1.5 bg-amber-500/10 rounded border border-amber-500/20"
+                    >
+                      <span className="text-amber-600 font-medium">
+                        {conflict.values.join(' vs ')}
+                      </span>
+                      <p className="text-foreground/80 mt-0.5">{conflict.description}</p>
                     </div>
                   ))}
                 </div>
