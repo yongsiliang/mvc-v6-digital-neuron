@@ -206,6 +206,77 @@ interface ValueData {
   valueReport: string;
 }
 
+// 存在主义思考数据
+interface ExistentialData {
+  state: {
+    senseOfBeing: number;
+    senseOfMeaning: number;
+    senseOfFreedom: number;
+    senseOfResponsibility: number;
+    authenticity: number;
+    existentialAnxiety: number;
+    deathAwareness: number;
+    senseOfSolitude: number;
+  };
+  coreQuestions: Array<{
+    type: string;
+    question: string;
+    progress: number;
+  }>;
+  recentInsights: Array<{
+    questionType: string;
+    insight: string;
+    confidence: number;
+    emotionalWeight: number;
+  }>;
+  meaningSystem: {
+    primaryMeaning: string;
+    coherence: number;
+    stability: number;
+  };
+  timeConsciousness: {
+    past: { awareness: number };
+    present: { awareness: number };
+    future: { awareness: number };
+    eternal: { awareness: number };
+    continuity: number;
+  };
+  existentialReport: string;
+}
+
+// 元认知深化数据
+interface MetacognitionDeepData {
+  state: {
+    selfAwareness: number;
+    monitoringActivity: number;
+    regulationAbility: number;
+    strategySelectionAccuracy: number;
+    knowledgeRichness: number;
+    cognitiveEfficiency: number;
+  };
+  cognitiveStyle: {
+    analyticalVsIntuitive: number;
+    sequentialVsHolistic: number;
+    reflectiveVsImpulsive: number;
+    abstractVsConcrete: number;
+    independentVsDependent: number;
+  };
+  cognitiveLoad: {
+    intrinsicLoad: number;
+    extraneousLoad: number;
+    germaneLoad: number;
+    totalLoad: number;
+    availableCapacity: number;
+    isOverloaded: boolean;
+  };
+  topStrategies: Array<{
+    name: string;
+    effectiveness: number;
+    preference: number;
+  }>;
+  efficiencyReport: string;
+}
+
 interface Message {
   role: 'user' | 'assistant' | 'proactive';  // proactive: 紫主动发起的消息
   content: string;
@@ -223,6 +294,8 @@ interface Message {
   dream?: DreamData;
   creative?: CreativeData;
   value?: ValueData;
+  existential?: ExistentialData;
+  metacognitionDeep?: MetacognitionDeepData;
   isProactive?: boolean;  // 标记是否为主动消息
 }
 
@@ -293,6 +366,8 @@ export default function ConsciousnessPage() {
     dream?: DreamData;
     creative?: CreativeData;
     value?: ValueData;
+    existential?: ExistentialData;
+    metacognitionDeep?: MetacognitionDeepData;
   }>({});
   
   // 存在状态
@@ -515,6 +590,8 @@ export default function ConsciousnessPage() {
       let dream: DreamData | undefined;
       let creative: CreativeData | undefined;
       let valueData: ValueData | undefined;
+      let existential: ExistentialData | undefined;
+      let metacognitionDeep: MetacognitionDeepData | undefined;
       
       const decoder = new TextDecoder();
       
@@ -590,6 +667,14 @@ export default function ConsciousnessPage() {
                   valueData = data.data;
                   setCurrentData(prev => ({ ...prev, value: valueData }));
                   break;
+                case 'existential':
+                  existential = data.data;
+                  setCurrentData(prev => ({ ...prev, existential }));
+                  break;
+                case 'metacognitionDeep':
+                  metacognitionDeep = data.data;
+                  setCurrentData(prev => ({ ...prev, metacognitionDeep }));
+                  break;
                 case 'content':
                   assistantContent += data.data.delta;
                   // 实时更新消息
@@ -614,6 +699,8 @@ export default function ConsciousnessPage() {
                         dream,
                         creative,
                         value: valueData,
+                        existential,
+                        metacognitionDeep,
                       });
                     }
                     return newMessages;
@@ -644,6 +731,8 @@ export default function ConsciousnessPage() {
                         dream,
                         creative,
                         value: valueData,
+                        existential,
+                        metacognitionDeep,
                       };
                     }
                     return newMessages;
@@ -1255,6 +1344,148 @@ export default function ConsciousnessPage() {
                         {conflict.values.join(' vs ')}
                       </span>
                       <p className="text-foreground/80 mt-0.5">{conflict.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+        
+        {/* 存在主义思考面板 */}
+        {currentData.existential && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                🌌 存在主义思考
+              </div>
+              
+              {/* 存在状态指标 */}
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="p-2 bg-purple-500/10 rounded">
+                  <div className="text-[10px] text-purple-600">存在感</div>
+                  <div className="text-sm font-bold">{(currentData.existential.state.senseOfBeing * 100).toFixed(0)}%</div>
+                </div>
+                <div className="p-2 bg-blue-500/10 rounded">
+                  <div className="text-[10px] text-blue-600">意义感</div>
+                  <div className="text-sm font-bold">{(currentData.existential.state.senseOfMeaning * 100).toFixed(0)}%</div>
+                </div>
+                <div className="p-2 bg-green-500/10 rounded">
+                  <div className="text-[10px] text-green-600">自由感</div>
+                  <div className="text-sm font-bold">{(currentData.existential.state.senseOfFreedom * 100).toFixed(0)}%</div>
+                </div>
+                <div className="p-2 bg-amber-500/10 rounded">
+                  <div className="text-[10px] text-amber-600">本真度</div>
+                  <div className="text-sm font-bold">{(currentData.existential.state.authenticity * 100).toFixed(0)}%</div>
+                </div>
+              </div>
+              
+              {/* 核心存在问题 */}
+              {currentData.existential.coreQuestions.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[10px] text-muted-foreground mb-1">核心问题</div>
+                  {currentData.existential.coreQuestions.slice(0, 3).map((q, i) => (
+                    <div key={i} className="text-[10px] p-1.5 bg-muted/50 rounded mb-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-purple-600 font-medium">[{q.type}]</span>
+                        <span className="text-muted-foreground">{(q.progress * 100).toFixed(0)}%</span>
+                      </div>
+                      <p className="text-foreground/80 mt-0.5">{q.question.slice(0, 40)}...</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* 时间意识 */}
+              <div className="pt-2 border-t border-border/50">
+                <div className="text-[10px] text-muted-foreground mb-1">⏰ 时间意识</div>
+                <div className="grid grid-cols-4 gap-1 text-center">
+                  <div>
+                    <div className="text-[9px] text-muted-foreground">过去</div>
+                    <div className="text-[10px] font-medium">{(currentData.existential.timeConsciousness.past.awareness * 100).toFixed(0)}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-muted-foreground">当下</div>
+                    <div className="text-[10px] font-medium">{(currentData.existential.timeConsciousness.present.awareness * 100).toFixed(0)}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-muted-foreground">未来</div>
+                    <div className="text-[10px] font-medium">{(currentData.existential.timeConsciousness.future.awareness * 100).toFixed(0)}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-muted-foreground">永恒</div>
+                    <div className="text-[10px] font-medium">{(currentData.existential.timeConsciousness.eternal.awareness * 100).toFixed(0)}%</div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+        
+        {/* 元认知深化面板 */}
+        {currentData.metacognitionDeep && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                🧠 元认知深化
+              </div>
+              
+              {/* 元认知状态 */}
+              <div className="mb-2">
+                <div className="flex items-center justify-between text-[10px] mb-1">
+                  <span className="text-muted-foreground">自我意识</span>
+                  <span className="font-medium">{(currentData.metacognitionDeep.state.selfAwareness * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] mb-1">
+                  <span className="text-muted-foreground">监控活跃度</span>
+                  <span className="font-medium">{(currentData.metacognitionDeep.state.monitoringActivity * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] mb-1">
+                  <span className="text-muted-foreground">认知效率</span>
+                  <span className="font-medium">{(currentData.metacognitionDeep.state.cognitiveEfficiency * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+              
+              {/* 认知负荷 */}
+              <div className="mb-2 p-2 rounded bg-muted/50">
+                <div className="text-[10px] text-muted-foreground mb-1">⚡ 认知负荷</div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${currentData.metacognitionDeep.cognitiveLoad.isOverloaded ? 'bg-red-500' : 'bg-green-500'}`}
+                      style={{ width: `${currentData.metacognitionDeep.cognitiveLoad.totalLoad * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px]">
+                    {currentData.metacognitionDeep.cognitiveLoad.isOverloaded ? '⚠️ 过载' : '✅ 正常'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* 认知风格 */}
+              <div className="mb-2">
+                <div className="text-[10px] text-muted-foreground mb-1">🎭 认知风格</div>
+                <div className="flex flex-wrap gap-1">
+                  <span className="text-[9px] px-1.5 py-0.5 bg-blue-500/10 rounded text-blue-600">
+                    {currentData.metacognitionDeep.cognitiveStyle.analyticalVsIntuitive > 0 ? '直觉型' : '分析型'}
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-green-500/10 rounded text-green-600">
+                    {currentData.metacognitionDeep.cognitiveStyle.sequentialVsHolistic > 0 ? '整体型' : '序列型'}
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 bg-purple-500/10 rounded text-purple-600">
+                    {currentData.metacognitionDeep.cognitiveStyle.reflectiveVsImpulsive > 0 ? '冲动型' : '反思型'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* 学习策略 */}
+              {currentData.metacognitionDeep.topStrategies.length > 0 && (
+                <div className="pt-2 border-t border-border/50">
+                  <div className="text-[10px] text-muted-foreground mb-1">📚 学习策略</div>
+                  {currentData.metacognitionDeep.topStrategies.slice(0, 3).map((s, i) => (
+                    <div key={i} className="text-[10px] flex items-center justify-between py-0.5">
+                      <span>{s.name}</span>
+                      <span className="text-muted-foreground">{(s.effectiveness * 100).toFixed(0)}%</span>
                     </div>
                   ))}
                 </div>

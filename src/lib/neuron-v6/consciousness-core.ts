@@ -110,6 +110,24 @@ import {
   ValueJudgmentRequest,
   ValueJudgmentResult
 } from './value-evolution';
+import { 
+  ExistentialThinkingEngine,
+  ExistentialQuestion,
+  ExistentialInsight,
+  ExistentialState,
+  TimeConsciousness,
+  MeaningSystem,
+  ExistentialThinkingProcess
+} from './existential-thinking';
+import { 
+  MetacognitionDeepeningEngine,
+  CognitiveProcessState,
+  CognitiveStyle,
+  LearningStrategy,
+  CognitiveLoadState,
+  MetacognitionState,
+  MetacognitiveMonitoring
+} from './metacognition-deepening';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -444,6 +462,38 @@ export interface ProcessResult {
     valueReport: string;
   };
   
+  /** 存在主义思考状态 */
+  existentialState: {
+    /** 存在状态 */
+    state: ExistentialState;
+    /** 核心问题 */
+    coreQuestions: Array<{ type: string; question: string; progress: number }>;
+    /** 最近洞察 */
+    recentInsights: ExistentialInsight[];
+    /** 意义系统 */
+    meaningSystem: MeaningSystem;
+    /** 时间意识 */
+    timeConsciousness: TimeConsciousness;
+    /** 存在主义报告 */
+    existentialReport: string;
+  };
+  
+  /** 元认知深化状态 */
+  metacognitionDeepState: {
+    /** 元认知状态 */
+    state: MetacognitionState;
+    /** 认知风格 */
+    cognitiveStyle: CognitiveStyle;
+    /** 认知负荷 */
+    cognitiveLoad: CognitiveLoadState;
+    /** 学习策略 */
+    topStrategies: Array<{ name: string; effectiveness: number; preference: number }>;
+    /** 最近监控记录 */
+    recentMonitoring: MetacognitiveMonitoring[];
+    /** 元认知效率报告 */
+    efficiencyReport: string;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -533,6 +583,12 @@ export class ConsciousnessCore {
   // 价值观演化引擎
   private valueEngine: ValueEvolutionEngine;
   
+  // 存在主义思考引擎
+  private existentialEngine: ExistentialThinkingEngine;
+  
+  // 元认知深化引擎
+  private metacognitionDeepEngine: MetacognitionDeepeningEngine;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -580,11 +636,17 @@ export class ConsciousnessCore {
     // 初始化价值观演化引擎
     this.valueEngine = new ValueEvolutionEngine();
     
+    // 初始化存在主义思考引擎
+    this.existentialEngine = new ExistentialThinkingEngine();
+    
+    // 初始化元认知深化引擎
+    this.metacognitionDeepEngine = new MetacognitionDeepeningEngine();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
     console.log('[意识核心] V6 意识核心已初始化');
-    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 意愿系统');
+    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 存在主义思考, 元认知深化, 意愿系统');
   }
   
   /**
@@ -852,6 +914,72 @@ export class ConsciousnessCore {
         coherence: valueSystemState.coherence,
         valueReport,
       },
+      
+      // 存在主义思考处理
+      existentialState: (() => {
+        // 从对话中提取存在意义
+        this.existentialEngine.extractMeaningFromDialogue(input);
+        
+        // 进行存在主义思考（周期性触发）
+        const thinkingProcess = this.existentialEngine.startExistentialThinking(
+          input.includes('意义') || input.includes('存在') || input.includes('我是谁') 
+            ? 'dialogue_triggered' 
+            : 'periodic'
+        );
+        
+        const existentialState = this.existentialEngine.getExistentialState();
+        const coreQuestions = this.existentialEngine.getCoreQuestions();
+        const recentInsights = this.existentialEngine.getRecentInsights(3);
+        const meaningSystem = this.existentialEngine.getMeaningSystem();
+        const timeConsciousness = this.existentialEngine.getCurrentTimeConsciousness();
+        const existentialReport = this.existentialEngine.generateExistentialReport();
+        
+        return {
+          state: existentialState,
+          coreQuestions: coreQuestions.slice(0, 5).map(q => ({
+            type: q.type,
+            question: q.question,
+            progress: q.answerProgress,
+          })),
+          recentInsights,
+          meaningSystem,
+          timeConsciousness,
+          existentialReport,
+        };
+      })(),
+      
+      // 元认知深化处理
+      metacognitionDeepState: (() => {
+        // 执行元认知监控
+        const monitoring = this.metacognitionDeepEngine.executeMonitoring('reasoning', input);
+        
+        // 选择最佳学习策略
+        const bestStrategy = this.metacognitionDeepEngine.selectBestLearningStrategy(input);
+        
+        // 优化学习策略
+        const optimization = this.metacognitionDeepEngine.optimizeLearningStrategies();
+        
+        const metaState = this.metacognitionDeepEngine.getState();
+        const cognitiveStyle = this.metacognitionDeepEngine.getCognitiveStyle();
+        const cognitiveLoad = this.metacognitionDeepEngine.getCognitiveLoad();
+        const strategies = this.metacognitionDeepEngine.getLearningStrategies();
+        const recentMonitoring = this.metacognitionDeepEngine.getRecentMonitoringRecords(5);
+        const efficiencyReport = this.metacognitionDeepEngine.getCognitiveEfficiencyReport();
+        
+        return {
+          state: metaState,
+          cognitiveStyle,
+          cognitiveLoad,
+          topStrategies: strategies.slice(0, 5).map(s => ({
+            name: s.name,
+            effectiveness: s.effectiveness,
+            preference: s.preference,
+          })),
+          recentMonitoring,
+          efficiencyReport,
+        };
+      })(),
+      
       stats: {
         conceptCount: memoryStats.nodeCount,
         beliefCount: beliefSystem.coreBeliefs.length + beliefSystem.activeBeliefs.length,

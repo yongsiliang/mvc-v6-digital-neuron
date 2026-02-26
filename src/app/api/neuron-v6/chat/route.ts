@@ -250,6 +250,25 @@ export async function POST(request: NextRequest) {
             valueReport: result.valueState.valueReport,
           });
           
+          // 发送存在主义思考状态
+          send('existential', {
+            state: result.existentialState.state,
+            coreQuestions: result.existentialState.coreQuestions,
+            recentInsights: result.existentialState.recentInsights.slice(0, 3),
+            meaningSystem: result.existentialState.meaningSystem,
+            timeConsciousness: result.existentialState.timeConsciousness,
+            existentialReport: result.existentialState.existentialReport,
+          });
+          
+          // 发送元认知深化状态
+          send('metacognitionDeep', {
+            state: result.metacognitionDeepState.state,
+            cognitiveStyle: result.metacognitionDeepState.cognitiveStyle,
+            cognitiveLoad: result.metacognitionDeepState.cognitiveLoad,
+            topStrategies: result.metacognitionDeepState.topStrategies,
+            efficiencyReport: result.metacognitionDeepState.efficiencyReport,
+          });
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           
