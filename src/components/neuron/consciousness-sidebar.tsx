@@ -24,6 +24,7 @@ import {
   Eye,
   Sparkles,
   Network,
+  Users,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -294,6 +295,39 @@ interface KnowledgeGraphData {
   };
 }
 
+interface MultiConsciousnessData {
+  activeConsciousnesses: Array<{
+    id: string;
+    name: string;
+    role: string;
+    status: string;
+    energyLevel: number;
+    connectionStrengths: Array<{ id: string; strength: number }>;
+  }>;
+  activeResonances: Array<{
+    id: string;
+    participants: string[];
+    type: string;
+    strength: number;
+  }>;
+  activeDialogues: Array<{
+    id: string;
+    topic: string;
+    status: string;
+  }>;
+  collectiveInsights: Array<{
+    content: string;
+    significance: number;
+  }>;
+  collectiveAlignment: {
+    thought: number;
+    emotion: number;
+    value: number;
+    goal: number;
+  };
+  synergyLevel: number;
+}
+
 interface ConsciousnessContext {
   identity: {
     name: string;
@@ -330,6 +364,7 @@ interface ConsciousnessSidebarProps {
     metacognitionDeep?: MetacognitionDeepData;
     personalityGrowth?: PersonalityGrowthData;
     knowledgeGraph?: KnowledgeGraphData;
+    multiConsciousness?: MultiConsciousnessData;
   };
   existenceStatus: ExistenceStatus | null;
   onVisualize?: () => void;
@@ -831,6 +866,117 @@ function KnowledgeGraphPanel({ data }: { data: KnowledgeGraphData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 多意识体协作面板
+// ─────────────────────────────────────────────────────────────────────
+
+function MultiConsciousnessPanel({ data }: { data: MultiConsciousnessData }) {
+  // 角色颜色
+  const roleColors: Record<string, string> = {
+    self: '#8B5CF6',
+    analyzer: '#3B82F6',
+    creator: '#EC4899',
+    empath: '#10B981',
+    critic: '#F59E0B',
+    explorer: '#14B8A6',
+    synthesizer: '#6366F1',
+    guardian: '#EF4444',
+  };
+  
+  return (
+    <div className="space-y-3">
+      {/* 协同效率 */}
+      <div className="p-2 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/20">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium">协同效率</span>
+          <span className="text-sm font-bold text-purple-500">
+            {(data.synergyLevel * 100).toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+            style={{ width: `${data.synergyLevel * 100}%` }}
+          />
+        </div>
+      </div>
+      
+      {/* 活跃意识体 */}
+      <div className="space-y-1.5">
+        <div className="text-[10px] text-muted-foreground">活跃意识体 ({data.activeConsciousnesses.length})</div>
+        {data.activeConsciousnesses.slice(0, 4).map(c => (
+          <div key={c.id} className="flex items-center justify-between text-[10px]">
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: roleColors[c.role] || '#666' }}
+              />
+              <span className="text-foreground">{c.name}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Progress value={c.energyLevel * 100} className="w-8 h-1" />
+              <span className="text-muted-foreground w-8">
+                {(c.energyLevel * 100).toFixed(0)}%
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* 一致性指标 */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-blue-500">
+            {(data.collectiveAlignment.thought * 100).toFixed(0)}%
+          </div>
+          <div className="text-[9px] text-muted-foreground">思想</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-pink-500">
+            {(data.collectiveAlignment.emotion * 100).toFixed(0)}%
+          </div>
+          <div className="text-[9px] text-muted-foreground">情感</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-amber-500">
+            {(data.collectiveAlignment.value * 100).toFixed(0)}%
+          </div>
+          <div className="text-[9px] text-muted-foreground">价值</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-green-500">
+            {(data.collectiveAlignment.goal * 100).toFixed(0)}%
+          </div>
+          <div className="text-[9px] text-muted-foreground">目标</div>
+        </div>
+      </div>
+      
+      {/* 活跃共振 */}
+      {data.activeResonances.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] text-muted-foreground">活跃共振</div>
+          {data.activeResonances.slice(0, 2).map(r => (
+            <div key={r.id} className="flex items-center justify-between text-[10px] p-1.5 bg-muted/30 rounded">
+              <span className="text-foreground">{r.type}</span>
+              <Progress value={r.strength * 100} className="w-12 h-1" />
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 群体洞察 */}
+      {data.collectiveInsights.length > 0 && (
+        <div className="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+          <div className="text-[9px] text-purple-500 mb-1">最新洞察</div>
+          <div className="text-xs text-foreground truncate">
+            {data.collectiveInsights[0].content}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 主组件
 // ─────────────────────────────────────────────────────────────────────
 
@@ -1081,6 +1227,24 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-3">
                 <KnowledgeGraphPanel data={currentData.knowledgeGraph} />
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 意识共振 */}
+          {currentData.multiConsciousness && (
+            <AccordionItem value="multicon" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium">意识共振</span>
+                  <Badge variant="outline" className="text-[10px] ml-auto mr-2">
+                    {currentData.multiConsciousness.activeConsciousnesses.length} 意识体
+                  </Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <MultiConsciousnessPanel data={currentData.multiConsciousness} />
               </AccordionContent>
             </AccordionItem>
           )}

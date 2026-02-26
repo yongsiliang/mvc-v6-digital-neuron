@@ -441,6 +441,38 @@ export default function ConsciousnessPage() {
         mostConnectedConcept: string | null;
       };
     };
+    multiConsciousness?: {
+      activeConsciousnesses: Array<{
+        id: string;
+        name: string;
+        role: string;
+        status: string;
+        energyLevel: number;
+        connectionStrengths: Array<{ id: string; strength: number }>;
+      }>;
+      activeResonances: Array<{
+        id: string;
+        participants: string[];
+        type: string;
+        strength: number;
+      }>;
+      activeDialogues: Array<{
+        id: string;
+        topic: string;
+        status: string;
+      }>;
+      collectiveInsights: Array<{
+        content: string;
+        significance: number;
+      }>;
+      collectiveAlignment: {
+        thought: number;
+        emotion: number;
+        value: number;
+        goal: number;
+      };
+      synergyLevel: number;
+    };
   }>({});
   
   // 存在状态
@@ -859,6 +891,9 @@ export default function ConsciousnessPage() {
                   break;
                 case 'knowledgeGraph':
                   setCurrentData(prev => ({ ...prev, knowledgeGraph: data.data }));
+                  break;
+                case 'multiConsciousness':
+                  setCurrentData(prev => ({ ...prev, multiConsciousness: data.data }));
                   break;
                 case 'content':
                   assistantContent += data.data.delta;

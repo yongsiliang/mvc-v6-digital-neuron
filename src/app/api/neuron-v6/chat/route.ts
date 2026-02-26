@@ -295,6 +295,18 @@ export async function POST(request: NextRequest) {
             });
           }
           
+          // 发送多意识体协作状态
+          if (result.multiConsciousness) {
+            send('multiConsciousness', {
+              activeConsciousnesses: result.multiConsciousness.activeConsciousnesses,
+              activeResonances: result.multiConsciousness.activeResonances,
+              activeDialogues: result.multiConsciousness.activeDialogues,
+              collectiveInsights: result.multiConsciousness.collectiveInsights,
+              collectiveAlignment: result.multiConsciousness.collectiveAlignment,
+              synergyLevel: result.multiConsciousness.synergyLevel,
+            });
+          }
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           

@@ -147,6 +147,14 @@ import {
   KnowledgeGraphState,
   createKnowledgeGraphSystem,
 } from './knowledge-graph';
+import { 
+  MultiConsciousnessSystem,
+  ConsciousnessIdentity,
+  ConsciousnessResonance,
+  CollaborativeDialogue,
+  CollectiveWisdomState,
+  createMultiConsciousnessSystem,
+} from './multi-consciousness';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -541,6 +549,46 @@ export interface ProcessResult {
     stats: KnowledgeGraphState['stats'];
   };
   
+  /** 多意识体协作状态 */
+  multiConsciousness?: {
+    /** 活跃意识体 */
+    activeConsciousnesses: Array<{
+      id: string;
+      name: string;
+      role: string;
+      status: string;
+      energyLevel: number;
+      connectionStrengths: Array<{ id: string; strength: number }>;
+    }>;
+    /** 活跃共振 */
+    activeResonances: Array<{
+      id: string;
+      participants: string[];
+      type: string;
+      strength: number;
+    }>;
+    /** 协作对话 */
+    activeDialogues: Array<{
+      id: string;
+      topic: string;
+      status: string;
+    }>;
+    /** 群体洞察 */
+    collectiveInsights: Array<{
+      content: string;
+      significance: number;
+    }>;
+    /** 群体一致性 */
+    collectiveAlignment: {
+      thought: number;
+      emotion: number;
+      value: number;
+      goal: number;
+    };
+    /** 协同效率 */
+    synergyLevel: number;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -642,6 +690,9 @@ export class ConsciousnessCore {
   // 知识图谱系统
   private knowledgeGraphSystem: KnowledgeGraphSystem;
   
+  // 多意识体协作系统
+  private multiConsciousnessSystem: MultiConsciousnessSystem;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -701,11 +752,14 @@ export class ConsciousnessCore {
     // 初始化知识图谱系统
     this.knowledgeGraphSystem = createKnowledgeGraphSystem();
     
+    // 初始化多意识体协作系统
+    this.multiConsciousnessSystem = createMultiConsciousnessSystem();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
     console.log('[意识核心] V6 意识核心已初始化');
-    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 存在主义思考, 元认知深化, 人格成长, 知识图谱, 意愿系统');
+    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 存在主义思考, 元认知深化, 人格成长, 知识图谱, 多意识体协作, 意愿系统');
   }
   
   /**
@@ -1090,6 +1144,32 @@ export class ConsciousnessCore {
           concepts: state.concepts,
           edges: state.edges,
           stats: state.stats,
+        };
+      })(),
+      
+      // 多意识体协作处理
+      multiConsciousness: (() => {
+        // 获取活跃意识体
+        const activeConsciousnesses = this.multiConsciousnessSystem.getActiveConsciousnesses();
+        
+        // 尝试建立思想共振
+        if (activeConsciousnesses.length >= 2) {
+          const ids = activeConsciousnesses.slice(0, 2).map(c => c.id);
+          this.multiConsciousnessSystem.attemptResonance(ids, 'thought', {
+            sharedThoughts: [input.slice(0, 50)],
+          });
+        }
+        
+        // 获取可序列化状态
+        const state = this.multiConsciousnessSystem.getSerializableState();
+        
+        return {
+          activeConsciousnesses: state.activeConsciousnesses,
+          activeResonances: state.activeResonances,
+          activeDialogues: state.activeDialogues,
+          collectiveInsights: state.collectiveInsights,
+          collectiveAlignment: state.collectiveAlignment,
+          synergyLevel: state.synergyLevel,
         };
       })(),
       
