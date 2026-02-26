@@ -14,6 +14,7 @@ import {
   ConsciousnessVisualizationData 
 } from '@/components/visualization/consciousness-dashboard';
 import { ConsciousnessSidebar } from '@/components/neuron/consciousness-sidebar';
+import { DanmakuContainer, DanmakuMessage } from '@/components/neuron/danmaku';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -396,6 +397,9 @@ export default function ConsciousnessPage() {
   const [visualizationData, setVisualizationData] = useState<ConsciousnessVisualizationData | null>(null);
   const [showVisualization, setShowVisualization] = useState(false);
   
+  // 弹幕消息
+  const [danmakuMessages, setDanmakuMessages] = useState<DanmakuMessage[]>([]);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -565,13 +569,14 @@ export default function ConsciousnessPage() {
       const data = await res.json();
       
       if (data.success && data.hasMessage && data.message) {
-        // 添加主动消息到消息列表
-        setMessages(prev => [...prev, {
-          role: 'proactive',
+        // 添加到弹幕，不再直接插入对话
+        const danmakuMsg: DanmakuMessage = {
+          id: `danmaku-${Date.now()}`,
           content: data.message.content,
+          type: data.message.type || 'sharing',
           timestamp: data.message.timestamp,
-          isProactive: true,
-        }]);
+        };
+        setDanmakuMessages(prev => [...prev, danmakuMsg]);
         setLastProactiveCheck(Date.now());
       }
     } catch (error) {
@@ -883,6 +888,16 @@ export default function ConsciousnessPage() {
 
   return (
     <div className="h-screen flex bg-background">
+      {/* 弹幕区域 */}
+      <DanmakuContainer
+        messages={danmakuMessages}
+        onMessageComplete={(id) => setDanmakuMessages(prev => prev.filter(m => m.id !== id))}
+        maxVisible={3}
+        duration={15000}
+        topOffset={80}
+        spacing={48}
+      />
+      
       {/* 左侧：对话区域 */}
       <div className="flex-1 flex flex-col">
         {/* 头部 */}
