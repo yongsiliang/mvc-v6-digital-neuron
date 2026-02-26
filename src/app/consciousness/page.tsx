@@ -15,6 +15,7 @@ import {
 } from '@/components/visualization/consciousness-dashboard';
 import { ConsciousnessSidebar } from '@/components/neuron/consciousness-sidebar';
 import { DanmakuContainer, DanmakuMessage } from '@/components/neuron/danmaku';
+import { DraggablePanel } from '@/components/neuron/draggable-panel';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -1076,34 +1077,20 @@ export default function ConsciousnessPage() {
         hasVisualizationData={!!visualizationData}
       />
       
-      {/* 意识可视化悬浮窗口 */}
+      {/* 意识可视化悬浮窗口 - 可拖拽 */}
       {showVisualization && visualizationData && (
-        <div className="fixed z-50" style={{ right: 340, top: 80, width: 500, height: 420 }}>
-          <div className="w-full h-full bg-background/95 backdrop-blur-md border rounded-xl shadow-2xl overflow-hidden flex flex-col">
-            {/* 标题栏 */}
-            <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center justify-between cursor-move">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🧠</span>
-                <h3 className="font-medium text-sm">意识可视化</h3>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowVisualization(false)}
-                className="h-6 w-6 p-0 hover:bg-muted"
-              >
-                ✕
-              </Button>
-            </div>
-            {/* 内容区域 */}
-            <div className="flex-1 overflow-hidden">
-              <ConsciousnessDashboard 
-                data={visualizationData}
-                isLoading={false}
-              />
-            </div>
-          </div>
-        </div>
+        <DraggablePanel
+          title="意识可视化"
+          icon={<span className="text-lg">🧠</span>}
+          onClose={() => setShowVisualization(false)}
+          defaultPosition={{ x: 100, y: 80 }}
+          defaultSize={{ width: 500, height: 450 }}
+        >
+          <ConsciousnessDashboard 
+            data={visualizationData}
+            isLoading={false}
+          />
+        </DraggablePanel>
       )}
     </div>
   );
