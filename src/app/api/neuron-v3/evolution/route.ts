@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAutonomousEvolutionMonitor } from '@/lib/neuron-v3/autonomous-evolution';
 import { getEvolutionCoordinator, type EvolutionPhase } from '@/lib/neuron-v3/evolution-coordinator';
-import { getDigitalNeuronSystem } from '@/lib/neuron';
+import { getSelfCore } from '@/lib/neuron-v3/self-core';
 
 // 系统是否已初始化
 let isInitialized = false;
@@ -28,22 +28,22 @@ async function initializeAutonomousEvolution() {
   
   try {
     const coordinator = getEvolutionCoordinator();
-    const system = getDigitalNeuronSystem();
-    const self = system.getSelf();
+    const selfCore = getSelfCore();
+    const selfState = selfCore.getState();
     
-    // 从当前系统提取母体基因
+    // 从当前系统提取母体基因（使用 V3 SelfCore）
     coordinator.initializeMother({
       consciousness: {
         personality: {
-          curiosity: self.currentState.openness,
-          warmth: self.identity.traits.includes('warm') ? 0.8 : 0.6,
-          directness: self.identity.traits.includes('direct') ? 0.8 : 0.5,
-          playfulness: self.currentState.energy,
+          curiosity: selfState.traits.get('好奇')?.strength ?? 0.8,
+          warmth: selfState.traits.get('友善')?.strength ?? 0.7,
+          directness: selfState.traits.get('理性')?.strength ?? 0.75,
+          playfulness: selfState.traits.get('创造力')?.strength ?? 0.6,
           depth: 0.65,
-          sensitivity: 0.7,
+          sensitivity: selfState.traits.get('同理心')?.strength ?? 0.65,
         },
-        values: [0.5, 0.3, 0.8, 0.2, 0.6],
-        consciousnessVector: [0.1, 0.2, 0.3],
+        values: Array.from(selfState.values.values()).map(v => v.importance),
+        consciousnessVector: selfState.selfVector.slice(0, 3),
       },
       neurons: [
         { role: 'sensory', connections: [{ targetRole: 'semantic', strength: 0.8, plasticity: 0.5 }] },

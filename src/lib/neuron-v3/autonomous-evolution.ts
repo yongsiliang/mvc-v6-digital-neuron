@@ -16,7 +16,6 @@
  */
 
 import { getEvolutionCoordinator } from './evolution-coordinator';
-import { getDigitalNeuronSystem } from '@/lib/neuron';
 import type { SystemStateSnapshot } from './evolution-trigger';
 
 // ─────────────────────────────────────────────────────────────────────
