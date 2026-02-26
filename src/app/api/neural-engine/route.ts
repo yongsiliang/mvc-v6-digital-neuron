@@ -171,6 +171,40 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'save': {
+        // 保存到数据库
+        const result = await adapter.saveToDatabase();
+
+        return NextResponse.json({
+          success: result.success,
+          neuronCount: result.neuronCount,
+          conceptCount: result.conceptCount,
+          error: result.error,
+        });
+      }
+
+      case 'load': {
+        // 从数据库加载
+        const result = await adapter.loadFromDatabase();
+
+        return NextResponse.json({
+          success: result.success,
+          neuronCount: result.neuronCount,
+          conceptCount: result.conceptCount,
+          error: result.error,
+        });
+      }
+
+      case 'clear-db': {
+        // 清除数据库
+        await adapter.clearDatabase();
+
+        return NextResponse.json({
+          success: true,
+          message: 'Database cleared successfully',
+        });
+      }
+
       default:
         return NextResponse.json(
           {

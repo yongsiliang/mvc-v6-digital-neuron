@@ -71,3 +71,34 @@ export type {
   SyncResult,
   EnhancedProcessingResult,
 } from './adapter';
+
+// 数据库操作
+export {
+  saveNeuron,
+  loadNeurons,
+  deleteNeuron,
+  deleteAllNeurons,
+  saveConcept,
+  loadConcepts,
+  deleteConcept,
+  saveEngineState,
+  loadEngineState,
+  saveCompleteEngineState,
+  clearAllEngineData,
+} from './db-operations';
+
+// Schema
+export {
+  neuralEngineNeurons,
+  neuralEngineConcepts,
+  neuralEngineState,
+} from './schema';
+
+export type {
+  NeuralEngineNeuron,
+  NewNeuralEngineNeuron,
+  NeuralEngineConcept,
+  NewNeuralEngineConcept,
+  NeuralEngineStateRow,
+  NewNeuralEngineState,
+} from './schema';

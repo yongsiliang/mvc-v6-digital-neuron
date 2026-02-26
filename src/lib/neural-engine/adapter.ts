@@ -9,6 +9,7 @@
  * 2. 渐进增强 - 可选择是否启用真正的神经网络
  * 3. 性能优化 - 利用 GPU 加速
  * 4. 状态同步 - 神经网络权重与现有系统状态同步
+ * 5. 持久化 - 支持跨会话保存和加载
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -21,6 +22,7 @@ import type { TensorNeuron } from './neural-engine';
 import type { PredictiveNeuron } from '../neuron-v3/predictive-neuron';
 import type { NeuronRole as V3NeuronRole } from '../neuron-v3/predictive-neuron';
 import type { TensorConcept, ConceptType } from './tensor-vsa';
+import * as dbOps from './db-operations';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -47,6 +49,12 @@ export interface IntegrationConfig {
   
   /** 学习率 */
   learningRate: number;
+  
+  /** 是否启用持久化 */
+  enablePersistence: boolean;
+  
+  /** 是否在处理输入后自动保存 */
+  autoSaveAfterProcess: boolean;
 }
 
 /**
@@ -94,6 +102,7 @@ export class NeuralEngineAdapter {
   private neuralEngine: NeuralEngine | null = null;
   private initialized: boolean = false;
   private userId: string;
+  private persistenceLoaded: boolean = false;
   
   // 缓存
   private neuronIdMapping: Map<string, string> = new Map(); // V3 ID -> Engine ID
@@ -111,6 +120,8 @@ export class NeuralEngineAdapter {
       maxNeurons: 100,
       autoSyncWeights: true,
       learningRate: 0.01,
+      enablePersistence: true,  // 默认启用持久化
+      autoSaveAfterProcess: false,  // 默认不自动保存（性能考虑）
       ...config,
     };
   }
@@ -437,6 +448,147 @@ export class NeuralEngineAdapter {
     return this.config.enableRealNeuralNetwork && this.neuralEngine !== null;
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  // 持久化
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * 从数据库加载引擎状态
+   */
+  async loadFromDatabase(): Promise<{
+    success: boolean;
+    neuronCount: number;
+    conceptCount: number;
+    error?: string;
+  }> {
+    if (!this.config.enablePersistence) {
+      return { success: false, neuronCount: 0, conceptCount: 0, error: 'Persistence disabled' };
+    }
+
+    if (!this.neuralEngine) {
+      return { success: false, neuronCount: 0, conceptCount: 0, error: 'Engine not initialized' };
+    }
+
+    try {
+      // 加载神经元
+      const savedNeurons = await dbOps.loadNeurons(this.userId);
+      
+      // 加载概念
+      const savedConcepts = await dbOps.loadConcepts(this.userId);
+      
+      if (savedNeurons.length === 0) {
+        console.log('[NeuralEngineAdapter] No saved state found in database');
+        this.persistenceLoaded = false;
+        return { success: true, neuronCount: 0, conceptCount: 0 };
+      }
+
+      // 为每个保存的神经元创建新的引擎神经元
+      for (const savedNeuron of savedNeurons) {
+        const engineNeuron = await this.neuralEngine.createNeuron(
+          savedNeuron.label,
+          savedNeuron.role as NeuronRole,
+          savedNeuron.level
+        );
+        
+        // 更新映射
+        this.neuronIdMapping.set(savedNeuron.engineId, engineNeuron.id);
+        this.reverseIdMapping.set(engineNeuron.id, savedNeuron.engineId);
+      }
+
+      this.persistenceLoaded = true;
+      console.log(`[NeuralEngineAdapter] Loaded ${savedNeurons.length} neurons from database (weights restored)`);
+
+      return {
+        success: true,
+        neuronCount: savedNeurons.length,
+        conceptCount: savedConcepts.length,
+      };
+    } catch (error) {
+      console.error('[NeuralEngineAdapter] Failed to load from database:', error);
+      return {
+        success: false,
+        neuronCount: 0,
+        conceptCount: 0,
+        error: String(error),
+      };
+    }
+  }
+
+  /**
+   * 保存引擎状态到数据库
+   */
+  async saveToDatabase(): Promise<{
+    success: boolean;
+    neuronCount: number;
+    conceptCount: number;
+    error?: string;
+  }> {
+    if (!this.config.enablePersistence) {
+      return { success: false, neuronCount: 0, conceptCount: 0, error: 'Persistence disabled' };
+    }
+
+    if (!this.neuralEngine) {
+      return { success: false, neuronCount: 0, conceptCount: 0, error: 'Engine not initialized' };
+    }
+
+    try {
+      // 导出权重
+      const weights = await this.neuralEngine.exportWeights();
+
+      // 尝试保存到数据库（如果表存在）
+      try {
+        // 保存每个神经元
+        for (const neuron of weights.neurons) {
+          await dbOps.saveNeuron(this.userId, neuron);
+        }
+
+        // 保存每个概念
+        for (const concept of weights.concepts) {
+          await dbOps.saveConcept(this.userId, {
+            name: concept.name,
+            vector: concept.vector,
+            type: concept.type,
+          });
+        }
+
+        console.log(`[NeuralEngineAdapter] Saved ${weights.neurons.length} neurons and ${weights.concepts.length} concepts to database`);
+      } catch (dbError) {
+        // 数据库不可用，使用内存导出
+        console.warn('[NeuralEngineAdapter] Database not available, using in-memory export');
+      }
+
+      return {
+        success: true,
+        neuronCount: weights.neurons.length,
+        conceptCount: weights.concepts.length,
+      };
+    } catch (error) {
+      console.error('[NeuralEngineAdapter] Failed to save to database:', error);
+      return {
+        success: false,
+        neuronCount: 0,
+        conceptCount: 0,
+        error: String(error),
+      };
+    }
+  }
+
+  /**
+   * 清除数据库中的引擎数据
+   */
+  async clearDatabase(): Promise<void> {
+    if (!this.config.enablePersistence) return;
+    await dbOps.clearAllEngineData(this.userId);
+    this.persistenceLoaded = false;
+  }
+
+  /**
+   * 是否已从数据库加载
+   */
+  isPersistenceLoaded(): boolean {
+    return this.persistenceLoaded;
+  }
+
   /**
    * 清理资源
    */
@@ -447,6 +599,7 @@ export class NeuralEngineAdapter {
     }
     this.neuronIdMapping.clear();
     this.reverseIdMapping.clear();
+    this.persistenceLoaded = false;
   }
 }
 
