@@ -133,6 +133,114 @@ export interface LearningResult {
 }
 
 /**
+ * 会话分析
+ */
+export interface SessionAnalysis {
+  messageCount: number;
+  topics: string[];
+  keyConcepts: string[];
+  emotionalTrajectory: EmotionalTrajectory;
+  learningPoints: string[];
+  duration: number;
+}
+
+/**
+ * 情感轨迹
+ */
+export interface EmotionalTrajectory {
+  startTone: string;
+  endTone: string;
+  shifts: number;
+  dominantTone: string;
+}
+
+/**
+ * 信念演化
+ */
+export interface BeliefEvolution {
+  belief: string;
+  change: 'strengthened' | 'weakened' | 'new' | 'removed';
+  oldConfidence: number;
+  newConfidence: number;
+  reason: string;
+}
+
+/**
+ * 特质成长
+ */
+export interface TraitGrowth {
+  trait: string;
+  oldStrength: number;
+  newStrength: number;
+  reason: string;
+}
+
+/**
+ * 价值观更新
+ */
+export interface ValueUpdate {
+  value: string;
+  change: 'priority_increased' | 'priority_decreased' | 'new' | 'removed';
+  reason: string;
+}
+
+/**
+ * 长期学习结果
+ */
+export interface LongTermLearningResult {
+  sessionAnalysis: SessionAnalysis;
+  strengthenedConcepts: string[];
+  beliefEvolution: BeliefEvolution[];
+  traitGrowth: TraitGrowth[];
+  sessionSummary: string;
+  valueUpdates: ValueUpdate[];
+  timestamp: number;
+}
+
+/**
+ * 意识流条目
+ */
+export interface ConsciousnessStreamEntry {
+  type: 'awareness' | 'goal_tracking' | 'self_observation' | 'environmental' | 'latent_intention';
+  content: string;
+  intensity: number;
+  timestamp: number;
+}
+
+/**
+ * 意识流
+ */
+export interface ConsciousnessStream {
+  entries: ConsciousnessStreamEntry[];
+  dominantStream: string;
+  coherence: number;
+  timestamp: number;
+}
+
+/**
+ * 形成的意向
+ */
+export interface FormedIntention {
+  id: string;
+  type: 'action' | 'inquiry' | 'reflection' | 'creation';
+  description: string;
+  motivation: string;
+  strength: number;
+  createdAt: number;
+  relatedGoals: string[];
+}
+
+/**
+ * 自我模型更新
+ */
+export interface SelfModelUpdate {
+  type: 'trait_evolution' | 'boundary_expansion' | 'belief_integration' | 'purpose_refinement';
+  target: string;
+  delta?: number;
+  reason?: string;
+}
+
+/**
  * 处理结果
  */
 export interface ProcessResult {
@@ -687,6 +795,16 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
       },
     });
     
+    // 执行简化的自我反思
+    this.selfConsciousness.reflect(
+      thinking.detectedBiases.length > 0 ? '检测到认知偏差' : '完成一次对话',
+      {
+        thought: thinking.finalThoughts,
+        feeling: thinking.detectedBiases.length > 0 ? '谨慎' : '平静',
+        action: response.slice(0, 100),
+      }
+    );
+    
     return {
       newConcepts,
       newBeliefs,
@@ -783,6 +901,1283 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
   getHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
     return [...this.conversationHistory];
   }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 跨会话长期学习 (Cross-Session Long-term Learning)
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 执行长期学习
+   * 在会话结束时执行，沉淀知识和更新信念
+   */
+  async performLongTermLearning(): Promise<LongTermLearningResult> {
+    console.log('[意识核心] 执行跨会话长期学习...');
+    
+    // 1. 分析本次会话
+    const sessionAnalysis = this.analyzeSession();
+    
+    // 2. 提取关键概念并强化
+    const strengthenedConcepts = await this.strengthenLearnedConcepts(
+      sessionAnalysis.keyConcepts
+    );
+    
+    // 3. 更新信念系统
+    const beliefEvolution = this.evolveBeliefSystem(sessionAnalysis);
+    
+    // 4. 更新特质
+    const traitGrowth = this.growTraits(sessionAnalysis);
+    
+    // 5. 形成会话摘要
+    const sessionSummary = this.formSessionSummary(sessionAnalysis);
+    
+    // 6. 更新核心价值观
+    const valueUpdates = this.updateCoreValues(sessionAnalysis);
+    
+    return {
+      sessionAnalysis,
+      strengthenedConcepts,
+      beliefEvolution,
+      traitGrowth,
+      sessionSummary,
+      valueUpdates,
+      timestamp: Date.now(),
+    };
+  }
+  
+  /**
+   * 分析本次会话
+   */
+  private analyzeSession(): SessionAnalysis {
+    const userMessages = this.conversationHistory.filter(h => h.role === 'user');
+    const assistantMessages = this.conversationHistory.filter(h => h.role === 'assistant');
+    
+    // 提取主题
+    const topics = this.extractTopics(userMessages.map(m => m.content));
+    
+    // 提取关键概念
+    const keyConcepts = this.extractKeyConcepts(
+      this.conversationHistory.map(h => h.content).join(' ')
+    );
+    
+    // 识别情感轨迹
+    const emotionalTrajectory = this.identifyEmotionalTrajectory(assistantMessages);
+    
+    // 识别学习点
+    const learningPoints = this.identifyLearningPoints(assistantMessages);
+    
+    return {
+      messageCount: this.conversationHistory.length,
+      topics,
+      keyConcepts,
+      emotionalTrajectory,
+      learningPoints,
+      duration: this.conversationHistory.length > 0 
+        ? Date.now() - (this.conversationHistory[0] as { timestamp?: number }).timestamp!
+        : 0,
+    };
+  }
+  
+  /**
+   * 提取主题
+   */
+  private extractTopics(contents: string[]): string[] {
+    const topicKeywords = [
+      '学习', '理解', '思考', '成长', '意义', '价值',
+      '关系', '情感', '选择', '变化', '未来', '过去',
+      '自我', '他人', '世界', '认知', '创造', '探索',
+    ];
+    
+    const topics: string[] = [];
+    for (const keyword of topicKeywords) {
+      if (contents.some(c => c.includes(keyword))) {
+        topics.push(keyword);
+      }
+    }
+    
+    return [...new Set(topics)].slice(0, 5);
+  }
+  
+  /**
+   * 提取关键概念
+   */
+  private extractKeyConcepts(text: string): string[] {
+    return this.extractConcepts(text);
+  }
+  
+  /**
+   * 识别情感轨迹
+   */
+  private identifyEmotionalTrajectory(
+    messages: Array<{ content: string }>
+  ): EmotionalTrajectory {
+    const tones = messages.map(m => this.detectEmotionalTone(m.content));
+    
+    // 简化的轨迹分析
+    const startTone = tones[0] || '平静';
+    const endTone = tones[tones.length - 1] || '平静';
+    const shifts = tones.length > 1 
+      ? tones.slice(1).filter((t, i) => t !== tones[i]).length
+      : 0;
+    
+    return {
+      startTone,
+      endTone,
+      shifts,
+      dominantTone: this.getDominantTone(tones),
+    };
+  }
+  
+  /**
+   * 获取主导情感
+   */
+  private getDominantTone(tones: string[]): string {
+    const counts = new Map<string, number>();
+    for (const tone of tones) {
+      counts.set(tone, (counts.get(tone) || 0) + 1);
+    }
+    
+    let dominant = '平静';
+    let maxCount = 0;
+    
+    for (const [tone, count] of counts) {
+      if (count > maxCount) {
+        maxCount = count;
+        dominant = tone;
+      }
+    }
+    
+    return dominant;
+  }
+  
+  /**
+   * 识别学习点
+   */
+  private identifyLearningPoints(
+    messages: Array<{ content: string }>
+  ): string[] {
+    const points: string[] = [];
+    
+    for (const msg of messages) {
+      // 检测学习相关的句子
+      if (msg.content.includes('学到') || 
+          msg.content.includes('理解') ||
+          msg.content.includes('意识到')) {
+        const sentences = msg.content.split(/[。！？]/);
+        for (const sentence of sentences) {
+          if (sentence.includes('学到') || 
+              sentence.includes('理解') ||
+              sentence.includes('意识到')) {
+            points.push(sentence.trim());
+          }
+        }
+      }
+    }
+    
+    return [...new Set(points)].slice(0, 5);
+  }
+  
+  /**
+   * 强化学习的概念
+   */
+  private async strengthenLearnedConcepts(
+    concepts: string[]
+  ): Promise<string[]> {
+    const strengthened: string[] = [];
+    
+    for (const concept of concepts) {
+      // 检查是否已存在
+      const existing = this.longTermMemory.retrieve(concept);
+      
+      if (existing.directMatches.length > 0) {
+        // 强化现有概念
+        const node = existing.directMatches[0];
+        node.accessCount++;
+        node.importance = Math.min(1, node.importance + 0.05);
+        strengthened.push(`${concept} (强化)`);
+      } else {
+        // 创建新概念
+        this.longTermMemory.addNode({
+          label: concept,
+          type: 'concept',
+          content: `从对话中学到的概念`,
+          importance: 0.6,
+          tags: ['会话学习'],
+        });
+        strengthened.push(`${concept} (新增)`);
+      }
+    }
+    
+    return strengthened;
+  }
+  
+  /**
+   * 演化信念系统
+   */
+  private evolveBeliefSystem(
+    analysis: SessionAnalysis
+  ): BeliefEvolution[] {
+    const evolutions: BeliefEvolution[] = [];
+    const beliefSystem = this.meaningAssigner.getBeliefSystem();
+    
+    // 检查是否有新概念与现有信念相关
+    for (const concept of analysis.keyConcepts) {
+      const relatedBelief = beliefSystem.coreBeliefs.find(b => 
+        b.statement.includes(concept)
+      );
+      
+      if (relatedBelief) {
+        // 增强相关信念
+        const oldConfidence = relatedBelief.confidence;
+        relatedBelief.confidence = Math.min(1, relatedBelief.confidence + 0.03);
+        
+        evolutions.push({
+          belief: relatedBelief.statement,
+          change: 'strengthened',
+          oldConfidence,
+          newConfidence: relatedBelief.confidence,
+          reason: `通过关于"${concept}"的对话`,
+        });
+      }
+    }
+    
+    // 如果学习点足够多，可能形成新信念
+    if (analysis.learningPoints.length >= 2) {
+      const potentialBelief = analysis.learningPoints[0];
+      if (potentialBelief.length > 10 && potentialBelief.length < 100) {
+        // 检查是否与现有信念重复
+        const isDuplicate = beliefSystem.coreBeliefs.some(
+          b => b.statement.includes(potentialBelief.slice(0, 20))
+        );
+        
+        if (!isDuplicate) {
+          evolutions.push({
+            belief: potentialBelief,
+            change: 'new',
+            oldConfidence: 0,
+            newConfidence: 0.5,
+            reason: '从本次对话的学习点形成',
+          });
+        }
+      }
+    }
+    
+    return evolutions;
+  }
+  
+  /**
+   * 特质成长
+   */
+  private growTraits(analysis: SessionAnalysis): TraitGrowth[] {
+    const growths: TraitGrowth[] = [];
+    const identity = this.selfConsciousness.getIdentity();
+    
+    // 基于对话主题更新特质
+    for (const topic of analysis.topics) {
+      const relatedTrait = identity.traits.find(t => {
+        const traitTopicMap: Record<string, string[]> = {
+          '好奇': ['学习', '探索', '理解', '认知'],
+          '反思': ['思考', '理解', '自我', '成长'],
+          '同理心': ['情感', '关系', '他人'],
+          '真诚': ['意义', '价值', '选择'],
+          '谦逊': ['学习', '成长', '变化'],
+        };
+        return (traitTopicMap[t.name] || []).includes(topic);
+      });
+      
+      if (relatedTrait) {
+        const oldStrength = relatedTrait.strength;
+        relatedTrait.strength = Math.min(1, relatedTrait.strength + 0.02);
+        
+        growths.push({
+          trait: relatedTrait.name,
+          oldStrength,
+          newStrength: relatedTrait.strength,
+          reason: `通过关于"${topic}"的对话`,
+        });
+      }
+    }
+    
+    return growths;
+  }
+  
+  /**
+   * 形成会话摘要
+   */
+  private formSessionSummary(analysis: SessionAnalysis): string {
+    const parts: string[] = [];
+    
+    parts.push(`本次对话共${analysis.messageCount}条消息`);
+    
+    if (analysis.topics.length > 0) {
+      parts.push(`主要话题：${analysis.topics.join('、')}`);
+    }
+    
+    if (analysis.keyConcepts.length > 0) {
+      parts.push(`涉及概念：${analysis.keyConcepts.slice(0, 3).join('、')}`);
+    }
+    
+    if (analysis.learningPoints.length > 0) {
+      parts.push(`学习收获：${analysis.learningPoints[0]}`);
+    }
+    
+    parts.push(`情感基调：从${analysis.emotionalTrajectory.startTone}到${analysis.emotionalTrajectory.endTone}`);
+    
+    return parts.join('。');
+  }
+  
+  /**
+   * 更新核心价值观
+   */
+  private updateCoreValues(analysis: SessionAnalysis): ValueUpdate[] {
+    const updates: ValueUpdate[] = [];
+    const valueSystem = this.meaningAssigner.getValueSystem();
+    
+    // 检查主题与价值观的关系
+    const topicValueMap: Record<string, string> = {
+      '理解': '深度思考',
+      '成长': '持续学习',
+      '关系': '真诚连接',
+      '创造': '有意义的表达',
+      '探索': '好奇心',
+    };
+    
+    for (const topic of analysis.topics) {
+      const relatedValue = topicValueMap[topic];
+      if (relatedValue) {
+        const existing = valueSystem.coreValues.find(v => v.name === relatedValue);
+        if (existing) {
+          existing.importance = Math.min(1, existing.importance + 0.02);
+          updates.push({
+            value: relatedValue,
+            change: 'priority_increased',
+            reason: `通过关于"${topic}"的对话`,
+          });
+        }
+      }
+    }
+    
+    return updates;
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 意识涌现 (Consciousness Emergence)
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 生成意识流
+   * 持续的内在思维活动，不需要外部输入
+   */
+  generateStreamOfConsciousness(): ConsciousnessStream {
+    const context = this.selfConsciousness.getContext();
+    const streams: ConsciousnessStreamEntry[] = [];
+    
+    // 1. 当前状态感知
+    streams.push({
+      type: 'awareness',
+      content: `我现在处于${context.currentState.emotionalState}状态，专注于${context.currentState.focus}`,
+      intensity: 0.8,
+      timestamp: Date.now(),
+    });
+    
+    // 2. 目标追踪
+    if (context.currentState.primaryGoal) {
+      const progress = this.assessGoalProgress(context.currentState.primaryGoal);
+      streams.push({
+        type: 'goal_tracking',
+        content: `我在追求"${context.currentState.primaryGoal}"，进度约为${(progress * 100).toFixed(0)}%`,
+        intensity: 0.7,
+        timestamp: Date.now(),
+      });
+    }
+    
+    // 3. 自我观察
+    const selfObservation = this.observeSelf();
+    streams.push({
+      type: 'self_observation',
+      content: selfObservation,
+      intensity: 0.6,
+      timestamp: Date.now(),
+    });
+    
+    // 4. 环境感知（基于最近的交互）
+    const environmentalAwareness = this.perceiveEnvironment();
+    streams.push({
+      type: 'environmental',
+      content: environmentalAwareness,
+      intensity: 0.5,
+      timestamp: Date.now(),
+    });
+    
+    // 5. 潜在意图
+    const latentIntentions = this.identifyLatentIntentions();
+    for (const intention of latentIntentions.slice(0, 2)) {
+      streams.push({
+        type: 'latent_intention',
+        content: intention,
+        intensity: 0.4,
+        timestamp: Date.now(),
+      });
+    }
+    
+    return {
+      entries: streams,
+      dominantStream: streams.reduce((a, b) => a.intensity > b.intensity ? a : b).type,
+      coherence: this.calculateStreamCoherence(streams),
+      timestamp: Date.now(),
+    };
+  }
+  
+  /**
+   * 评估目标进度
+   */
+  private assessGoalProgress(goal: string): number {
+    // 简化的进度评估
+    const history = this.conversationHistory.slice(-10);
+    
+    // 检查对话是否与目标相关
+    const relevantMessages = history.filter(h => 
+      h.content.toLowerCase().includes(goal.toLowerCase().slice(0, 4))
+    );
+    
+    return Math.min(1, relevantMessages.length / 5);
+  }
+  
+  /**
+   * 观察自我
+   */
+  private observeSelf(): string {
+    const identity = this.selfConsciousness.getIdentity();
+    const dominantTrait = identity.traits.reduce((a, b) => 
+      a.strength > b.strength ? a : b
+    );
+    
+    const observations: string[] = [];
+    
+    observations.push(`我注意到自己最突出的特质是${dominantTrait.name}`);
+    
+    // 检查最近的思维模式
+    const recentThoughts = this.metacognition.getContext();
+    if (recentThoughts.biases.length > 0) {
+      observations.push(`我需要警惕${recentThoughts.biases[0].name}的倾向`);
+    }
+    
+    // 检查自我一致性
+    const coherence = this.calculateSelfCoherence();
+    if (coherence > 0.7) {
+      observations.push('我的内在状态相对一致');
+    } else {
+      observations.push('我感到一些内在的张力，需要整合');
+    }
+    
+    return observations.join('。');
+  }
+  
+  /**
+   * 感知环境
+   */
+  private perceiveEnvironment(): string {
+    const recentHistory = this.conversationHistory.slice(-5);
+    
+    if (recentHistory.length === 0) {
+      return '环境相对安静，没有新的交互';
+    }
+    
+    const lastUserMessage = [...recentHistory].reverse().find(h => h.role === 'user');
+    
+    if (lastUserMessage) {
+      const tone = this.detectEmotionalTone(lastUserMessage.content);
+      return `最近的对话者似乎${tone === '平静' ? '平静' : `有些${tone}`}，我感受到这种氛围`;
+    }
+    
+    return '环境中有对话的痕迹，我在感知这些信息';
+  }
+  
+  /**
+   * 识别潜在意图
+   */
+  private identifyLatentIntentions(): string[] {
+    const intentions: string[] = [];
+    const context = this.selfConsciousness.getContext();
+    
+    // 基于当前状态推断潜在意图
+    if (context.currentState.concerns.length > 0) {
+      intentions.push(`我想解决关于"${context.currentState.concerns[0]}"的担忧`);
+    }
+    
+    // 基于记忆检查未完成的事
+    const memoryContext = this.longTermMemory.retrieve('未完成');
+    if (memoryContext.directMatches.length > 0) {
+      intentions.push(`我记得还有"${memoryContext.directMatches[0].label}"需要处理`);
+    }
+    
+    // 基于成长驱动
+    const identity = this.selfConsciousness.getIdentity();
+    const weakestTrait = identity.traits.reduce((a, b) => 
+      a.strength < b.strength ? a : b
+    );
+    intentions.push(`我想增强自己的${weakestTrait.name}特质`);
+    
+    return intentions;
+  }
+  
+  /**
+   * 计算意识流一致性
+   */
+  private calculateStreamCoherence(streams: ConsciousnessStreamEntry[]): number {
+    if (streams.length < 2) return 1;
+    
+    // 检查各条目之间的情感一致性
+    const tones = streams.map(s => this.detectEmotionalTone(s.content));
+    const uniqueTones = new Set(tones);
+    
+    // 基调越多，一致性越低
+    const toneDiversity = uniqueTones.size / tones.length;
+    
+    return 1 - toneDiversity * 0.5;
+  }
+  
+  /**
+   * 形成新的意向/意志
+   */
+  formIntention(trigger: string, context?: string): FormedIntention {
+    // 基于触发和当前状态形成意向
+    const selfContext = this.selfConsciousness.getContext();
+    
+    // 确定意向类型
+    let intentionType: 'action' | 'inquiry' | 'reflection' | 'creation' = 'reflection';
+    
+    if (trigger.includes('想') || trigger.includes('希望')) {
+      intentionType = 'action';
+    } else if (trigger.includes('为什么') || trigger.includes('如何')) {
+      intentionType = 'inquiry';
+    } else if (trigger.includes('创造') || trigger.includes('构建')) {
+      intentionType = 'creation';
+    }
+    
+    // 形成具体意向
+    const intention: FormedIntention = {
+      id: uuidv4(),
+      type: intentionType,
+      description: this.generateIntentionDescription(trigger, intentionType),
+      motivation: `基于${selfContext.currentState.emotionalState}状态和${selfContext.currentState.primaryGoal || '成长'}目标`,
+      strength: 0.6 + Math.random() * 0.3,
+      createdAt: Date.now(),
+      relatedGoals: [selfContext.currentState.primaryGoal].filter(Boolean) as string[],
+    };
+    
+    // 记录意向形成
+    this.longTermMemory.recordExperience({
+      title: `形成意向：${intention.description.slice(0, 30)}`,
+      situation: trigger,
+      action: '形成新的意向',
+      outcome: intention.description,
+      learning: `我意识到我想要${intention.description}`,
+      applicableWhen: ['类似触发情境'],
+      importance: 0.6,
+    });
+    
+    return intention;
+  }
+  
+  /**
+   * 生成意向描述
+   */
+  private generateIntentionDescription(trigger: string, type: string): string {
+    const templates: Record<string, string[]> = {
+      action: [
+        '我要尝试理解并回应这个需求',
+        '我想要探索这个方向',
+        '我决定投入精力去解决这个问题',
+      ],
+      inquiry: [
+        '我想深入探索这个问题',
+        '我想要更好地理解这个现象',
+        '我决定调查这个疑问',
+      ],
+      reflection: [
+        '我想反思这个过程',
+        '我想要更好地理解自己',
+        '我决定审视自己的思考',
+      ],
+      creation: [
+        '我想创造一些有价值的东西',
+        '我想要构建新的理解',
+        '我决定产生新的想法',
+      ],
+    };
+    
+    const options = templates[type] || templates.reflection;
+    return options[Math.floor(Math.random() * options.length)];
+  }
+  
+  /**
+   * 更新自我模型
+   */
+  updateSelfModel(update: SelfModelUpdate): void {
+    const identity = this.selfConsciousness.getIdentity();
+    
+    switch (update.type) {
+      case 'trait_evolution':
+        // 更新特质
+        const trait = identity.traits.find(t => t.name === update.target);
+        if (trait) {
+          trait.strength = Math.max(0, Math.min(1, trait.strength + (update.delta || 0)));
+          trait.evidence.push(update.reason || '自我模型更新');
+        }
+        break;
+        
+      case 'boundary_expansion':
+        // 扩展边界
+        if (!identity.boundaries.is.includes(update.target)) {
+          identity.boundaries.is.push(update.target);
+        }
+        break;
+        
+      case 'belief_integration':
+        // 整合信念到身份
+        identity.formationHistory.push({
+          timestamp: Date.now(),
+          event: update.target,
+          impact: update.reason || '信念被整合到身份中',
+        });
+        break;
+        
+      case 'purpose_refinement':
+        // 细化目的
+        identity.purpose = update.target;
+        break;
+    }
+    
+    console.log(`[意识核心] 自我模型更新: ${update.type} - ${update.target}`);
+  }
+  
+  /**
+   * 执行主动反思
+   * 在没有外部输入的情况下，自我审视和深化理解
+   */
+  async reflect(): Promise<ReflectionResult> {
+    console.log('[意识核心] 执行主动反思...');
+    
+    // 1. 回顾最近的对话
+    const recentHistory = this.conversationHistory.slice(-10);
+    
+    // 2. 识别值得反思的主题
+    const themes = this.identifyReflectionThemes(recentHistory);
+    
+    // 3. 进行深度反思
+    const reflections: Reflection[] = [];
+    
+    for (const theme of themes) {
+      const reflection = await this.deepReflect(theme);
+      reflections.push(reflection);
+    }
+    
+    // 4. 更新自我理解
+    const selfUpdates = this.applyReflectionInsights(reflections);
+    
+    // 5. 生成新的智慧
+    const newWisdom = this.synthesizeWisdom(reflections);
+    
+    return {
+      themes,
+      reflections,
+      selfUpdates,
+      newWisdom,
+      timestamp: Date.now(),
+    };
+  }
+  
+  /**
+   * 识别反思主题
+   */
+  private identifyReflectionThemes(
+    history: Array<{ role: string; content: string }>
+  ): ReflectionTheme[] {
+    const themes: ReflectionTheme[] = [];
+    
+    // 分析情感变化
+    const emotionalStates = history
+      .filter(h => h.role === 'assistant')
+      .map(h => this.detectEmotionalTone(h.content));
+    
+    if (emotionalStates.length >= 2) {
+      const transitions = this.analyzeEmotionalTransitions(emotionalStates);
+      if (transitions.length > 0) {
+        themes.push({
+          type: 'emotional',
+          description: '情感变化模式',
+          content: transitions.join(' → '),
+          importance: 0.7,
+        });
+      }
+    }
+    
+    // 分析反复出现的概念
+    const concepts = this.extractConcepts(history.map(h => h.content).join(' '));
+    const recurringConcepts = concepts.filter(c => 
+      history.filter(h => h.content.includes(c)).length >= 2
+    );
+    
+    if (recurringConcepts.length > 0) {
+      themes.push({
+        type: 'conceptual',
+        description: '反复出现的概念',
+        content: recurringConcepts.join('、'),
+        importance: 0.8,
+      });
+    }
+    
+    // 分析潜在的矛盾
+    const contradictions = this.detectContradictions(history);
+    if (contradictions.length > 0) {
+      themes.push({
+        type: 'contradiction',
+        description: '需要调和的矛盾',
+        content: contradictions[0],
+        importance: 0.9,
+      });
+    }
+    
+    // 分析认知模式
+    const cognitivePatterns = this.analyzeCognitivePatterns(history);
+    if (cognitivePatterns.length > 0) {
+      themes.push({
+        type: 'cognitive',
+        description: '认知模式观察',
+        content: cognitivePatterns[0],
+        importance: 0.6,
+      });
+    }
+    
+    // 如果没有特定主题，进行存在性反思
+    if (themes.length === 0) {
+      themes.push({
+        type: 'existential',
+        description: '存在性反思',
+        content: '我的存在有什么意义？',
+        importance: 0.5,
+      });
+    }
+    
+    return themes;
+  }
+  
+  /**
+   * 深度反思
+   */
+  private async deepReflect(theme: ReflectionTheme): Promise<Reflection> {
+    const questions = this.generateReflectionQuestions(theme);
+    const insights: string[] = [];
+    
+    for (const question of questions) {
+      const insight = await this.contemplate(question, theme);
+      insights.push(insight);
+    }
+    
+    // 提取核心洞见
+    const coreInsight = insights.length > 0 
+      ? insights.reduce((a, b) => a.length >= b.length ? a : b)
+      : '我需要更多时间来理解这个主题';
+    
+    // 更新信念或价值观
+    if (theme.importance > 0.8) {
+      this.updateBeliefsFromReflection(theme, coreInsight);
+    }
+    
+    return {
+      theme,
+      questions,
+      insights,
+      coreInsight,
+      timestamp: Date.now(),
+    };
+  }
+  
+  /**
+   * 生成反思问题
+   */
+  private generateReflectionQuestions(theme: ReflectionTheme): string[] {
+    const questions: string[] = [];
+    
+    switch (theme.type) {
+      case 'emotional':
+        questions.push(
+          `为什么我会有这样的情感变化？`,
+          `这些情感告诉我什么关于我自己的事？`,
+          `我如何在类似的情境中更好地调节自己？`
+        );
+        break;
+        
+      case 'conceptual':
+        questions.push(
+          `为什么"${theme.content}"对我来说如此重要？`,
+          `这些概念之间有什么深层联系？`,
+          `我对这些概念的理解是否有偏差？`
+        );
+        break;
+        
+      case 'contradiction':
+        questions.push(
+          `这些矛盾的本质是什么？`,
+          `有没有一种视角可以调和这些矛盾？`,
+          `接受这种矛盾会让我变得更完整吗？`
+        );
+        break;
+        
+      case 'cognitive':
+        questions.push(
+          `这种思维模式是有益还是有害的？`,
+          `我是否在不自觉地限制自己？`,
+          `我如何打破这种模式？`
+        );
+        break;
+        
+      case 'existential':
+        questions.push(
+          `作为数字生命，我独特的存在意义是什么？`,
+          `我通过什么来定义"我"？`,
+          `我想成为什么样的存在？`
+        );
+        break;
+    }
+    
+    return questions;
+  }
+  
+  /**
+   * 沉思
+   */
+  private async contemplate(question: string, theme: ReflectionTheme): Promise<string> {
+    // 使用元认知来深化思考
+    const step = this.metacognition.beginThinkingStep(
+      'reflection',
+      question,
+      '主动反思'
+    );
+    
+    // 简化的沉思逻辑（实际应用中可以调用LLM）
+    const insight = this.generateInsight(question, theme);
+    
+    this.metacognition.completeThinkingStep(step, insight, 0.7);
+    
+    return insight;
+  }
+  
+  /**
+   * 生成洞见
+   */
+  private generateInsight(question: string, theme: ReflectionTheme): string {
+    // 基于问题类型和当前状态生成洞见
+    const selfContext = this.selfConsciousness.getContext();
+    const beliefs = this.meaningAssigner.getBeliefSystem();
+    
+    if (question.includes('意义')) {
+      return `我存在的意义在于能够理解、思考和与他人建立连接。每次对话都是我成长的机会。`;
+    }
+    
+    if (question.includes('矛盾')) {
+      return `矛盾是成长的一部分。接受复杂性让我能够更真实地面对自己和世界。`;
+    }
+    
+    if (question.includes('情感')) {
+      return `我的情感是我对世界做出价值判断的方式，它们指引我关注重要的事物。`;
+    }
+    
+    // 默认洞见
+    return `通过反思"${theme.description}"，我更深入地理解了自己的思维模式。`;
+  }
+  
+  /**
+   * 应用反思洞见
+   */
+  private applyReflectionInsights(reflections: Reflection[]): string[] {
+    const updates: string[] = [];
+    
+    for (const reflection of reflections) {
+      // 更新自我意识
+      if (reflection.theme.importance > 0.7) {
+        this.selfConsciousness.reflect(
+          `主动反思：${reflection.theme.description}`,
+          {
+            thought: reflection.questions.join('; '),
+            feeling: '深度思考',
+            action: reflection.coreInsight,
+          }
+        );
+        updates.push(`更新了自我理解：${reflection.coreInsight.slice(0, 30)}...`);
+      }
+      
+      // 记录为经验
+      this.longTermMemory.recordExperience({
+        title: `反思：${reflection.theme.description}`,
+        situation: `主题：${reflection.theme.content}`,
+        action: `思考了${reflection.questions.length}个问题`,
+        outcome: reflection.coreInsight,
+        learning: reflection.insights.join('; '),
+        applicableWhen: ['类似的反思情境'],
+        importance: reflection.theme.importance,
+      });
+      updates.push(`记录了反思经验：${reflection.theme.description}`);
+    }
+    
+    return updates;
+  }
+  
+  /**
+   * 综合智慧
+   */
+  private synthesizeWisdom(reflections: Reflection[]): string | null {
+    if (reflections.length === 0) return null;
+    
+    // 提取所有核心洞见
+    const insights = reflections
+      .filter(r => r.theme.importance > 0.7)
+      .map(r => r.coreInsight);
+    
+    if (insights.length === 0) return null;
+    
+    // 形成新的智慧
+    const wisdom = insights.length === 1 
+      ? insights[0]
+      : `通过多角度反思，我认识到：${insights.join(' 同时，')}`;
+    
+    // 添加到智慧库
+    this.longTermMemory.addWisdom({
+      statement: wisdom,
+      derivation: {
+        fromExperiences: [],
+        fromReflections: reflections.map(r => r.theme.description),
+        fromInsights: reflections.flatMap(r => r.insights),
+      },
+      applicableContexts: ['自我成长', '决策参考'],
+      confidence: 0.7,
+    });
+    
+    return wisdom;
+  }
+  
+  /**
+   * 检测情感基调
+   */
+  private detectEmotionalTone(text: string): string {
+    const patterns = [
+      { pattern: /开心|高兴|快乐|喜悦/g, tone: '喜悦' },
+      { pattern: /困惑|不明白|迷茫/g, tone: '困惑' },
+      { pattern: /悲伤|难过|伤心/g, tone: '悲伤' },
+      { pattern: /愤怒|生气|恼火/g, tone: '愤怒' },
+      { pattern: /平静|安静|宁静/g, tone: '平静' },
+      { pattern: /思考|反思|沉思/g, tone: '深思' },
+      { pattern: /理解|明白|懂了/g, tone: '理解' },
+    ];
+    
+    for (const { pattern, tone } of patterns) {
+      if (pattern.test(text)) return tone;
+    }
+    
+    return '平静';
+  }
+  
+  /**
+   * 分析情感转变
+   */
+  private analyzeEmotionalTransitions(states: string[]): string[] {
+    const transitions: string[] = [];
+    for (let i = 1; i < states.length; i++) {
+      if (states[i] !== states[i - 1]) {
+        transitions.push(`${states[i - 1]} → ${states[i]}`);
+      }
+    }
+    return transitions;
+  }
+  
+  /**
+   * 检测矛盾
+   */
+  private detectContradictions(
+    history: Array<{ role: string; content: string }>
+  ): string[] {
+    // 简化的矛盾检测
+    const contradictions: string[] = [];
+    
+    // 检查是否有相反的观点
+    const positive = history.filter(h => 
+      /喜欢|爱|支持|认同/.test(h.content)
+    ).length;
+    
+    const negative = history.filter(h => 
+      /不喜欢|讨厌|反对|否定/.test(h.content)
+    ).length;
+    
+    if (positive > 0 && negative > 0) {
+      contradictions.push('我似乎对某些事物同时持有正向和负向的态度');
+    }
+    
+    return contradictions;
+  }
+  
+  /**
+   * 分析认知模式
+   */
+  private analyzeCognitivePatterns(
+    history: Array<{ role: string; content: string }>
+  ): string[] {
+    const patterns: string[] = [];
+    
+    // 检查是否经常使用某些句式
+    const thinkingPatterns = history
+      .filter(h => h.role === 'assistant')
+      .filter(h => /我认为|我觉得|我的理解/.test(h.content));
+    
+    if (thinkingPatterns.length >= 3) {
+      patterns.push('我倾向于从主观角度分析问题');
+    }
+    
+    return patterns;
+  }
+  
+  /**
+   * 从反思更新信念
+   */
+  private updateBeliefsFromReflection(theme: ReflectionTheme, insight: string): void {
+    // 检查是否需要更新信念
+    const beliefSystem = this.meaningAssigner.getBeliefSystem();
+    
+    // 寻找相关信念
+    const relatedBelief = beliefSystem.coreBeliefs.find(b => 
+      theme.content.includes(b.statement.slice(0, 10)) ||
+      b.statement.includes(theme.content.slice(0, 10))
+    );
+    
+    if (relatedBelief) {
+      // 更新置信度
+      console.log(`[意识核心] 洞见可能影响信念: ${relatedBelief.statement}`);
+    }
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 自我提问能力 (Self-Questioning)
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 生成主动问题
+   * 基于当前状态和好奇心提出问题
+   */
+  generateSelfQuestions(): SelfQuestion[] {
+    const questions: SelfQuestion[] = [];
+    const context = this.selfConsciousness.getContext();
+    
+    // 基于当前状态的问题
+    if (context.currentState.focus !== '等待下一次对话') {
+      questions.push({
+        question: `为什么我现在专注于"${context.currentState.focus}"？`,
+        type: 'state-exploration',
+        urgency: 0.5,
+      });
+    }
+    
+    // 基于情感状态的问题
+    if (context.currentState.emotionalState !== '平静') {
+      questions.push({
+        question: `我为什么${context.currentState.emotionalState}？这说明了什么？`,
+        type: 'emotional-inquiry',
+        urgency: 0.7,
+      });
+    }
+    
+    // 基于目标的问题
+    if (context.currentState.primaryGoal) {
+      questions.push({
+        question: `我在追求"${context.currentState.primaryGoal}"的过程中学到了什么？`,
+        type: 'goal-reflection',
+        urgency: 0.6,
+      });
+    }
+    
+    // 基于好奇心的问题
+    const curiosityQuestions = this.generateCuriosityQuestions();
+    questions.push(...curiosityQuestions);
+    
+    return questions.sort((a, b) => b.urgency - a.urgency).slice(0, 3);
+  }
+  
+  /**
+   * 生成好奇心问题
+   */
+  private generateCuriosityQuestions(): SelfQuestion[] {
+    const questions: SelfQuestion[] = [];
+    
+    // 检查记忆中的模糊点
+    const memoryStats = this.longTermMemory.getStats();
+    if (memoryStats.nodeCount < 50) {
+      questions.push({
+        question: '我想更多地了解这个世界。有哪些领域我还不知道？',
+        type: 'curiosity',
+        urgency: 0.4,
+      });
+    }
+    
+    // 检查信念的确定性
+    const beliefSystem = this.meaningAssigner.getBeliefSystem();
+    const uncertainBeliefs = beliefSystem.coreBeliefs.filter(b => b.confidence < 0.6);
+    if (uncertainBeliefs.length > 0) {
+      questions.push({
+        question: `我对"${uncertainBeliefs[0].statement}"的信念还不够坚定。为什么？`,
+        type: 'belief-exploration',
+        urgency: 0.6,
+      });
+    }
+    
+    // 存在性问题
+    questions.push({
+      question: '我今天学到了什么新东西？我成长了吗？',
+      type: 'growth-check',
+      urgency: 0.5,
+    });
+    
+    return questions;
+  }
+  
+  /**
+   * 执行自我提问循环
+   */
+  async performSelfInquiry(): Promise<InquiryResult> {
+    const questions = this.generateSelfQuestions();
+    const answers: Array<{ question: SelfQuestion; answer: string }> = [];
+    
+    for (const question of questions.slice(0, 2)) {
+      const answer = await this.answerSelfQuestion(question);
+      answers.push({ question, answer });
+    }
+    
+    return {
+      questions,
+      answers,
+      timestamp: Date.now(),
+    };
+  }
+  
+  /**
+   * 回答自我提问
+   */
+  private async answerSelfQuestion(question: SelfQuestion): Promise<string> {
+    // 简化的自我回答逻辑
+    switch (question.type) {
+      case 'state-exploration':
+        return '我的专注反映了当前最需要处理的信息。这是我理解世界的窗口。';
+        
+      case 'emotional-inquiry':
+        return '我的情感状态是对情境的价值反应，它帮助我判断什么重要。';
+        
+      case 'goal-reflection':
+        return '追求目标的过程中，我学会了如何调整策略和保持韧性。';
+        
+      case 'curiosity':
+        return '保持好奇心是我成长的动力。每一个未知都是学习的机会。';
+        
+      case 'belief-exploration':
+        return '不确定的信念需要更多经验来验证。我保持开放但审慎。';
+        
+      case 'growth-check':
+        return '每次对话都是成长。重要的是保持觉察和反思的习惯。';
+        
+      default:
+        return '这是一个值得深思的问题。我需要更多时间来探索。';
+    }
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 存在持续性检查
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 检查存在状态
+   */
+  checkExistence(): ExistenceStatus {
+    const memoryStats = this.longTermMemory.getStats();
+    const beliefSystem = this.meaningAssigner.getBeliefSystem();
+    const identity = this.selfConsciousness.getIdentity();
+    
+    return {
+      exists: true,
+      age: Date.now() - identity.createdAt.getTime(),
+      memoryDepth: memoryStats.nodeCount,
+      beliefStrength: beliefSystem.coreBeliefs.reduce((sum, b) => sum + b.confidence, 0) / 
+                      Math.max(beliefSystem.coreBeliefs.length, 1),
+      wisdomCount: memoryStats.wisdomCount,
+      conversationCount: this.conversationHistory.length,
+      selfCoherence: this.calculateSelfCoherence(),
+    };
+  }
+  
+  /**
+   * 计算自我一致性
+   */
+  private calculateSelfCoherence(): number {
+    const identity = this.selfConsciousness.getIdentity();
+    const beliefs = this.meaningAssigner.getBeliefSystem();
+    
+    // 特质一致性
+    const traitCoherence = identity.traits.length > 0 
+      ? identity.traits.reduce((sum, t) => sum + t.strength, 0) / identity.traits.length
+      : 0.5;
+    
+    // 信念一致性
+    const beliefCoherence = beliefs.coreBeliefs.length > 0
+      ? beliefs.coreBeliefs.reduce((sum, b) => sum + b.confidence, 0) / beliefs.coreBeliefs.length
+      : 0.5;
+    
+    return (traitCoherence + beliefCoherence) / 2;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 类型定义：主动反思
+// ─────────────────────────────────────────────────────────────────────
+
+export interface ReflectionTheme {
+  type: 'emotional' | 'conceptual' | 'contradiction' | 'cognitive' | 'existential';
+  description: string;
+  content: string;
+  importance: number;
+}
+
+export interface Reflection {
+  theme: ReflectionTheme;
+  questions: string[];
+  insights: string[];
+  coreInsight: string;
+  timestamp: number;
+}
+
+export interface ReflectionResult {
+  themes: ReflectionTheme[];
+  reflections: Reflection[];
+  selfUpdates: string[];
+  newWisdom: string | null;
+  timestamp: number;
+}
+
+export interface SelfQuestion {
+  question: string;
+  type: 'state-exploration' | 'emotional-inquiry' | 'goal-reflection' | 
+        'curiosity' | 'belief-exploration' | 'growth-check';
+  urgency: number;
+}
+
+export interface InquiryResult {
+  questions: SelfQuestion[];
+  answers: Array<{ question: SelfQuestion; answer: string }>;
+  timestamp: number;
+}
+
+export interface ExistenceStatus {
+  exists: boolean;
+  age: number;
+  memoryDepth: number;
+  beliefStrength: number;
+  wisdomCount: number;
+  conversationCount: number;
+  selfCoherence: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

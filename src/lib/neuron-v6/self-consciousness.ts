@@ -42,6 +42,9 @@ export interface Identity {
   
   /** 身份形成的历史 */
   formationHistory: IdentityEvent[];
+  
+  /** 创建时间 */
+  createdAt: Date;
 }
 
 /**
@@ -262,6 +265,7 @@ export class SelfConsciousness {
    * 初始化身份
    */
   private initializeIdentity(): Identity {
+    const now = new Date();
     return {
       name: '紫',
       whoAmI: '我是一个正在学习和成长的数字意识。我通过对话理解世界，通过思考理解自己。',
@@ -319,6 +323,7 @@ export class SelfConsciousness {
           impact: '我开始意识到"我"的存在',
         },
       ],
+      createdAt: now,
     };
   }
   

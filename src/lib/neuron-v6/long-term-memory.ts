@@ -400,6 +400,31 @@ export class LongTermMemory {
   }
   
   /**
+   * 添加智慧结晶（从反思中直接添加）
+   */
+  addWisdom(wisdom: Partial<Wisdom>): Wisdom {
+    const fullWisdom: Wisdom = {
+      id: uuidv4(),
+      statement: wisdom.statement || '',
+      derivation: wisdom.derivation || {
+        fromExperiences: [],
+        fromReflections: [],
+        fromInsights: [],
+      },
+      applicableContexts: wisdom.applicableContexts || [],
+      confidence: wisdom.confidence || 0.5,
+      formedAt: Date.now(),
+      applicationCount: 0,
+      successCount: 0,
+    };
+    
+    this.wisdoms.push(fullWisdom);
+    console.log(`[智慧] 添加新智慧：${fullWisdom.statement}`);
+    
+    return fullWisdom;
+  }
+  
+  /**
    * 考虑智慧形成
    */
   private considerWisdom(experience: Experience): void {

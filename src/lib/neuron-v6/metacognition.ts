@@ -24,7 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
 export interface ThinkingStep {
   id: string;
   order: number;
-  type: 'perception' | 'analysis' | 'inference' | 'evaluation' | 'decision';
+  type: 'perception' | 'analysis' | 'inference' | 'evaluation' | 'decision' | 'reflection';
   description: string;
   input: string;
   output: string;
@@ -543,6 +543,7 @@ export class MetacognitionEngine {
       inference: '推理',
       evaluation: '评估',
       decision: '决策',
+      reflection: '反思',
     };
     
     return typeNames[maxType] || maxType;
