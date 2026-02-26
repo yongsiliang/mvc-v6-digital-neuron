@@ -409,6 +409,38 @@ export default function ConsciousnessPage() {
       milestones: Array<{ id: string; name: string; achieved: boolean }>;
       growthRate: number;
     };
+    knowledgeGraph?: {
+      domains: Array<{
+        id: string;
+        name: string;
+        color: string;
+        conceptCount: number;
+        maturity: number;
+      }>;
+      concepts: Array<{
+        id: string;
+        name: string;
+        domainId: string;
+        understanding: number;
+        importance: number;
+        activation: number;
+        connectionCount: number;
+      }>;
+      edges: Array<{
+        id: string;
+        sourceId: string;
+        targetId: string;
+        relation: string;
+        strength: number;
+      }>;
+      stats: {
+        totalConcepts: number;
+        totalEdges: number;
+        averageConnectivity: number;
+        strongestConnection: number;
+        mostConnectedConcept: string | null;
+      };
+    };
   }>({});
   
   // 存在状态
@@ -824,6 +856,9 @@ export default function ConsciousnessPage() {
                   break;
                 case 'personalityGrowth':
                   setCurrentData(prev => ({ ...prev, personalityGrowth: data.data }));
+                  break;
+                case 'knowledgeGraph':
+                  setCurrentData(prev => ({ ...prev, knowledgeGraph: data.data }));
                   break;
                 case 'content':
                   assistantContent += data.data.delta;

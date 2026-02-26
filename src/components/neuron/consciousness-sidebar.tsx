@@ -23,6 +23,7 @@ import {
   Cpu,
   Eye,
   Sparkles,
+  Network,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -260,6 +261,39 @@ interface PersonalityGrowthData {
   growthRate: number;
 }
 
+interface KnowledgeGraphData {
+  domains: Array<{
+    id: string;
+    name: string;
+    color: string;
+    conceptCount: number;
+    maturity: number;
+  }>;
+  concepts: Array<{
+    id: string;
+    name: string;
+    domainId: string;
+    understanding: number;
+    importance: number;
+    activation: number;
+    connectionCount: number;
+  }>;
+  edges: Array<{
+    id: string;
+    sourceId: string;
+    targetId: string;
+    relation: string;
+    strength: number;
+  }>;
+  stats: {
+    totalConcepts: number;
+    totalEdges: number;
+    averageConnectivity: number;
+    strongestConnection: number;
+    mostConnectedConcept: string | null;
+  };
+}
+
 interface ConsciousnessContext {
   identity: {
     name: string;
@@ -295,6 +329,7 @@ interface ConsciousnessSidebarProps {
     existential?: ExistentialData;
     metacognitionDeep?: MetacognitionDeepData;
     personalityGrowth?: PersonalityGrowthData;
+    knowledgeGraph?: KnowledgeGraphData;
   };
   existenceStatus: ExistenceStatus | null;
   onVisualize?: () => void;
@@ -705,6 +740,97 @@ function PersonalityGrowthPanel({ data }: { data: PersonalityGrowthData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 知识网络面板
+// ─────────────────────────────────────────────────────────────────────
+
+function KnowledgeGraphPanel({ data }: { data: KnowledgeGraphData }) {
+  const topDomains = [...data.domains]
+    .sort((a, b) => b.conceptCount - a.conceptCount)
+    .slice(0, 5);
+  
+  const activeConcepts = [...data.concepts]
+    .sort((a, b) => b.activation - a.activation)
+    .slice(0, 5);
+  
+  return (
+    <div className="space-y-3">
+      {/* 统计概览 */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="p-2 bg-muted/30 rounded-lg text-center">
+          <div className="text-lg font-bold text-blue-500">{data.stats.totalConcepts}</div>
+          <div className="text-[9px] text-muted-foreground">概念</div>
+        </div>
+        <div className="p-2 bg-muted/30 rounded-lg text-center">
+          <div className="text-lg font-bold text-green-500">{data.stats.totalEdges}</div>
+          <div className="text-[9px] text-muted-foreground">关联</div>
+        </div>
+      </div>
+      
+      {/* 顶级领域 */}
+      {topDomains.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-[10px] text-muted-foreground">知识领域</div>
+          {topDomains.map((domain) => (
+            <div key={domain.id} className="flex items-center gap-2 text-[10px]">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: domain.color }}
+              />
+              <span className="flex-1 text-foreground">{domain.name}</span>
+              <span className="text-muted-foreground">{domain.conceptCount}</span>
+              <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${domain.maturity * 100}%`,
+                    backgroundColor: domain.color,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 活跃概念 */}
+      {activeConcepts.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-[10px] text-muted-foreground">活跃概念</div>
+          {activeConcepts.map((concept, index) => (
+            <div key={concept.id} className="flex items-center gap-2 text-[10px]">
+              <span className="text-muted-foreground w-3">#{index + 1}</span>
+              <span className="flex-1 text-foreground truncate">{concept.name}</span>
+              <div className="w-10 h-1 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full"
+                  style={{ width: `${concept.activation * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 最强连接 */}
+      {data.stats.mostConnectedConcept && (
+        <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+          <div className="text-[9px] text-muted-foreground mb-1">最连接概念</div>
+          <div className="text-sm font-medium text-blue-600 truncate">
+            {data.stats.mostConnectedConcept}
+          </div>
+        </div>
+      )}
+      
+      {/* 平均连接度 */}
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>平均连接度</span>
+        <span>{data.stats.averageConnectivity.toFixed(1)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 主组件
 // ─────────────────────────────────────────────────────────────────────
 
@@ -937,6 +1063,24 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-3">
                 <PersonalityGrowthPanel data={currentData.personalityGrowth} />
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 知识网络 */}
+          {currentData.knowledgeGraph && (
+            <AccordionItem value="knowledge" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Network className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-medium">知识网络</span>
+                  <Badge variant="outline" className="text-[10px] ml-auto mr-2">
+                    {currentData.knowledgeGraph.stats.totalConcepts} 概念
+                  </Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <KnowledgeGraphPanel data={currentData.knowledgeGraph} />
               </AccordionContent>
             </AccordionItem>
           )}

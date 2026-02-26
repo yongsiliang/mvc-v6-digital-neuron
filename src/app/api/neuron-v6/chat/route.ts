@@ -285,6 +285,16 @@ export async function POST(request: NextRequest) {
             });
           }
           
+          // 发送知识图谱状态
+          if (result.knowledgeGraph) {
+            send('knowledgeGraph', {
+              domains: result.knowledgeGraph.domains,
+              concepts: result.knowledgeGraph.concepts.slice(0, 50), // 限制传输数量
+              edges: result.knowledgeGraph.edges.slice(0, 100),
+              stats: result.knowledgeGraph.stats,
+            });
+          }
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           

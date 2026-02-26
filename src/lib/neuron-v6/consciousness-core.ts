@@ -139,6 +139,14 @@ import {
   PersonalityState,
   DEFAULT_CORE_TRAITS,
 } from './personality-growth';
+import { 
+  KnowledgeGraphSystem,
+  KnowledgeDomain,
+  ConceptNode,
+  ConceptEdge,
+  KnowledgeGraphState,
+  createKnowledgeGraphSystem,
+} from './knowledge-graph';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -521,6 +529,18 @@ export interface ProcessResult {
     growthRate: number;
   };
   
+  /** 知识图谱状态 */
+  knowledgeGraph?: {
+    /** 领域 */
+    domains: KnowledgeDomain[];
+    /** 概念 */
+    concepts: ConceptNode[];
+    /** 关联 */
+    edges: ConceptEdge[];
+    /** 统计 */
+    stats: KnowledgeGraphState['stats'];
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -619,6 +639,9 @@ export class ConsciousnessCore {
   // 人格成长系统
   private personalityGrowthSystem: PersonalityGrowthSystem;
   
+  // 知识图谱系统
+  private knowledgeGraphSystem: KnowledgeGraphSystem;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -675,11 +698,14 @@ export class ConsciousnessCore {
     // 初始化人格成长系统
     this.personalityGrowthSystem = new PersonalityGrowthSystem();
     
+    // 初始化知识图谱系统
+    this.knowledgeGraphSystem = createKnowledgeGraphSystem();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
     console.log('[意识核心] V6 意识核心已初始化');
-    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 存在主义思考, 元认知深化, 意愿系统');
+    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 存在主义思考, 元认知深化, 人格成长, 知识图谱, 意愿系统');
   }
   
   /**
@@ -1041,6 +1067,29 @@ export class ConsciousnessCore {
           integration: state.integration,
           milestones: state.milestones,
           growthRate: state.growthRate,
+        };
+      })(),
+      
+      // 知识图谱处理
+      knowledgeGraph: (() => {
+        // 从对话中学习概念和关联
+        const learningResult = this.knowledgeGraphSystem.learnFromDialogue(input, {
+          importance: 0.5,
+        });
+        
+        // 发现聚类（如果有足够的概念）
+        if (this.knowledgeGraphSystem.getState().concepts.size >= 5) {
+          this.knowledgeGraphSystem.discoverClusters();
+        }
+        
+        // 获取可序列化状态
+        const state = this.knowledgeGraphSystem.getSerializableState();
+        
+        return {
+          domains: state.domains,
+          concepts: state.concepts,
+          edges: state.edges,
+          stats: state.stats,
         };
       })(),
       
