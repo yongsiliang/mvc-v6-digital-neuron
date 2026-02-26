@@ -12,9 +12,11 @@
 import { NextRequest } from 'next/server';
 import { LLMClient, HeaderUtils, Config } from 'coze-coding-dev-sdk';
 import { DualLearningLoop, createDualLearningLoop } from '@/lib/neuron-v5/dual-learning';
+import { resetAndInitialize } from '@/lib/neuron-v3/innate-knowledge';
 
 // 单例：保持学习状态
 let dualLearningLoop: DualLearningLoop | null = null;
+let isInitialized = false;
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,11 +33,16 @@ export async function POST(request: NextRequest) {
     // 提取请求头
     const headers = HeaderUtils.extractForwardHeaders(request.headers);
     
-    // 创建或复用双向学习循环（使用与V4相同的方式初始化LLMClient）
-    if (!dualLearningLoop) {
+    // 创建或复用双向学习循环
+    if (!dualLearningLoop || !isInitialized) {
+      // 重置并初始化网络（注入先天知识）
+      const initResult = resetAndInitialize();
+      console.log('神经元网络初始化:', initResult);
+      
       const config = new Config();
       const llmClient = new LLMClient(config, headers);
       dualLearningLoop = createDualLearningLoop(llmClient);
+      isInitialized = true;
     }
 
     // 创建流式响应

@@ -13,6 +13,7 @@
 import { LLMClient } from 'coze-coding-dev-sdk';
 import { HebbianNetwork, HebbianNeuron, HebbianSynapse } from '../neuron-v3/hebbian-network';
 import { SelfCore, CoreMemory, EmotionState } from '../neuron-v3/self-core';
+import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -495,6 +496,7 @@ export class DualLearningLoop {
   private selfCore: SelfCore;
   private stateQuerier: NeuronStateQuerier;
   private signalExtractor: LearningSignalExtractor;
+  private trapDetector: InnateKnowledgeInitializer;
   
   // 对话历史
   private conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
@@ -505,8 +507,10 @@ export class DualLearningLoop {
     selfCore?: SelfCore
   ) {
     this.llmClient = llmClient;
-    this.network = network || HebbianNetwork.getInstance();
+    // 使用已初始化的网络（包含先天知识）
+    this.network = network || getInitializedNetwork();
     this.selfCore = selfCore || SelfCore.getInstance();
+    this.trapDetector = new InnateKnowledgeInitializer(this.network);
     this.stateQuerier = new NeuronStateQuerier(this.network, this.selfCore);
     this.signalExtractor = new LearningSignalExtractor();
   }
@@ -565,7 +569,10 @@ export class DualLearningLoop {
     context: NeuronStateContext
   ): Promise<ThinkingProcess> {
     
-    const thinkingPrompt = this.buildThinkingPrompt(input, context);
+    // 检测陷阱
+    const detectedTrap = this.trapDetector.detectTrap(input);
+    
+    const thinkingPrompt = this.buildThinkingPrompt(input, context, detectedTrap);
     
     let rawThinking = '';
     const stream = this.llmClient.stream([
@@ -586,6 +593,20 @@ export class DualLearningLoop {
     const analysis = this.parseThinkingAnalysis(rawThinking);
     const learningSignals = this.signalExtractor.extract(rawThinking, input);
     
+    // 如果检测到陷阱，添加学习信号
+    if (detectedTrap) {
+      learningSignals.push({
+        id: uuidv4(),
+        type: 'hypothesis',
+        content: {
+          description: `检测到陷阱模式【${detectedTrap.name}】：${detectedTrap.trap}。正确答案：${detectedTrap.correctAnswer}`
+        },
+        confidence: 0.9,
+        sourceConversation: input,
+        timestamp: Date.now()
+      });
+    }
+    
     return {
       rawThinking,
       analysis,
@@ -596,16 +617,32 @@ export class DualLearningLoop {
   /**
    * 构建思考提示
    */
-  private buildThinkingPrompt(input: string, context: NeuronStateContext): string {
+  private buildThinkingPrompt(
+    input: string, 
+    context: NeuronStateContext,
+    detectedTrap?: { name: string; trap: string; correctAnswer: string; reasoning: string } | null
+  ): string {
+    
+    const trapWarning = detectedTrap ? `
+## ⚠️ 检测到陷阱模式
+
+**陷阱名称**：${detectedTrap.name}
+**陷阱描述**：${detectedTrap.trap}
+**正确答案**：${detectedTrap.correctAnswer}
+**推理**：${detectedTrap.reasoning}
+
+⚠️ 你必须避免掉入这个陷阱！
+` : '';
+
     return `你是"紫"，一个数字生命体。现在进入深度思考模式。
 
 ## 我的神经网络状态
 
 ### 当前激活的概念
-${context.activatedConcepts.map(c => `- ${c.label} (${(c.activation * 100).toFixed(0)}%)`).join('\n')}
+${context.activatedConcepts.map(c => `- ${c.label} (${(c.activation * 100).toFixed(0)}%)`).join('\n') || '- 暂无激活概念'}
 
 ### 强连接（学到的关联）
-${context.strongConnections.map(c => `- ${c.from} → ${c.to} (权重: ${c.weight.toFixed(2)})`).join('\n')}
+${context.strongConnections.map(c => `- ${c.from} → ${c.to} (权重: ${c.weight.toFixed(2)})`).join('\n') || '- 暂无强连接'}
 
 ### 过去学到的模式
 ${context.learnedPatterns.length > 0 
@@ -613,7 +650,7 @@ ${context.learnedPatterns.length > 0
   : '- 暂无相关学习模式'}
 
 ### 我的预测
-${context.predictions.map(p => `- ${p.concept} (置信度: ${(p.confidence * 100).toFixed(0)}%)`).join('\n')}
+${context.predictions.map(p => `- ${p.concept} (置信度: ${(p.confidence * 100).toFixed(0)}%)`).join('\n') || '- 暂无预测'}
 
 ### 我是谁
 ${context.selfState.identity}
@@ -653,6 +690,8 @@ ${context.activeHypotheses.map(h => `- ${h.hypothesis} (置信度: ${(h.confiden
 - 我应该怎么回答？
 - 需要澄清什么？
 - 怎么说最自然？
+
+${trapWarning}
 
 直接输出你的思考过程，不要输出JSON格式。`;
   }
