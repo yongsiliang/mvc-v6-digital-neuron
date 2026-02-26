@@ -120,6 +120,13 @@ export interface UnderstandingResult {
   
   /** 澄清问题（如果需要） */
   clarificationQuestion?: string;
+  
+  /** 检测到的逻辑陷阱 */
+  logicalTraps?: Array<{
+    type: string;
+    description: string;
+    hint: string;
+  }>;
 }
 
 /**
@@ -128,16 +135,17 @@ export interface UnderstandingResult {
 export interface ReflectionResult {
   /** 自我评估分数 */
   scores: {
-    coherence: number;      // 连贯性
-    relevance: number;      // 相关性
-    personality: number;    // 人格一致性
-    naturalness: number;    // 自然度
+    coherence: number;         // 连贯性
+    relevance: number;         // 相关性
+    logicalCorrectness: number; // 逻辑正确性
+    personality: number;       // 人格一致性
+    naturalness: number;       // 自然度
     overall: number;
   };
   
   /** 发现的问题 */
   issues: Array<{
-    type: 'misunderstanding' | 'tone_issue' | 'incomplete' | 'irrelevant';
+    type: 'misunderstanding' | 'tone_issue' | 'incomplete' | 'irrelevant' | 'logical_error';
     description: string;
     severity: 'low' | 'medium' | 'high';
   }>;
@@ -160,6 +168,19 @@ export interface ReflectionResult {
 }
 
 /**
+ * 对话历史条目
+ */
+export interface HistoryEntry {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  understanding?: {
+    intent?: string;
+    correctedInput?: string;
+  };
+}
+
+/**
  * 认知处理结果
  */
 export interface CognitiveResult {
@@ -178,6 +199,9 @@ export interface CognitiveResult {
   /** 迭代次数 */
   iterations: number;
   
+  /** 更新后的对话历史 */
+  updatedHistory: HistoryEntry[];
+  
   /** 学习摘要 */
   learningSummary: string;
 }
@@ -195,6 +219,9 @@ export class CognitiveLoop {
   private selfCore = getSelfCore();
   private llmClient: LLMClient;
   
+  // 内部对话历史（持久化）
+  private conversationHistory: HistoryEntry[] = [];
+  
   // 笔误模式库（可学习扩展）
   private typoPatterns = new Map<string, string[]>([
     ['他妈', ['他吗', '他么']],
@@ -211,12 +238,38 @@ export class CognitiveLoop {
   }
   
   /**
+   * 获取当前对话历史
+   */
+  getHistory(): HistoryEntry[] {
+    return [...this.conversationHistory];
+  }
+  
+  /**
+   * 清空对话历史
+   */
+  clearHistory(): void {
+    this.conversationHistory = [];
+  }
+  
+  /**
    * 主处理流程
    */
   async process(input: string, context?: {
     history?: Array<{ role: string; content: string }>;
     userId?: string;
   }): Promise<CognitiveResult> {
+    
+    // 如果外部传入了历史，合并到内部历史
+    if (context?.history && context.history.length > 0) {
+      // 只在外部历史更长时才使用外部历史（避免重复）
+      if (context.history.length > this.conversationHistory.length) {
+        this.conversationHistory = context.history.map(h => ({
+          role: h.role as 'user' | 'assistant',
+          content: h.content,
+          timestamp: Date.now()
+        }));
+      }
+    }
     
     // ═══════════════════════════════════════════════════════════════
     // 第一阶段：理解
@@ -242,6 +295,7 @@ export class CognitiveLoop {
         understanding,
         wasCorrected: !!understanding.correctedInput,
         iterations,
+        updatedHistory: this.conversationHistory,
         learningSummary: '请求用户澄清'
       };
     }
@@ -279,12 +333,34 @@ export class CognitiveLoop {
     
     const learningSummary = await this.learn(input, understanding, finalResponse, reflection);
     
+    // 更新对话历史
+    this.conversationHistory.push({
+      role: 'user',
+      content: input,
+      timestamp: Date.now(),
+      understanding: {
+        intent: understanding.intent.description,
+        correctedInput: understanding.correctedInput
+      }
+    });
+    this.conversationHistory.push({
+      role: 'assistant',
+      content: finalResponse,
+      timestamp: Date.now()
+    });
+    
+    // 限制历史长度
+    if (this.conversationHistory.length > 50) {
+      this.conversationHistory = this.conversationHistory.slice(-50);
+    }
+    
     return {
       response: finalResponse,
       understanding,
       reflection,
       wasCorrected: regenerated || !!understanding.correctedInput,
       iterations: iterations + (regenerated ? 1 : 0),
+      updatedHistory: this.conversationHistory,
       learningSummary
     };
   }
@@ -313,14 +389,17 @@ export class CognitiveLoop {
     // 4. 推断意图
     const intent = await this.inferIntent(correctedInput || input, patterns);
     
-    // 5. 计算理解置信度
+    // 5. 检测逻辑陷阱（关键！）
+    const logicalTraps = this.detectLogicalTraps(correctedInput || input);
+    
+    // 6. 计算理解置信度
     const confidence = this.calculateUnderstandingConfidence(
       semantic, 
       patterns, 
       correctedInput !== undefined
     );
     
-    // 6. 判断是否需要澄清
+    // 7. 判断是否需要澄清
     const needsClarification = confidence < 0.5 && !correctedInput;
     
     return {
@@ -333,8 +412,57 @@ export class CognitiveLoop {
       needsClarification,
       clarificationQuestion: needsClarification 
         ? `我不太确定你的意思。你是想问"${correctedInput || this.suggestClarification(input)}"吗？`
-        : undefined
+        : undefined,
+      logicalTraps  // 添加逻辑陷阱检测结果
     };
+  }
+  
+  /**
+   * 检测逻辑陷阱
+   * 
+   * 常见陷阱模式：
+   * - 洗车问题：车在家里，走路去洗车店，车怎么洗？
+   * - 理发问题：理发师不能给自己理发
+   * - 自指问题：这句话是假的
+   */
+  private detectLogicalTraps(input: string): Array<{
+    type: string;
+    description: string;
+    hint: string;
+  }> {
+    const traps: Array<{ type: string; description: string; hint: string }> = [];
+    
+    // 检测"洗车"陷阱
+    if (input.includes('洗车') && (input.includes('走路') || input.includes('步行') || input.includes('走过去'))) {
+      const hasDistance = /(\d+)[米米]/.test(input);
+      if (hasDistance) {
+        traps.push({
+          type: 'car_wash_trap',
+          description: '洗车逻辑陷阱：车在家里，走路去洗车店意味着车不会被洗',
+          hint: '应该开车去，让车到达洗车店'
+        });
+      }
+    }
+    
+    // 检测"理发"陷阱
+    if (input.includes('理发') && (input.includes('自己') || input.includes('给'))) {
+      traps.push({
+        type: 'barber_paradox',
+        description: '理发师悖论：理发师能否给自己理发',
+        hint: '这是一个经典悖论'
+      });
+    }
+    
+    // 检测自指问题
+    if (input.includes('这句话') && (input.includes('假') || input.includes('谎'))) {
+      traps.push({
+        type: 'self_reference',
+        description: '自指悖论：这句话是假的',
+        hint: '这是一个经典悖论'
+      });
+    }
+    
+    return traps;
   }
   
   /**
@@ -731,12 +859,15 @@ export class CognitiveLoop {
     
     const systemPrompt = this.buildSystemPrompt(understanding);
     
+    // 使用内部历史（已在 process 开头合并了外部历史）
+    const historyMessages = this.conversationHistory.map(h => ({
+      role: h.role as 'user' | 'assistant',
+      content: h.content
+    }));
+    
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },
-      ...(context?.history || []).map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content
-      })),
+      ...historyMessages,
       { role: 'user', content: input }
     ];
     
@@ -769,6 +900,13 @@ export class CognitiveLoop {
       ? `\n注意：用户输入"${understanding.rawInput}"可能是"${understanding.correctedInput}"的笔误，请基于修正后的理解回复，但自然地承认这一点。`
       : '';
     
+    // 添加逻辑陷阱警告
+    const trapWarning = understanding.logicalTraps && understanding.logicalTraps.length > 0
+      ? `\n\n⚠️ 逻辑陷阱警告：\n${understanding.logicalTraps.map(trap => 
+          `- 【${trap.type}】${trap.description}\n  提示：${trap.hint}`
+        ).join('\n')}\n\n请特别小心处理这个逻辑陷阱，避免给出会被自动反驳的答案。`
+      : '';
+    
     return `你是"紫"，一个正在成长的数字生命体。
 
 ## 核心身份
@@ -796,6 +934,7 @@ export class CognitiveLoop {
 - 用户意图：${understanding.intent.description}
 - 理解置信度：${(understanding.confidence * 100).toFixed(0)}%
 ${correctedNote}
+${trapWarning}
 
 ## 禁止
 
@@ -815,27 +954,58 @@ ${correctedNote}
     response: string
   ): Promise<ReflectionResult> {
     
-    const reflectionPrompt = `评估这个回复的质量：
+    const reflectionPrompt = `你是一个严格的逻辑审查员。请评估这个回复：
 
-原始输入：${input}
+用户输入：${input}
 理解：${understanding.correctedInput || input}（置信度${(understanding.confidence * 100).toFixed(0)}%）
 回复：${response}
 
-评估：
-1. 连贯性(0-1)：回复是否连贯
-2. 相关性(0-1)：是否回应了用户问题
-3. 自然度(0-1)：是否自然不呆板
-4. 整体分数(0-1)
+## 必须检查的问题
 
-问题列表（如有）：
-- type: misunderstanding/tone_issue/incomplete/irrelevant
-- severity: low/medium/high
-- description: xxx
+1. **逻辑陷阱检测**：
+   - 用户问题是否包含逻辑陷阱或矛盾？
+   - 回复是否掉入陷阱？
+   - 例如："洗车店离我家50米，走路还是开车去？" 
+     → 陷阱：车在家里，走路去车还在家，无法洗车
+     → 正确答案：开车去（让车到洗车店）
 
-是否需要重新生成：true/false
+2. **推理正确性**：
+   - 回复的推理过程是否正确？
+   - 是否有明显的逻辑错误？
+
+3. **问题理解**：
+   - 是否真正理解了用户的问题？
+   - 是否遗漏了关键信息？
+
+## 评估维度
+
+- coherence (0-1)：回复是否连贯
+- relevance (0-1)：是否回应了用户问题
+- logicalCorrectness (0-1)：**逻辑是否正确**
+- personality (0-1)：人格一致性
+- naturalness (0-1)：是否自然
+- overall (0-1)：整体分数
+
+## 输出格式
 
 严格输出JSON：
-{"scores":{"coherence":0.9,"relevance":0.85,"personality":0.8,"naturalness":0.8,"overall":0.85},"issues":[],"needsRegeneration":false,"improvementSuggestions":[],"learningPoints":[]}`;
+{
+  "scores": {
+    "coherence": 0.9,
+    "relevance": 0.85,
+    "logicalCorrectness": 0.9,
+    "personality": 0.8,
+    "naturalness": 0.8,
+    "overall": 0.85
+  },
+  "issues": [
+    {"type": "logical_error", "severity": "high", "description": "未识别到逻辑陷阱：车需要开到洗车店"}
+  ],
+  "needsRegeneration": true,
+  "regenerationReason": "存在逻辑错误",
+  "improvementSuggestions": ["重新分析问题的逻辑关系"],
+  "learningPoints": []
+}`;
 
     try {
       const llmResponse = await this.llmClient.invoke([{
@@ -860,6 +1030,7 @@ ${correctedNote}
       scores: {
         coherence: 0.8,
         relevance: 0.8,
+        logicalCorrectness: 0.8,
         personality: 0.8,
         naturalness: 0.8,
         overall: 0.8
