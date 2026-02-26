@@ -1906,6 +1906,14 @@ ${thinkingSection}
     
     const extractionResult = this.keyInfoExtractor.extract(input, response);
     
+    console.log(`[关键信息] 提取结果: ${extractionResult.keyInfos.length} 条信息`);
+    console.log(`[关键信息] 类型分布: ${extractionResult.keyInfos.map(i => i.type).join(', ')}`);
+    
+    // 详细输出每个关键信息
+    extractionResult.keyInfos.forEach((info, idx) => {
+      console.log(`[关键信息] #${idx+1}: type="${info.type}", subject="${info.subject}", content="${info.content?.slice(0, 30)}"`);
+    });
+    
     if (extractionResult.shouldRemember) {
       console.log(`[关键信息] ${extractionResult.summary}`);
       console.log(`[关键信息] 优先级: ${extractionResult.memoryPriority}`);

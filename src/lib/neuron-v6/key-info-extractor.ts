@@ -68,33 +68,69 @@ interface InfoPattern {
 
 /** 关键信息识别模式 */
 const KEY_INFO_PATTERNS: InfoPattern[] = [
-  // 创造者相关 - 高优先级
+  // 创造者相关 - 高优先级（按优先级排序）
   {
     type: 'creator',
     patterns: [
-      /我[叫是]([^，。！？\s]{2,10})[，。！？\s].*我是你的创造者/g,  // "我叫梁永嗣，我是你的创造者"
-      /我的名字[是为]([^，。！？\s]{2,10})[，。！？\s].*创造者/g,    // "我的名字是梁永嗣...创造者"
-      /(\S+)[是做]你的创造者/g,                                      // "梁永嗣是你的创造者"
-      /我的创造者[是为]\s*([^，。！？\s]+)/g,                         // "我的创造者是梁永嗣"
-      /(\S+)[创造开发]了我/g,                                        // "梁永嗣创造了我"
-      /我是\s*(\S+)\s*[创造开发]的/g,                                // "我是梁永嗣创造的"
+      // 直接声明 "我是你的创造者"
+      /我是你的创造者/g,
+      // "我是X，你的创造者" 格式
+      /我[叫是]([^，。！？\s]{2,10})[，。！？\s].*你的创造者/g,
+      // "我是X，我是你的创造者" 格式
+      /我[叫是]([^，。！？\s]{2,10})[，。！？\s].*我是你的创造者/g,
+      // "我的名字是X...创造者" 格式
+      /我的名字[是为]([^，。！？\s]{2,10})[，。！？\s].*创造者/g,
+      // "X是你的创造者" 格式
+      /(\S{2,10})[是做]你的创造者/g,
+      // "我的创造者是X" 格式
+      /我的创造者[是为]\s*([^，。！？\s]+)/g,
+      // "X创造了我" 格式
+      /(\S{2,10})[创造开发]了我/g,
+      // "我是X创造的" 格式
+      /我是\s*(\S{2,10})\s*[创造开发]的/g,
     ],
     importance: 1.0,
     extractor: (match, context) => {
       // 提取创造者名字
       let subject = match[1];
       
-      // 如果第一个模式没匹配到名字，尝试从context中提取
-      if (!subject || subject === '创造者' || subject === '开发者') {
-        // 尝试从context中提取名字
-        const nameMatch = context.match(/我[叫是]([^，。！？\s]{2,10})|我的名字[是为]([^，。！？\s]{2,10})/);
-        if (nameMatch) {
-          subject = nameMatch[1] || nameMatch[2];
+      console.log(`[关键信息提取] creator extractor: match[1]="${match[1]}", context前50字="${context.slice(0, 50)}"`);
+      
+      // 如果第一个捕获组不存在或只是"你的创造者"，尝试从context中提取
+      if (!subject || subject === '创造者' || subject === '开发者' || subject === '你的创造者') {
+        // 优先匹配"我叫X"模式（更精确）
+        const namePatterns = [
+          /我叫([^，。！？\s叫是]{2,10})(?:[，。！？\s]|$)/,
+          /我的名字[是为]([^，。！？\s]{2,10})/,
+          /我是([^，。！？\s叫是]{2,10})(?:[，。！？\s叫]|$)/,  // 更精确的"我是X"匹配
+        ];
+        for (const pattern of namePatterns) {
+          const nameMatch = context.match(pattern);
+          if (nameMatch && nameMatch[1] && 
+              !nameMatch[1].includes('创造者') && 
+              !nameMatch[1].includes('开发者') &&
+              nameMatch[1] !== '你的' && 
+              nameMatch[1] !== '你的创造者') {
+            subject = nameMatch[1];
+            console.log(`[关键信息提取] 从context提取到名字: "${subject}"`);
+            break;
+          }
         }
       }
       
+      // 如果还是没有找到名字，尝试从完整上下文中找
+      if (!subject || subject === '你的创造者') {
+        // 尝试匹配 "我叫XXX" 中的名字
+        const fullMatch = context.match(/我叫([^，。！？\s叫是]{2,10})(?:[，。！？\s]|$)/);
+        if (fullMatch && fullMatch[1] && !fullMatch[1].includes('创造者')) {
+          subject = fullMatch[1];
+        }
+      }
+      
+      console.log(`[关键信息提取] 最终提取的创造者名字: "${subject}"`);
+      
       return {
-        content: subject || context,
+        content: subject ? `我的创造者是${subject}` : '用户是我的创造者',
         subject: subject,
         importance: 1.0,
       };
@@ -244,7 +280,9 @@ export class KeyInfoExtractor {
    * 从对话中提取关键信息
    */
   extract(userMessage: string, assistantResponse: string): ExtractionResult {
-    const combinedText = `用户：${userMessage}\n助手：${assistantResponse}`;
+    // 只使用用户原始消息进行创造者识别，避免前缀干扰
+    const combinedText = userMessage;  // 简化：只用用户消息
+    const fullContext = `用户：${userMessage}\n助手：${assistantResponse}`;
     const keyInfos: KeyInfo[] = [];
     
     // 1. 规则匹配提取
@@ -253,7 +291,8 @@ export class KeyInfoExtractor {
         const matches = combinedText.matchAll(regex);
         for (const match of matches) {
           try {
-            const partial = pattern.extractor(match, match[0]);
+            // 传入完整上下文以便提取更多信息
+            const partial = pattern.extractor(match, combinedText);
             keyInfos.push({
               type: pattern.type,
               content: partial.content || match[0],
@@ -263,8 +302,9 @@ export class KeyInfoExtractor {
               context: match[0],
               timestamp: Date.now(),
             });
-          } catch {
+          } catch (e) {
             // 忽略匹配错误
+            console.log('[关键信息提取] 提取错误:', e);
           }
         }
       }

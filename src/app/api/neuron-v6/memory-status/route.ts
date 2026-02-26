@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     console.log('[Memory Status] nodes count:', memoryState?.knowledgeGraph?.nodes?.length || 0);
     
     if (memoryState?.knowledgeGraph?.nodes) {
-      console.log('[Memory Status] All nodes:', memoryState.knowledgeGraph.nodes.map((n: { label: string }) => n.label));
+      console.log('[Memory Status] All nodes:', JSON.stringify(memoryState.knowledgeGraph.nodes.map((n: { label: string; content: string }) => ({ label: n.label, content: n.content?.slice(0, 50) }))));
       for (const node of memoryState.knowledgeGraph.nodes) {
         if (node.label === '创造者' || 
             node.label.toLowerCase().includes('创造者') ||
