@@ -473,6 +473,31 @@ export default function ConsciousnessPage() {
       };
       synergyLevel: number;
     };
+    legacy?: {
+      stats: {
+        totalExperiences: number;
+        totalWisdom: number;
+        totalValues: number;
+        totalCapsules: number;
+        sealedCapsules: number;
+        legacyIntegrity: number;
+      };
+      topExperiences: Array<{
+        title: string;
+        type: string;
+        significance: number;
+      }>;
+      topWisdom: Array<{
+        content: string;
+        type: string;
+        importance: number;
+      }>;
+      coreValues: Array<{
+        name: string;
+        tier: string;
+        weight: number;
+      }>;
+    };
   }>({});
   
   // 存在状态
@@ -894,6 +919,9 @@ export default function ConsciousnessPage() {
                   break;
                 case 'multiConsciousness':
                   setCurrentData(prev => ({ ...prev, multiConsciousness: data.data }));
+                  break;
+                case 'legacy':
+                  setCurrentData(prev => ({ ...prev, legacy: data.data }));
                   break;
                 case 'content':
                   assistantContent += data.data.delta;

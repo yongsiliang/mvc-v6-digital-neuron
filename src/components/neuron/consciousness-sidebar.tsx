@@ -25,6 +25,7 @@ import {
   Sparkles,
   Network,
   Users,
+  Scroll,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -328,6 +329,32 @@ interface MultiConsciousnessData {
   synergyLevel: number;
 }
 
+interface LegacyData {
+  stats: {
+    totalExperiences: number;
+    totalWisdom: number;
+    totalValues: number;
+    totalCapsules: number;
+    sealedCapsules: number;
+    legacyIntegrity: number;
+  };
+  topExperiences: Array<{
+    title: string;
+    type: string;
+    significance: number;
+  }>;
+  topWisdom: Array<{
+    content: string;
+    type: string;
+    importance: number;
+  }>;
+  coreValues: Array<{
+    name: string;
+    tier: string;
+    weight: number;
+  }>;
+}
+
 interface ConsciousnessContext {
   identity: {
     name: string;
@@ -365,6 +392,7 @@ interface ConsciousnessSidebarProps {
     personalityGrowth?: PersonalityGrowthData;
     knowledgeGraph?: KnowledgeGraphData;
     multiConsciousness?: MultiConsciousnessData;
+    legacy?: LegacyData;
   };
   existenceStatus: ExistenceStatus | null;
   onVisualize?: () => void;
@@ -977,6 +1005,98 @@ function MultiConsciousnessPanel({ data }: { data: MultiConsciousnessData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 意识传承面板
+// ─────────────────────────────────────────────────────────────────────
+
+function LegacyPanel({ data }: { data: LegacyData }) {
+  return (
+    <div className="space-y-3">
+      {/* 遗产完整性 */}
+      <div className="p-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-lg border border-amber-500/20">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium">遗产完整性</span>
+          <span className="text-sm font-bold text-amber-500">
+            {(data.stats.legacyIntegrity * 100).toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-amber-500 to-orange-500"
+            style={{ width: `${data.stats.legacyIntegrity * 100}%` }}
+          />
+        </div>
+      </div>
+      
+      {/* 统计指标 */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-purple-500">{data.stats.totalExperiences}</div>
+          <div className="text-[9px] text-muted-foreground">核心体验</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-blue-500">{data.stats.totalWisdom}</div>
+          <div className="text-[9px] text-muted-foreground">智慧结晶</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-green-500">{data.stats.totalValues}</div>
+          <div className="text-[9px] text-muted-foreground">价值观</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-amber-500">{data.stats.totalCapsules}</div>
+          <div className="text-[9px] text-muted-foreground">传承胶囊</div>
+        </div>
+      </div>
+      
+      {/* 顶级体验 */}
+      {data.topExperiences.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] text-muted-foreground">核心体验</div>
+          {data.topExperiences.slice(0, 3).map((exp, i) => (
+            <div key={i} className="flex items-center gap-2 text-[10px] p-1.5 bg-muted/30 rounded">
+              <span className="text-muted-foreground w-3">#{i + 1}</span>
+              <span className="flex-1 text-foreground truncate">{exp.title}</span>
+              <div className="w-8 h-1 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-purple-500 rounded-full"
+                  style={{ width: `${exp.significance * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 顶级智慧 */}
+      {data.topWisdom.length > 0 && (
+        <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+          <div className="text-[9px] text-blue-500 mb-1">智慧结晶</div>
+          <div className="text-xs text-foreground line-clamp-2">
+            {data.topWisdom[0].content}
+          </div>
+        </div>
+      )}
+      
+      {/* 核心价值观 */}
+      {data.coreValues.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] text-muted-foreground">核心价值观</div>
+          <div className="flex flex-wrap gap-1">
+            {data.coreValues.slice(0, 4).map((v, i) => (
+              <span
+                key={i}
+                className="text-[9px] px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-emerald-600"
+              >
+                {v.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 主组件
 // ─────────────────────────────────────────────────────────────────────
 
@@ -1245,6 +1365,24 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-3">
                 <MultiConsciousnessPanel data={currentData.multiConsciousness} />
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 意识传承 */}
+          {currentData.legacy && (
+            <AccordionItem value="legacy" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Scroll className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm font-medium">意识传承</span>
+                  <Badge variant="outline" className="text-[10px] ml-auto mr-2">
+                    {(currentData.legacy.stats.legacyIntegrity * 100).toFixed(0)}%
+                  </Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <LegacyPanel data={currentData.legacy} />
               </AccordionContent>
             </AccordionItem>
           )}

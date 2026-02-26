@@ -307,6 +307,16 @@ export async function POST(request: NextRequest) {
             });
           }
           
+          // 发送意识传承状态
+          if (result.legacy) {
+            send('legacy', {
+              stats: result.legacy.stats,
+              topExperiences: result.legacy.topExperiences,
+              topWisdom: result.legacy.topWisdom,
+              coreValues: result.legacy.coreValues,
+            });
+          }
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           

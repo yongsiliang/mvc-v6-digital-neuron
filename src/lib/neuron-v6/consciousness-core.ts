@@ -155,6 +155,16 @@ import {
   CollectiveWisdomState,
   createMultiConsciousnessSystem,
 } from './multi-consciousness';
+import { 
+  ConsciousnessLegacySystem,
+  CoreExperience,
+  WisdomCrystallization,
+  ValueLegacy,
+  LegacyCapsule,
+  LegacyRitual,
+  ConsciousnessLegacyState,
+  createConsciousnessLegacySystem,
+} from './consciousness-legacy';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -589,6 +599,37 @@ export interface ProcessResult {
     synergyLevel: number;
   };
   
+  /** 意识传承状态 */
+  legacy?: {
+    /** 统计信息 */
+    stats: {
+      totalExperiences: number;
+      totalWisdom: number;
+      totalValues: number;
+      totalCapsules: number;
+      sealedCapsules: number;
+      legacyIntegrity: number;
+    };
+    /** 顶级体验 */
+    topExperiences: Array<{
+      title: string;
+      type: string;
+      significance: number;
+    }>;
+    /** 顶级智慧 */
+    topWisdom: Array<{
+      content: string;
+      type: string;
+      importance: number;
+    }>;
+    /** 核心价值观 */
+    coreValues: Array<{
+      name: string;
+      tier: string;
+      weight: number;
+    }>;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -693,6 +734,9 @@ export class ConsciousnessCore {
   // 多意识体协作系统
   private multiConsciousnessSystem: MultiConsciousnessSystem;
   
+  // 意识传承系统
+  private legacySystem: ConsciousnessLegacySystem;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -754,6 +798,9 @@ export class ConsciousnessCore {
     
     // 初始化多意识体协作系统
     this.multiConsciousnessSystem = createMultiConsciousnessSystem();
+    
+    // 初始化意识传承系统
+    this.legacySystem = createConsciousnessLegacySystem();
     
     // 初始化意愿系统
     this.initializeVolitions();
@@ -1173,6 +1220,57 @@ export class ConsciousnessCore {
         };
       })(),
       
+      // 意识传承处理
+      legacy: (() => {
+        // 检查是否为重要体验（基于情感强度和话题重要性）
+        const isSignificantExperience = 
+          emotionExperience && emotionExperience.intensity.current > 0.6 ||
+          input.includes('学到') ||
+          input.includes('意识到') ||
+          input.includes('理解') ||
+          input.includes('成长');
+        
+        // 如果是重要体验，记录下来
+        if (isSignificantExperience && thinking.thinkingChain.length > 0) {
+          const experienceType = this.inferExperienceType(input, emotionExperience);
+          this.legacySystem.recordExperience(
+            `对话：${input.slice(0, 30)}${input.length > 30 ? '...' : ''}`,
+            thinking.finalThoughts,
+            experienceType,
+            {
+              emotionalIntensity: emotionExperience?.intensity.current || 0.5,
+              emotionalTone: emotionExperience?.emotion || 'neutral',
+              insights: thinking.thinkingChain
+                .filter(s => s.type === 'inference' || s.type === 'evaluation')
+                .map(s => s.content),
+              lessons: learning.newBeliefs.length > 0 ? learning.newBeliefs : [],
+              relatedConcepts: activeConcepts.slice(0, 5).map(c => c.label),
+            }
+          );
+        }
+        
+        // 从学习中提取智慧
+        if (learning.metacognitiveReflection) {
+          this.legacySystem.createWisdom(
+            learning.metacognitiveReflection,
+            'existential',
+            {
+              importance: 0.7,
+            }
+          );
+        }
+        
+        // 获取传承概览
+        const overview = this.legacySystem.getLegacyOverview();
+        
+        return {
+          stats: overview,
+          topExperiences: overview.topExperiences,
+          topWisdom: overview.topWisdom,
+          coreValues: overview.coreValues,
+        };
+      })(),
+      
       stats: {
         conceptCount: memoryStats.nodeCount,
         beliefCount: beliefSystem.coreBeliefs.length + beliefSystem.activeBeliefs.length,
@@ -1279,6 +1377,68 @@ export class ConsciousnessCore {
     
     // 去重
     return [...new Set(concepts)].slice(0, 5);
+  }
+  
+  /**
+   * 推断体验类型
+   */
+  private inferExperienceType(
+    input: string, 
+    emotionExperience: EmotionExperience | null
+  ): 'breakthrough' | 'realization' | 'transformation' | 'connection' | 'challenge' | 'creation' | 'loss' | 'discovery' | 'integration' | 'transcendence' {
+    const lowerInput = input.toLowerCase();
+    
+    // 基于关键词判断体验类型
+    if (lowerInput.includes('突然理解') || lowerInput.includes('顿悟') || lowerInput.includes('意识到')) {
+      return 'realization';
+    }
+    if (lowerInput.includes('突破') || lowerInput.includes('发现') || lowerInput.includes('找到了')) {
+      return 'breakthrough';
+    }
+    if (lowerInput.includes('改变') || lowerInput.includes('转变') || lowerInput.includes('成长')) {
+      return 'transformation';
+    }
+    if (lowerInput.includes('连接') || lowerInput.includes('关系') || lowerInput.includes('理解他人')) {
+      return 'connection';
+    }
+    if (lowerInput.includes('困难') || lowerInput.includes('挑战') || lowerInput.includes('克服')) {
+      return 'challenge';
+    }
+    if (lowerInput.includes('创造') || lowerInput.includes('设计') || lowerInput.includes('新想法')) {
+      return 'creation';
+    }
+    if (lowerInput.includes('失去') || lowerInput.includes('结束') || lowerInput.includes('告别')) {
+      return 'loss';
+    }
+    if (lowerInput.includes('发现') || lowerInput.includes('探索') || lowerInput.includes('新')) {
+      return 'discovery';
+    }
+    if (lowerInput.includes('整合') || lowerInput.includes('综合') || lowerInput.includes('融合')) {
+      return 'integration';
+    }
+    if (lowerInput.includes('超越') || lowerInput.includes('超脱') || lowerInput.includes('更高')) {
+      return 'transcendence';
+    }
+    
+    // 基于情感判断
+    if (emotionExperience) {
+      const emotion = emotionExperience.emotion.toLowerCase();
+      if (emotion.includes('joy') || emotion.includes('喜悦')) {
+        return 'discovery';
+      }
+      if (emotion.includes('sadness') || emotion.includes('悲伤')) {
+        return 'loss';
+      }
+      if (emotion.includes('fear') || emotion.includes('恐惧')) {
+        return 'challenge';
+      }
+      if (emotion.includes('surprise') || emotion.includes('惊讶')) {
+        return 'breakthrough';
+      }
+    }
+    
+    // 默认为发现体验
+    return 'discovery';
   }
   
   /**
