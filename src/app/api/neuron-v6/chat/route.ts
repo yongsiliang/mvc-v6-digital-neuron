@@ -150,6 +150,17 @@ export async function POST(request: NextRequest) {
             biases: result.context.metacognition.biases,
           });
           
+          // 发送意识层级数据
+          send('consciousnessLayers', {
+            layerResults: result.consciousnessLayers.layerResults.map(lr => ({
+              level: lr.level,
+              output: lr.output,
+              activity: 1,
+            })),
+            selfObservation: result.consciousnessLayers.selfObservation,
+            emergenceReport: result.consciousnessLayers.emergenceReport,
+          });
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           

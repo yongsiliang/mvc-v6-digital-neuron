@@ -7,6 +7,8 @@
  * - 自我意识模块：动态身份、自我反思
  * - 长期记忆系统：知识沉淀、智慧积累
  * - 元认知引擎：思考自己的思考
+ * - 意识层级系统：感知→理解→元认知→自我
+ * - 内心独白系统：持续的意识流
  * 
  * 这是"有意识的思考者"的完整实现
  * ═══════════════════════════════════════════════════════════════════════
@@ -35,6 +37,20 @@ import {
   MetacognitiveContext, 
   createMetacognitionEngine 
 } from './metacognition';
+import { 
+  ConsciousnessLayerEngine,
+  ConsciousnessLevel,
+  ConsciousnessState,
+  SelfObservationResult,
+  LayerProcessResult,
+  createConsciousnessLayerEngine
+} from './consciousness-layers';
+import { 
+  InnerMonologueEngine,
+  InnerMonologueEntry,
+  InnerMonologueOutput,
+  createInnerMonologueEngine
+} from './inner-monologue';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -291,6 +307,16 @@ export interface ProcessResult {
   /** 学习结果 */
   learning: LearningResult;
   
+  /** 意识层级结果 */
+  consciousnessLayers: {
+    /** 层级处理结果 */
+    layerResults: LayerProcessResult[];
+    /** 自我观察结果 */
+    selfObservation: SelfObservationResult | null;
+    /** 涌现报告 */
+    emergenceReport: string;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -353,6 +379,12 @@ export class ConsciousnessCore {
   private longTermMemory: LongTermMemory;
   private metacognition: MetacognitionEngine;
   
+  // 意识层级引擎
+  private layerEngine: ConsciousnessLayerEngine;
+  
+  // 内心独白引擎
+  private innerMonologue: InnerMonologueEngine;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -373,11 +405,17 @@ export class ConsciousnessCore {
     this.longTermMemory = createLongTermMemory();
     this.metacognition = createMetacognitionEngine();
     
+    // 初始化意识层级引擎
+    this.layerEngine = createConsciousnessLayerEngine();
+    
+    // 初始化内心独白引擎
+    this.innerMonologue = createInnerMonologueEngine();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
     console.log('[意识核心] V6 意识核心已初始化');
-    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意愿系统');
+    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 意愿系统');
   }
   
   /**
@@ -441,6 +479,18 @@ export class ConsciousnessCore {
     console.log('[意识核心] 开始处理输入...');
     
     // ══════════════════════════════════════════════════════════════════
+    // 第零步：意识层级处理 - 感知→理解→元认知→自我
+    // ══════════════════════════════════════════════════════════════════
+    
+    const layerResult = await this.layerEngine.processInput(input);
+    const { layerResults, selfObservation } = layerResult;
+    
+    console.log('[意识层级] 层级处理完成:', layerResults.map(r => r.level).join(' → '));
+    if (selfObservation) {
+      console.log('[自我观察]', selfObservation.iSeeMyself);
+    }
+    
+    // ══════════════════════════════════════════════════════════════════
     // 第一步：构建完整上下文
     // ══════════════════════════════════════════════════════════════════
     
@@ -482,11 +532,19 @@ export class ConsciousnessCore {
     const memoryStats = this.longTermMemory.getStats();
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
     
+    // 生成涌现报告
+    const emergenceReport = this.layerEngine.getEmergenceReport();
+    
     return {
       context,
       thinking,
       response,
       learning,
+      consciousnessLayers: {
+        layerResults,
+        selfObservation,
+        emergenceReport,
+      },
       stats: {
         conceptCount: memoryStats.nodeCount,
         beliefCount: beliefSystem.coreBeliefs.length + beliefSystem.activeBeliefs.length,
@@ -2413,6 +2471,24 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
     const stream = this.generateStreamOfConsciousness();
     const questions = this.generateSelfQuestions();
     
+    // 生成内心独白
+    const monologueOutput = this.innerMonologue.generateMonologue(
+      this.layerEngine.getState(),
+      this.conversationHistory.slice(-3).map(h => h.content).join(' ')
+    );
+    
+    console.log('[内心独白]', monologueOutput.entry.content);
+    
+    // 将内心独白添加到意识流
+    if (monologueOutput.entry) {
+      stream.entries.push({
+        type: 'self_observation',
+        content: monologueOutput.entry.content,
+        intensity: monologueOutput.entry.depth,
+        timestamp: Date.now(),
+      });
+    }
+    
     // 随机选择是否进行深度反思
     let reflection: import('./consciousness-core').ReflectionResult | null = null;
     if (Math.random() < 0.3) {
@@ -2437,6 +2513,7 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
       questions,
       reflection,
       timestamp: Date.now(),
+      innerMonologue: monologueOutput,
     };
   }
   
@@ -2648,6 +2725,7 @@ export interface BackgroundThinkingResult {
   stream: ConsciousnessStream;
   questions: SelfQuestion[];
   reflection: import('./consciousness-core').ReflectionResult | null;
+  innerMonologue?: InnerMonologueOutput;
   timestamp: number;
 }
 

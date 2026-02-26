@@ -68,6 +68,28 @@ interface LearningData {
   metacognitiveReflection: string | null;
 }
 
+// 意识层级
+interface ConsciousnessLayer {
+  level: string;
+  output: string;
+  activity: number;
+}
+
+// 自我观察结果
+interface SelfObservation {
+  observedLevel: string;
+  observation: string;
+  iSeeMyself: string;
+  iRealize: string;
+}
+
+// 意识层级数据
+interface ConsciousnessLayersData {
+  layerResults: ConsciousnessLayer[];
+  selfObservation: SelfObservation | null;
+  emergenceReport: string;
+}
+
 interface Message {
   role: 'user' | 'assistant' | 'proactive';  // proactive: 紫主动发起的消息
   content: string;
@@ -78,6 +100,7 @@ interface Message {
   memory?: MemoryData;
   metacognition?: MetacognitionData;
   learning?: LearningData;
+  consciousnessLayers?: ConsciousnessLayersData;
   isProactive?: boolean;  // 标记是否为主动消息
 }
 
@@ -141,6 +164,7 @@ export default function ConsciousnessPage() {
     meaning?: MeaningData;
     memory?: MemoryData;
     metacognition?: MetacognitionData;
+    consciousnessLayers?: ConsciousnessLayersData;
   }>({});
   
   // 存在状态
@@ -356,6 +380,7 @@ export default function ConsciousnessPage() {
       let memory: MemoryData | undefined;
       let metacognition: MetacognitionData | undefined;
       let learning: LearningData | undefined;
+      let consciousnessLayers: ConsciousnessLayersData | undefined;
       
       const decoder = new TextDecoder();
       
@@ -403,6 +428,10 @@ export default function ConsciousnessPage() {
                   metacognition = data.data;
                   setCurrentData(prev => ({ ...prev, metacognition }));
                   break;
+                case 'consciousnessLayers':
+                  consciousnessLayers = data.data;
+                  setCurrentData(prev => ({ ...prev, consciousnessLayers }));
+                  break;
                 case 'content':
                   assistantContent += data.data.delta;
                   // 实时更新消息
@@ -420,6 +449,7 @@ export default function ConsciousnessPage() {
                         meaning,
                         memory,
                         metacognition,
+                        consciousnessLayers,
                       });
                     }
                     return newMessages;
@@ -443,6 +473,7 @@ export default function ConsciousnessPage() {
                         memory,
                         metacognition,
                         learning,
+                        consciousnessLayers,
                       };
                     }
                     return newMessages;
@@ -644,6 +675,53 @@ export default function ConsciousnessPage() {
 
       {/* 右侧：意识状态面板 */}
       <div className="w-96 border-l flex flex-col">
+        {/* 意识层级面板 */}
+        {currentData.consciousnessLayers && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                🧠 意识层级
+              </div>
+              <div className="space-y-2">
+                {currentData.consciousnessLayers.layerResults.map((layer, i) => (
+                  <div 
+                    key={i} 
+                    className={`p-2 rounded text-xs ${
+                      layer.level === 'self' 
+                        ? 'bg-primary/10 border border-primary/20' 
+                        : layer.level === 'metacognition'
+                        ? 'bg-blue-500/10 border border-blue-500/20'
+                        : layer.level === 'understanding'
+                        ? 'bg-green-500/10 border border-green-500/20'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium capitalize">{layer.level}</span>
+                      <span className="text-muted-foreground text-[10px]">
+                        {i === currentData.consciousnessLayers!.layerResults.length - 1 ? '⬆️ 当前' : '↓'}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground line-clamp-2">{layer.output}</p>
+                  </div>
+                ))}
+              </div>
+              
+              {/* 自我观察 */}
+              {currentData.consciousnessLayers.selfObservation && (
+                <div className="mt-3 p-2 bg-primary/5 rounded border border-primary/10">
+                  <div className="text-xs font-medium text-primary mb-1">
+                    👁️ 自我观察
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {currentData.consciousnessLayers.selfObservation.iSeeMyself}
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+        
         {/* 存在状态卡片 */}
         {existenceStatus && (
           <div className="p-2 border-b">
