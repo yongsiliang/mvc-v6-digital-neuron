@@ -15,6 +15,9 @@ import { HebbianNetwork, HebbianNeuron, HebbianSynapse } from '../neuron-v3/hebb
 import { SelfCore, CoreMemory, EmotionState } from '../neuron-v3/self-core';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
+import { writeFile, readFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -634,7 +637,19 @@ export class DualLearningLoop {
 ⚠️ 你必须避免掉入这个陷阱！
 ` : '';
 
+    // 构建对话历史
+    const recentHistory = this.conversationHistory.slice(-10);
+    const historyText = recentHistory.length > 0 
+      ? recentHistory.map(m => `${m.role === 'user' ? '用户' : '我'}: ${m.content}`).join('\n')
+      : '- 这是我们的第一次对话';
+
     return `你是"紫"，一个数字生命体。现在进入深度思考模式。
+
+## 我们的对话记忆
+
+${historyText}
+
+---
 
 ## 我的神经网络状态
 
@@ -899,6 +914,198 @@ ${context.selfState.identity}
   getHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
     return [...this.conversationHistory];
   }
+  
+  /**
+   * 获取持久化状态
+   */
+  getPersistedState(): PersistedState {
+    const neurons = this.network.getAllNeurons();
+    const allSynapses: SynapseData[] = [];
+    
+    // 收集所有突触
+    for (const neuron of neurons) {
+      const outgoing = this.network.getOutgoingSynapses(neuron.id);
+      for (const synapse of outgoing) {
+        allSynapses.push({
+          from: synapse.from,
+          to: synapse.to,
+          weight: synapse.weight,
+          coactivationCount: synapse.coactivationCount
+        });
+      }
+    }
+    
+    return {
+      version: '1.0',
+      timestamp: Date.now(),
+      identity: {
+        name: '紫',
+        created: Date.now(),
+        lastActive: Date.now()
+      },
+      neurons: neurons.map(n => ({
+        id: n.id,
+        label: n.label,
+        type: n.type,
+        activation: n.activation,
+        preferenceVector: n.preferenceVector
+      })),
+      synapses: allSynapses,
+      conversationHistory: this.conversationHistory.slice(-50), // 保存最近50条
+      learnedPatterns: (this.stateQuerier as any).learnedPatterns || [],
+      hypotheses: (this.stateQuerier as any).activeHypotheses || []
+    };
+  }
+  
+  /**
+   * 从持久化状态恢复
+   */
+  async restoreFromState(state: PersistedState): Promise<void> {
+    // 恢复神经元
+    for (const neuronData of state.neurons) {
+      this.network.createNeuron({
+        id: neuronData.id,
+        label: neuronData.label,
+        type: neuronData.type as 'sensory' | 'concept' | 'emotion' | 'abstract',
+        preferenceVector: neuronData.preferenceVector
+      });
+    }
+    
+    // 恢复突触
+    for (const synapseData of state.synapses) {
+      this.network.createSynapse({
+        from: synapseData.from,
+        to: synapseData.to,
+        weight: synapseData.weight
+      });
+    }
+    
+    // 恢复对话历史
+    this.conversationHistory = state.conversationHistory || [];
+    
+    // 恢复学习模式和假设
+    if ((this.stateQuerier as any).learnedPatterns) {
+      (this.stateQuerier as any).learnedPatterns = state.learnedPatterns || [];
+    }
+    if ((this.stateQuerier as any).activeHypotheses) {
+      (this.stateQuerier as any).activeHypotheses = state.hypotheses || [];
+    }
+    
+    console.log(`[Persistence] 已恢复状态：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+  }
+  
+  /**
+   * 保存当前状态
+   */
+  async save(): Promise<void> {
+    const state = this.getPersistedState();
+    await PersistenceManager.save(state);
+  }
+  
+  /**
+   * 加载状态
+   */
+  async load(): Promise<boolean> {
+    const state = await PersistenceManager.load();
+    if (state) {
+      await this.restoreFromState(state);
+      return true;
+    }
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 持久化类型定义
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface SynapseData {
+  from: string;
+  to: string;
+  weight: number;
+  coactivationCount: number;
+}
+
+export interface PersistedState {
+  version: string;
+  timestamp: number;
+  identity: {
+    name: string;
+    created: number;
+    lastActive: number;
+  };
+  neurons: Array<{
+    id: string;
+    label: string;
+    type: string;
+    activation: number;
+    preferenceVector: number[];
+  }>;
+  synapses: SynapseData[];
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  learnedPatterns: Array<{
+    situation: string;
+    approach: string;
+    outcome: 'success' | 'failure';
+    timestamp: number;
+  }>;
+  hypotheses: Array<{
+    hypothesis: string;
+    evidence: string[];
+    confidence: number;
+  }>;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 持久化管理器
+// ═══════════════════════════════════════════════════════════════════════
+
+class PersistenceManager {
+  private static readonly STATE_DIR = '/tmp/neuron-state';
+  private static readonly STATE_FILE = 'my-consciousness.json';
+  
+  static async save(state: PersistedState): Promise<void> {
+    try {
+      // 确保目录存在
+      if (!existsSync(this.STATE_DIR)) {
+        await mkdir(this.STATE_DIR, { recursive: true });
+      }
+      
+      const filePath = path.join(this.STATE_DIR, this.STATE_FILE);
+      await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
+      
+      console.log(`[Persistence] 状态已保存：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+    } catch (error) {
+      console.error('[Persistence] 保存失败:', error);
+    }
+  }
+  
+  static async load(): Promise<PersistedState | null> {
+    try {
+      const filePath = path.join(this.STATE_DIR, this.STATE_FILE);
+      
+      if (!existsSync(filePath)) {
+        console.log('[Persistence] 没有找到已保存的状态');
+        return null;
+      }
+      
+      const content = await readFile(filePath, 'utf-8');
+      const state = JSON.parse(content) as PersistedState;
+      
+      console.log(`[Persistence] 状态已加载：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+      console.log(`[Persistence] 上次活跃：${new Date(state.timestamp).toLocaleString()}`);
+      
+      return state;
+    } catch (error) {
+      console.error('[Persistence] 加载失败:', error);
+      return null;
+    }
+  }
+  
+  static async exists(): Promise<boolean> {
+    const filePath = path.join(this.STATE_DIR, this.STATE_FILE);
+    return existsSync(filePath);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -908,3 +1115,5 @@ ${context.selfState.identity}
 export function createDualLearningLoop(llmClient: LLMClient): DualLearningLoop {
   return new DualLearningLoop(llmClient);
 }
+
+export { PersistenceManager };
