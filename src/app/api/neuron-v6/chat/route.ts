@@ -176,11 +176,15 @@ export async function POST(request: NextRequest) {
             stats: result.stats,
           });
           
+          // 关闭流
+          controller.close();
+          
         } catch (error) {
           console.error('[V6] 处理错误:', error);
           send('error', {
             message: error instanceof Error ? error.message : 'Unknown error',
           });
+          controller.close();
         }
       },
     });

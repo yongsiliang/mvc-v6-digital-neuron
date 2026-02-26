@@ -238,14 +238,17 @@ export default function ConsciousnessPage() {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+    if (input.trim() === '' || isLoading) return;
     
     const userMessage = input.trim();
     setInput('');
     setIsLoading(true);
     
     // 添加用户消息
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setMessages(prev => [...prev, { role: 'user', content: userMessage, timestamp: Date.now() }]);
+    
+    // 超时保护：60秒后自动结束
+    let timeoutId: NodeJS.Timeout | null = null;
     
     try {
       const response = await fetch('/api/neuron-v6/chat', {
@@ -253,6 +256,10 @@ export default function ConsciousnessPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No reader');
@@ -267,6 +274,12 @@ export default function ConsciousnessPage() {
       
       const decoder = new TextDecoder();
       
+      // 设置超时
+      timeoutId = setTimeout(() => {
+        console.warn('[V6] 响应超时，自动结束');
+        setIsLoading(false);
+      }, 60000);
+      
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -278,6 +291,11 @@ export default function ConsciousnessPage() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+              
+              // 收到完成或错误信号，清除超时
+              if (data.type === 'complete' || data.type === 'error') {
+                if (timeoutId) clearTimeout(timeoutId);
+              }
               
               switch (data.type) {
                 case 'context':
@@ -359,6 +377,7 @@ export default function ConsciousnessPage() {
         content: '抱歉，我在思考中遇到了一些问题...' 
       }]);
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
