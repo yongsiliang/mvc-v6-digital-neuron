@@ -463,3 +463,68 @@ export const neuronV3LearningEvents = pgTable("neuron_v3_learning_events", {
 	index("neuron_v3_events_user_idx").using("btree", table.userId.asc().nullsLast().op("text_ops")),
 	index("neuron_v3_events_time_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
 ]);
+
+// ═══════════════════════════════════════════════════════════════════════
+// 类型导出 - 为旧版模块提供兼容类型
+// ═══════════════════════════════════════════════════════════════════════
+
+// 推断类型
+export type NeuronMemory = typeof neuronMemories.$inferSelect;
+export type NeuronMemoryInsert = typeof neuronMemories.$inferInsert;
+
+export type LearnedAngle = {
+  id: string;
+  userId: string;
+  angleName: string;
+  angleValue: number;
+  angle?: number;  // 兼容旧版
+  confidence: number;
+  createdAt: string;
+};
+
+// 旧版模块兼容类型
+export type MeaningMemory = {
+  id: string;
+  content: string;
+  meaningType: string;
+  importance: number;
+  createdAt: string;
+  meaningSummary?: string;  // 旧版使用
+  emotionalWeight?: number;
+  meaningVector?: number[];
+  connectedMemoryIds?: string[];
+};
+
+export type MeaningConnection = {
+  fromMemoryId: string;
+  toMemoryId: string;
+  connectionType: string;
+  strength: number;
+};
+
+export type MeaningType = 
+  | 'semantic' 
+  | 'episodic' 
+  | 'emotional' 
+  | 'procedural'
+  | 'insight'
+  | 'pattern'
+  | 'strategy'
+  | 'emotion'
+  | 'concept';
+
+export type ConnectionType = 
+  | 'excitatory' 
+  | 'inhibitory' 
+  | 'modulatory'
+  | 'complementary'
+  | 'similar'
+  | 'contrastive';
+
+export type TriggerSource = 
+  | 'user_input' 
+  | 'internal' 
+  | 'timer' 
+  | 'external'
+  | 'input'
+  | 'resonance';

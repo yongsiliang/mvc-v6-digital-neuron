@@ -659,6 +659,13 @@ export class VSASemanticSpace {
   }
 
   /**
+   * 获取所有概念条目
+   */
+  getAllConcepts(): Map<string, ConceptEntry> {
+    return this.concepts;
+  }
+
+  /**
    * 导出状态
    */
   exportState(): {

@@ -75,13 +75,17 @@ const DEFAULT_PERSISTENCE_CONFIG: PersistenceConfig = {
 
 /**
  * 保存的神经元数据
+ * 
+ * 注意：类型与数据库 schema 保持一致
+ * - emergentLayer: integer in DB
+ * - createdAt/updatedAt: timestamp with mode 'string'
  */
 export interface SavedNeuron {
   id: string;
   label: string | null;
   labelSource: 'human' | 'inferred' | 'learned' | null;
   functionalRole: string;
-  emergentLayer: string | null;
+  emergentLayer: number;  // DB: integer
   sensitivityVector: number[];
   sensitivityDimension: number;
   sensitivityPlasticity: number;
@@ -94,7 +98,7 @@ export interface SavedNeuron {
   connectionChanges: number;
   usefulness: number;
   source: string;
-  createdAt: string;
+  createdAt: string | null;  // DB: timestamp with mode 'string', can be null
   updatedAt: string | null;
 }
 
@@ -114,7 +118,7 @@ export interface SavedConnection {
   totalActivations: number;
   averageActivationStrength: number;
   source: string;
-  createdAt: string;
+  createdAt: string | null;  // DB: timestamp with mode 'string', can be null
 }
 
 /**
@@ -122,7 +126,7 @@ export interface SavedConnection {
  */
 export interface SavedMemory {
   id: string;
-  userId: string;
+  userId: string | null;  // DB: can be null
   content: string;
   type: MemoryType;
   importance: number;
@@ -135,7 +139,7 @@ export interface SavedMemory {
   tags: string[];
   recallCount: number;
   lastRecalledAt: string | null;
-  createdAt: string;
+  createdAt: string | null;  // DB: timestamp with mode 'string', can be null
 }
 
 /**
@@ -459,12 +463,24 @@ export class PersistenceManager {
   // ─────────────────────────────────────────────────────────────────
 
   private neuronToSaved(neuron: Neuron): SavedNeuron {
+    // 将 EmergentLayer 字符串转换为数字
+    const layerToNumber = (layer: string | null): number => {
+      const mapping: Record<string, number> = {
+        'sensory': 0,
+        'conceptual': 1,
+        'emotional': 2,
+        'episodic': 3,
+        'integrative': 4,
+      };
+      return layer ? (mapping[layer] ?? 0) : 0;
+    };
+
     return {
       id: neuron.id,
       label: neuron.label || null,
       labelSource: neuron.labelSource || null,
       functionalRole: neuron.functionalRole,
-      emergentLayer: neuron.emergentLayer || null,
+      emergentLayer: layerToNumber(neuron.emergentLayer),
       sensitivityVector: neuron.sensitivity,
       sensitivityDimension: neuron.sensitivityDimension,
       sensitivityPlasticity: neuron.sensitivityPlasticity,
@@ -556,7 +572,7 @@ export class PersistenceManager {
       id: saved.id,
       content: saved.content,
       type: saved.type,
-      createdAt: new Date(saved.createdAt).getTime(),
+      createdAt: saved.createdAt ? new Date(saved.createdAt).getTime() : Date.now(),
       lastRecalledAt: saved.lastRecalledAt ? new Date(saved.lastRecalledAt).getTime() : undefined,
       recallCount: saved.recallCount,
       importance: saved.importance,

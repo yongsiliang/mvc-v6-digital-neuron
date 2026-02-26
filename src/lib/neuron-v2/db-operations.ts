@@ -73,12 +73,14 @@ export async function getUserByExternalId(externalAuthId: string): Promise<UserI
 
 /**
  * 保存神经元
+ * 
+ * 注意：不传递 id 字段，让数据库自动生成
  */
 export async function saveNeuron(userId: UserId, neuron: SavedNeuron): Promise<void> {
   await db
     .insert(neuronsV2)
     .values({
-      id: neuron.id,
+      // id: 不传递，让数据库自动生成
       userId,
       label: neuron.label,
       labelSource: neuron.labelSource,
@@ -93,10 +95,10 @@ export async function saveNeuron(userId: UserId, neuron: SavedNeuron): Promise<v
       lastActivatedAt: neuron.lastActivatedAt,
       totalActivations: neuron.totalActivations,
       averageActivation: neuron.averageActivation,
-      connectionChanges: neuron.connectionChanges,
+      connectionChanges: neuron.connectionChanges ?? 0,  // 确保不为 null
       usefulness: neuron.usefulness,
       source: neuron.source,
-      createdAt: neuron.createdAt,
+      // createdAt: 不传递，让数据库自动生成
       updatedAt: neuron.updatedAt,
     })
     .onConflictDoUpdate({
