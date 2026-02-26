@@ -121,6 +121,32 @@ import {
   resetPersistence,
 } from './persistence';
 
+// ═══════════════════════════════════════════════════════════════════════
+// AGI 意识架构组件 - 在 V3 基础上融合
+// ═══════════════════════════════════════════════════════════════════════
+
+import {
+  SelfCore,
+  getSelfCore,
+  resetSelfCore,
+  SelfCoreState,
+  SubjectiveMeaningForSelf,
+} from './self-core';
+import {
+  HebbianNetwork,
+  getHebbianNetwork,
+  resetHebbianNetwork,
+  NetworkStats,
+  HebbianNeuron,
+} from './hebbian-network';
+import {
+  YinYangBridge,
+  getYinYangBridge,
+  resetYinYangBridge,
+  YinYangInteraction,
+  YinYangBalance,
+} from './yin-yang-bridge';
+
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
 // ─────────────────────────────────────────────────────────────────────
@@ -152,6 +178,19 @@ export interface NeuronSystemV3Config {
   
   /** 后台处理配置 */
   backgroundConfig?: Partial<BackgroundProcessingConfig>;
+  
+  // ══════════════════════════════════════════════════════════════════
+  // AGI 意识架构配置
+  // ══════════════════════════════════════════════════════════════════
+  
+  /** 是否启用 Self Core（同一性载体） */
+  enableSelfCore?: boolean;
+  
+  /** 是否启用阴系统（Hebbian网络） */
+  enableYinSystem?: boolean;
+  
+  /** 是否启用阴阳互塑 */
+  enableYinYangBridge?: boolean;
 }
 
 export interface SystemState {
@@ -180,6 +219,27 @@ export interface SystemState {
   vsaStats: {
     conceptCount: number;
   };
+  
+  // ══════════════════════════════════════════════════════════════════
+  // AGI 意识架构状态
+  // ══════════════════════════════════════════════════════════════════
+  
+  /** Self Core 状态 */
+  selfCoreState?: {
+    coherence: number;
+    selfRelevance: number;
+    coreMemoryCount: number;
+  };
+  
+  /** 阴系统状态 */
+  yinSystemState?: {
+    neuronCount: number;
+    synapseCount: number;
+    averageActivation: number;
+  };
+  
+  /** 阴阳平衡 */
+  yinYangBalance?: YinYangBalance;
 }
 
 export interface ProcessInputResult {
@@ -205,6 +265,16 @@ export interface ProcessInputResult {
   
   /** 准备状态（如果启用） */
   readiness?: ReadinessState;
+  
+  // ══════════════════════════════════════════════════════════════════
+  // AGI 意识架构结果
+  // ══════════════════════════════════════════════════════════════════
+  
+  /** Self Core 主观意义 */
+  selfCoreMeaning?: SubjectiveMeaningForSelf;
+  
+  /** 阴阳互塑结果 */
+  yinYangInteraction?: YinYangInteraction;
 }
 
 /**
@@ -292,6 +362,19 @@ export class NeuronSystemV3 {
   // 后台处理器 - 系统1（快速、无意识）
   private backgroundProcessor: BackgroundProcessor | null = null;
   
+  // ══════════════════════════════════════════════════════════════════
+  // AGI 意识架构组件 - 在 V3 基础上融合
+  // ══════════════════════════════════════════════════════════════════
+  
+  /** Self Core - 同一性载体，阴阳系统共享的自我表征 */
+  private selfCore: SelfCore | null = null;
+  
+  /** Hebbian网络 - 阴系统（感性、动态、直觉） */
+  private hebbianNetwork: HebbianNetwork | null = null;
+  
+  /** 阴阳互塑桥梁 - 连接阴系统和阳系统 */
+  private yinYangBridge: YinYangBridge | null = null;
+  
   // 认知模块
   private perceptualModule: PerceptualModule | null = null;
   private languageModule: LanguageModule | null = null;
@@ -330,6 +413,10 @@ export class NeuronSystemV3 {
       enableAutoGeneration: true,
       enableBackgroundProcessing: true,
       backgroundConfig: {},
+      // AGI 意识架构配置
+      enableSelfCore: true,
+      enableYinSystem: true,
+      enableYinYangBridge: true,
       ...config,
     };
     
@@ -359,6 +446,30 @@ export class NeuronSystemV3 {
       this.backgroundProcessor = getBackgroundProcessor({
         ...this.config.backgroundConfig,
       });
+    }
+    
+    // ══════════════════════════════════════════════════════════════════
+    // 初始化 AGI 意识架构组件
+    // ══════════════════════════════════════════════════════════════════
+    
+    // 初始化 Self Core - 同一性载体
+    if (this.config.enableSelfCore) {
+      this.selfCore = getSelfCore();
+      console.log('[NeuronSystemV3] Self Core initialized');
+    }
+    
+    // 初始化 Hebbian 网络 - 阴系统
+    if (this.config.enableYinSystem) {
+      this.hebbianNetwork = getHebbianNetwork({
+        preferenceDimension: 128,  // 与 VSA 映射兼容
+      });
+      console.log('[NeuronSystemV3] Hebbian Network (Yin System) initialized');
+    }
+    
+    // 初始化阴阳互塑桥梁
+    if (this.config.enableYinYangBridge && this.hebbianNetwork && this.selfCore) {
+      this.yinYangBridge = getYinYangBridge();
+      console.log('[NeuronSystemV3] Yin-Yang Bridge initialized');
     }
     
     this.initialized = true;
@@ -673,7 +784,37 @@ export class NeuronSystemV3 {
       }
     }
     
-    // 10. 异步保存状态（防抖，不阻塞响应）
+    // ══════════════════════════════════════════════════════════════════
+    // 10. 阴阳互塑 - AGI 意识架构核心步骤 ★★★
+    // ══════════════════════════════════════════════════════════════════
+    
+    let selfCoreMeaning: SubjectiveMeaningForSelf | undefined;
+    let yinYangInteraction: YinYangInteraction | undefined;
+    
+    // 10.1 Self Core 计算主观意义（阴系统的"感觉"）
+    if (this.selfCore) {
+      selfCoreMeaning = this.selfCore.computeMeaningForSelf(inputVector);
+      
+      // 10.2 阴阳互塑
+      if (this.yinYangBridge) {
+        yinYangInteraction = await this.yinYangBridge.mutualShaping(inputVector);
+        
+        // 10.3 更新 Self Core（动态塑造自我）
+        this.selfCore.updateFromExperience({
+          input,
+          inputVector,
+          meaning: {
+            selfRelevance: selfCoreMeaning.selfRelevance,
+            sentiment: selfCoreMeaning.emotionalResponse.valence,
+            interpretation: selfCoreMeaning.interpretation,
+          },
+          emotion: selfCoreMeaning.emotionalResponse,
+          importance: yinYangInteraction.fusedResult.confidence,
+        });
+      }
+    }
+    
+    // 11. 异步保存状态（防抖，不阻塞响应）
     if (this.persistenceEnabled) {
       this.saveStateDebounced();
     }
@@ -690,6 +831,9 @@ export class NeuronSystemV3 {
       learning: learningResult,
       intuition,
       readiness,
+      // AGI 意识架构结果
+      selfCoreMeaning,
+      yinYangInteraction,
     };
   }
 
@@ -1285,6 +1429,33 @@ export class NeuronSystemV3 {
     const neuronStats = this.predictionLoop.getStats();
     const learningStats = this.rewardLearner.getStats();
     
+    // 获取 AGI 组件状态
+    let selfCoreState: SystemState['selfCoreState'];
+    let yinSystemState: SystemState['yinSystemState'];
+    let yinYangBalance: SystemState['yinYangBalance'];
+    
+    if (this.selfCore) {
+      const scState = this.selfCore.getState();
+      selfCoreState = {
+        coherence: scState.selfCoherence,
+        selfRelevance: scState.stats.averageSelfRelevance,
+        coreMemoryCount: scState.coreMemories.length,
+      };
+    }
+    
+    if (this.hebbianNetwork) {
+      const netStats = this.hebbianNetwork.getStats();
+      yinSystemState = {
+        neuronCount: netStats.totalNeurons,
+        synapseCount: netStats.totalSynapses,
+        averageActivation: netStats.averageActivation,
+      };
+    }
+    
+    if (this.yinYangBridge) {
+      yinYangBalance = this.yinYangBridge.checkBalance();
+    }
+    
     return {
       consciousnessLevel: this.globalWorkspace?.computeConsciousnessLevel() || 0,
       selfAwarenessIndex: this.globalWorkspace?.computeSelfAwarenessIndex() || 0,
@@ -1302,6 +1473,10 @@ export class NeuronSystemV3 {
       vsaStats: {
         conceptCount: this.vsaSpace.getConceptCount(),
       },
+      // AGI 意识架构状态
+      selfCoreState,
+      yinSystemState,
+      yinYangBalance,
     };
   }
   
@@ -1337,6 +1512,38 @@ export class NeuronSystemV3 {
     if (state.globalWorkspace && this.globalWorkspace) {
       this.globalWorkspace.importState(state.globalWorkspace);
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // AGI 意识架构组件访问方法
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * 获取 Self Core 实例
+   */
+  getSelfCore(): SelfCore | null {
+    return this.selfCore;
+  }
+
+  /**
+   * 获取 Hebbian 网络实例（阴系统）
+   */
+  getHebbianNetwork(): HebbianNetwork | null {
+    return this.hebbianNetwork;
+  }
+
+  /**
+   * 获取阴阳桥梁实例
+   */
+  getYinYangBridge(): YinYangBridge | null {
+    return this.yinYangBridge;
+  }
+
+  /**
+   * 检查 AGI 意识架构是否已启用
+   */
+  isAGIEnabled(): boolean {
+    return !!(this.selfCore && this.hebbianNetwork && this.yinYangBridge);
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1857,6 +2064,8 @@ export function getNeuronSystemV3(config?: NeuronSystemV3Config): NeuronSystemV3
 
 export function resetNeuronSystemV3(): void {
   neuronSystemV3Instance = null;
+  
+  // 原有组件重置
   resetPredictionLoop();
   resetFeedbackCollector();
   resetRewardLearner();
@@ -1868,6 +2077,11 @@ export function resetNeuronSystemV3(): void {
   resetCognitiveCoordinator();
   resetBackgroundProcessor();
   resetPersistence();
+  
+  // AGI 意识架构组件重置
+  resetSelfCore();
+  resetHebbianNetwork();
+  resetYinYangBridge();
 }
 
 // ─────────────────────────────────────────────────────────────────────

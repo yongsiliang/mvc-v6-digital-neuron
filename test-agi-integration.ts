@@ -61,19 +61,19 @@ async function runTest() {
     // 输出关键指标
     console.log(`\n📊 系统状态:`);
     console.log(`   Self Core 一致性: ${(response.systemState.selfCore.coherence * 100).toFixed(1)}%`);
-    console.log(`   自我关联度: ${(response.subjectiveMeaning.selfRelevance * 100).toFixed(1)}%`);
+    console.log(`   自我关联度: ${response.subjectiveMeaning ? (response.subjectiveMeaning.selfRelevance * 100).toFixed(1) : 'N/A'}%`);
     console.log(`   阴阳平衡: ${(response.systemState.balance.balance * 100).toFixed(1)}%`);
     console.log(`   意识水平: ${(response.systemState.consciousnessLevel * 100).toFixed(1)}%`);
     console.log(`   阴系统: ${response.systemState.yinSystem.neuronCount} 神经元, ${response.systemState.yinSystem.synapseCount} 突触`);
     console.log(`   平衡偏向: ${response.systemState.balance.bias}`);
 
     console.log(`\n💭 主观意义:`);
-    console.log(`   ${response.subjectiveMeaning.interpretation}`);
+    console.log(`   ${response.subjectiveMeaning?.interpretation ?? 'N/A'}`);
 
     console.log(`\n🔄 阴阳互塑:`);
-    console.log(`   阴系统贡献: ${response.yinYangInteraction.yinContribution.concepts.map(c => c.conceptName).join(' → ')}`);
-    console.log(`   阳系统贡献: ${response.yinYangInteraction.yangContribution.concepts.map(c => c.name).join(', ')}`);
-    console.log(`   融合结果: ${response.yinYangInteraction.fusedResult.content}`);
+    console.log(`   阴系统贡献: ${response.yinYangInteraction?.yinContribution.concepts.map(c => c.conceptName).join(' → ') ?? 'N/A'}`);
+    console.log(`   阳系统贡献: ${response.yinYangInteraction?.yangContribution.concepts.map(c => c.name).join(', ') ?? 'N/A'}`);
+    console.log(`   融合结果: ${response.yinYangInteraction?.fusedResult.content ?? 'N/A'}`);
 
     console.log(`\n⏱️  处理时间: ${response.processingTime}ms`);
   }

@@ -1,10 +1,11 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * Consciousness AGI - AGI意识系统
+ * Consciousness AGI - NeuronSystemV3 的便捷封装
  * 
- * 整合V3的所有组件，加入Self Core和阴阳互塑
+ * 注意：此文件现在是对 NeuronSystemV3 的便捷封装，
+ * 核心功能已融合到 NeuronSystemV3 中。
  * 
- * 核心架构：
+ * 核心架构（已在 NeuronSystemV3 中实现）：
  * - Self Core：同一性载体
  * - 阴系统：Hebbian网络（直觉、分布式、动态）
  * - 阳系统：VSA空间 + 预测神经元（理性、符号、稳定）
@@ -13,33 +14,20 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import { SelfCore, getSelfCore, resetSelfCore, SelfCoreState, SubjectiveMeaningForSelf } from './self-core';
-import { 
-  HebbianNetwork, 
-  getHebbianNetwork, 
-  resetHebbianNetwork,
-  HebbianNeuron,
-  NetworkStats 
-} from './hebbian-network';
-import { 
-  YinYangBridge, 
-  getYinYangBridge, 
-  resetYinYangBridge,
-  YinYangInteraction,
-  YinYangBalance
-} from './yin-yang-bridge';
-import { VSASemanticSpace, getVSASpace, VSAVector } from './vsa-space';
-import { 
-  GlobalWorkspace, 
-  getGlobalWorkspace,
-  ConsciousContent
-} from './global-workspace';
-import { PredictionLoop, getPredictionLoop } from './prediction-loop';
-import { getMeaningCalculator, SubjectiveMeaning } from './meaning-calculator';
+import {
+  NeuronSystemV3,
+  getNeuronSystemV3,
+  resetNeuronSystemV3,
+  ProcessInputResult,
+  SystemState,
+} from './index';
+import { SubjectiveMeaningForSelf } from './self-core';
+import { YinYangInteraction, YinYangBalance } from './yin-yang-bridge';
+import { ConsciousContent } from './global-workspace';
+import { NetworkStats } from './hebbian-network';
 
 // ─────────────────────────────────────────────────────────────────────
-// 类型定义
+// 类型定义（保持向后兼容）
 // ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -47,55 +35,45 @@ import { getMeaningCalculator, SubjectiveMeaning } from './meaning-calculator';
  */
 export interface ConsciousnessAGIConfig {
   /** 用户ID */
-  userId: string;
+  userId?: string;
   
   /** 是否启用阴系统 */
-  enableYinSystem: boolean;
+  enableYinSystem?: boolean;
   
   /** 是否启用阳系统 */
-  enableYangSystem: boolean;
+  enableYangSystem?: boolean;
   
   /** 是否启用Self Core */
-  enableSelfCore: boolean;
+  enableSelfCore?: boolean;
   
   /** 是否启用全局工作空间 */
-  enableGlobalWorkspace: boolean;
+  enableGlobalWorkspace?: boolean;
   
   /** 是否启用预测循环 */
-  enablePredictionLoop: boolean;
+  enablePredictionLoop?: boolean;
   
   /** 是否启用自动学习 */
-  enableAutoLearning: boolean;
+  enableAutoLearning?: boolean;
 }
-
-const DEFAULT_CONFIG: ConsciousnessAGIConfig = {
-  userId: 'default-user',
-  enableYinSystem: true,
-  enableYangSystem: true,
-  enableSelfCore: true,
-  enableGlobalWorkspace: true,
-  enablePredictionLoop: true,
-  enableAutoLearning: true,
-};
 
 /**
  * AGI处理上下文
  */
 export interface AGIProcessingContext {
   /** 会话ID */
-  sessionId: string;
+  sessionId?: string;
   
   /** 输入内容 */
-  input: string;
+  input?: string;
   
   /** 对话历史 */
-  conversationHistory: Array<{
+  conversationHistory?: Array<{
     role: 'user' | 'assistant';
     content: string;
   }>;
   
   /** 时间戳 */
-  timestamp: number;
+  timestamp?: number;
 }
 
 /**
@@ -106,10 +84,10 @@ export interface AGIResponse {
   content: string;
   
   /** Self Core主观意义 */
-  subjectiveMeaning: SubjectiveMeaningForSelf;
+  subjectiveMeaning?: SubjectiveMeaningForSelf;
   
   /** 阴阳互塑结果 */
-  yinYangInteraction: YinYangInteraction;
+  yinYangInteraction?: YinYangInteraction;
   
   /** 意识内容（如果启用） */
   consciousContent?: ConsciousContent;
@@ -119,6 +97,9 @@ export interface AGIResponse {
   
   /** 处理时间 */
   processingTime: number;
+  
+  /** 完整的处理结果（新增） */
+  fullResult?: ProcessInputResult;
 }
 
 /**
@@ -178,56 +159,38 @@ export interface SystemReport {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Consciousness AGI 类
+// ConsciousnessAGI 类 - NeuronSystemV3 的便捷封装
 // ─────────────────────────────────────────────────────────────────────
 
 /**
  * AGI意识系统
  * 
- * 整合所有组件，提供统一的处理接口
+ * 这是对 NeuronSystemV3 的便捷封装，提供更简洁的接口。
+ * 核心功能已在 NeuronSystemV3 中实现。
  */
 export class ConsciousnessAGI {
-  private config: ConsciousnessAGIConfig;
-  
-  // 核心组件
-  private selfCore: SelfCore;
-  private hebbianNetwork: HebbianNetwork;
-  private yinYangBridge: YinYangBridge;
-  private vsaSpace: VSASemanticSpace;
-  private globalWorkspace: GlobalWorkspace | null;
-  private predictionLoop: PredictionLoop | null;
-  
-  // 状态
-  private isInitialized = false;
+  private neuronSystem: NeuronSystemV3;
   private processedInputs = 0;
   
   // 单例
   private static instance: ConsciousnessAGI | null = null;
   
-  private constructor(config: Partial<ConsciousnessAGIConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    
-    // 初始化组件
-    this.selfCore = getSelfCore();
-    this.hebbianNetwork = getHebbianNetwork();
-    this.yinYangBridge = getYinYangBridge();
-    this.vsaSpace = getVSASpace(10000);
-    
-    // 可选组件
-    this.globalWorkspace = this.config.enableGlobalWorkspace 
-      ? getGlobalWorkspace() 
-      : null;
-    this.predictionLoop = this.config.enablePredictionLoop 
-      ? getPredictionLoop(this.config.userId) 
-      : null;
-    
-    this.isInitialized = true;
+  private constructor(config: ConsciousnessAGIConfig = {}) {
+    // 使用 NeuronSystemV3 作为底层实现
+    this.neuronSystem = getNeuronSystemV3({
+      enableSelfCore: config.enableSelfCore ?? true,
+      enableYinSystem: config.enableYinSystem ?? true,
+      enableYinYangBridge: true,
+      enableConsciousness: config.enableGlobalWorkspace ?? true,
+      enableMeaningCalculation: true,
+      enableBackgroundProcessing: true,
+    });
   }
   
   /**
    * 获取单例实例
    */
-  static getInstance(config?: Partial<ConsciousnessAGIConfig>): ConsciousnessAGI {
+  static getInstance(config?: ConsciousnessAGIConfig): ConsciousnessAGI {
     if (!ConsciousnessAGI.instance) {
       ConsciousnessAGI.instance = new ConsciousnessAGI(config);
     }
@@ -239,9 +202,7 @@ export class ConsciousnessAGI {
    */
   static reset(): void {
     ConsciousnessAGI.instance = null;
-    resetSelfCore();
-    resetHebbianNetwork();
-    resetYinYangBridge();
+    resetNeuronSystemV3();
   }
   
   // ══════════════════════════════════════════════════════════════════
@@ -251,347 +212,175 @@ export class ConsciousnessAGI {
   /**
    * 处理输入
    * 
-   * 这是对外的主要接口
+   * 这是对外的主要接口，封装 NeuronSystemV3.processInput
    */
   async process(
     input: string, 
     context?: Partial<AGIProcessingContext>
   ): Promise<AGIResponse> {
     const startTime = Date.now();
-    const sessionId = context?.sessionId || uuidv4();
     
-    // 1. 编码输入
-    const inputVector = this.vsaSpace.getConcept(input);
+    // 调用 NeuronSystemV3 的处理方法
+    const result = await this.neuronSystem.processInput(input, context as Record<string, unknown>);
     
-    // 2. Self Core计算主观意义
-    const subjectiveMeaning = this.selfCore.computeMeaningForSelf(inputVector);
+    // 获取系统状态
+    const systemState = this.neuronSystem.getSystemState();
     
-    // 3. 阴阳互塑
-    const yinYangInteraction = await this.yinYangBridge.mutualShaping(inputVector);
-    
-    // 4. 全局工作空间（如果启用）
-    let consciousContent: ConsciousContent | undefined;
-    if (this.globalWorkspace) {
-      consciousContent = await this.processThroughGlobalWorkspace(
-        input, 
-        subjectiveMeaning, 
-        yinYangInteraction
-      );
-    }
-    
-    // 5. 更新Self Core
-    this.selfCore.updateFromExperience({
-      input,
-      inputVector,
-      meaning: {
-        selfRelevance: subjectiveMeaning.selfRelevance,
-        sentiment: subjectiveMeaning.emotionalResponse.valence,
-        interpretation: subjectiveMeaning.interpretation,
-      },
-      emotion: subjectiveMeaning.emotionalResponse,
-      importance: yinYangInteraction.fusedResult.confidence,
-    });
-    
-    // 6. 应用学习（如果启用）
-    if (this.config.enableAutoLearning) {
-      await this.applyLearning(yinYangInteraction);
-    }
-    
-    // 7. 生成响应
-    const response = await this.generateResponse(
-      input,
-      subjectiveMeaning,
-      yinYangInteraction,
-      consciousContent
-    );
-    
-    // 8. 收集系统状态
-    const systemState = this.collectSystemState(subjectiveMeaning, yinYangInteraction);
+    // 构建响应
+    const response: AGIResponse = {
+      content: result.consciousness?.data as string || result.meaning?.interpretation || '',
+      subjectiveMeaning: result.selfCoreMeaning,
+      yinYangInteraction: result.yinYangInteraction,
+      consciousContent: result.consciousness,
+      systemState: this.buildAGISystemState(systemState),
+      processingTime: result.neuronResponse.processingTime || (Date.now() - startTime),
+      fullResult: result,
+    };
     
     this.processedInputs++;
     
+    return response;
+  }
+  
+  /**
+   * 构建 AGI 系统状态
+   */
+  private buildAGISystemState(state: SystemState): AGISystemState {
     return {
-      content: response,
-      subjectiveMeaning,
-      yinYangInteraction,
-      consciousContent,
-      systemState,
-      processingTime: Date.now() - startTime,
-    };
-  }
-  
-  /**
-   * 通过全局工作空间处理
-   */
-  private async processThroughGlobalWorkspace(
-    input: string,
-    meaning: SubjectiveMeaningForSelf,
-    interaction: YinYangInteraction
-  ): Promise<ConsciousContent | undefined> {
-    if (!this.globalWorkspace) return undefined;
-    
-    // 构建候选内容，选择最强的作为意识内容
-    const candidates: Array<{ source: string; strength: number; content: string }> = [
-      {
-        source: 'yin',
-        strength: interaction.yinContribution.confidence,
-        content: interaction.yinContribution.concepts.map(c => c.conceptName).join(' → '),
+      selfCore: state.selfCoreState || {
+        coherence: 0,
+        selfRelevance: 0,
+        coreMemoryCount: 0,
       },
-      {
-        source: 'yang',
-        strength: interaction.yangContribution.confidence,
-        content: interaction.yangContribution.reasoning.join('; '),
-      },
-    ];
-    
-    // 添加情感候选
-    if (Math.abs(meaning.emotionalResponse.valence) > 0.3) {
-      candidates.push({
-        source: 'emotion',
-        strength: Math.abs(meaning.emotionalResponse.valence),
-        content: meaning.emotionalResponse.valence > 0 ? '积极情感' : '消极情感',
-      });
-    }
-    
-    // 选择最强的
-    candidates.sort((a, b) => b.strength - a.strength);
-    const winner = candidates[0];
-    
-    // 构建意识内容
-    return {
-      id: uuidv4(),
-      type: winner.source === 'emotion' ? 'emotional' : 'thought',
-      data: winner.content,
-      source: winner.source,
-      enteredAt: Date.now(),
-      duration: 1000,
-      strength: winner.strength,
-      broadcast: true,
-      relatedIds: [],
-    };
-  }
-  
-  /**
-   * 应用学习
-   */
-  private async applyLearning(interaction: YinYangInteraction): Promise<void> {
-    // 1. Hebbian学习
-    this.hebbianNetwork.applyHebbianLearning();
-    
-    // 2. 结构可塑性（基于惊讶度）
-    const surpriseLevel = 1 - interaction.fusedResult.confidence;
-    this.hebbianNetwork.applyStructuralPlasticity(surpriseLevel);
-  }
-  
-  /**
-   * 生成响应
-   */
-  private async generateResponse(
-    input: string,
-    meaning: SubjectiveMeaningForSelf,
-    interaction: YinYangInteraction,
-    consciousContent?: ConsciousContent
-  ): Promise<string> {
-    const parts: string[] = [];
-    
-    // 基于阴阳融合结果
-    parts.push(interaction.fusedResult.content);
-    
-    // 添加主观意义
-    if (meaning.selfRelevance > 0.5) {
-      parts.push(`这对我的意义：${meaning.interpretation}`);
-    }
-    
-    // 添加情感响应
-    if (Math.abs(meaning.emotionalResponse.valence) > 0.3) {
-      const emotion = meaning.emotionalResponse.valence > 0 ? '感到积极' : '感到些许消极';
-      parts.push(`情感上，我${emotion}。`);
-    }
-    
-    // 添加意识内容（如果有）
-    if (consciousContent) {
-      parts.push(`当前意识焦点：${JSON.stringify(consciousContent.data)}`);
-    }
-    
-    return parts.join('\n\n');
-  }
-  
-  /**
-   * 收集系统状态
-   */
-  private collectSystemState(
-    meaning: SubjectiveMeaningForSelf,
-    interaction: YinYangInteraction
-  ): AGISystemState {
-    const selfCoreState = this.selfCore.getState();
-    const networkStats = this.hebbianNetwork.getStats();
-    
-    return {
-      selfCore: {
-        coherence: selfCoreState.selfCoherence,
-        selfRelevance: meaning.selfRelevance,
-        coreMemoryCount: selfCoreState.coreMemories.length,
-      },
-      yinSystem: {
-        neuronCount: networkStats.totalNeurons,
-        synapseCount: networkStats.totalSynapses,
-        averageActivation: networkStats.averageActivation,
+      yinSystem: state.yinSystemState || {
+        neuronCount: 0,
+        synapseCount: 0,
+        averageActivation: 0,
       },
       yangSystem: {
-        conceptCount: this.vsaSpace.getConceptCount?.() || 0,
+        conceptCount: state.vsaStats.conceptCount,
       },
-      balance: interaction.balance,
-      consciousnessLevel: this.calculateConsciousnessLevel(meaning, interaction),
+      balance: state.yinYangBalance || {
+        yinActivity: 0,
+        yangActivity: 0,
+        balance: 0,
+        bias: 'balanced',
+        biasStrength: 0,
+        suggestion: '系统未完全初始化',
+      },
+      consciousnessLevel: state.consciousnessLevel,
     };
   }
   
-  /**
-   * 计算意识水平
-   */
-  private calculateConsciousnessLevel(
-    meaning: SubjectiveMeaningForSelf,
-    interaction: YinYangInteraction
-  ): number {
-    // 意识水平 = 自我关联度 * 一致性 * 阴阳平衡 * 融合置信度
-    return (
-      meaning.selfRelevance * 0.3 +
-      this.selfCore.getSelfCoherence() * 0.3 +
-      interaction.balance.balance * 0.2 +
-      interaction.fusedResult.confidence * 0.2
-    );
-  }
-  
   // ══════════════════════════════════════════════════════════════════
-  // 状态访问与报告
+  // 便捷访问方法
   // ══════════════════════════════════════════════════════════════════
   
   /**
-   * 获取系统报告
+   * 获取 Self Core
    */
-  getSystemReport(): SystemReport {
-    const selfCoreState = this.selfCore.getState();
-    const networkStats = this.hebbianNetwork.getStats();
-    const lastBalance = this.yinYangBridge.getLastBalance();
-    
-    // 判断总体状态
-    let overallStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
-    if (selfCoreState.selfCoherence < 0.5 || (lastBalance && lastBalance.balance < 0.4)) {
-      overallStatus = 'critical';
-    } else if (selfCoreState.selfCoherence < 0.7 || (lastBalance && lastBalance.balance < 0.6)) {
-      overallStatus = 'warning';
-    }
-    
-    // 生成建议
-    const suggestions: string[] = [];
-    if (selfCoreState.selfCoherence < 0.7) {
-      suggestions.push('Self Core一致性较低，建议增加自我反思');
-    }
-    if (lastBalance && lastBalance.bias !== 'balanced') {
-      suggestions.push(`阴阳系统偏向${lastBalance.bias}，${lastBalance.suggestion}`);
-    }
-    if (networkStats.totalNeurons < 10) {
-      suggestions.push('阴系统神经元数量不足，建议增加学习');
-    }
-    
-    return {
-      overallStatus,
-      selfCore: {
-        coherence: selfCoreState.selfCoherence,
-        traits: Array.from(selfCoreState.traits.entries()).map(([name, trait]) => ({
-          name,
-          strength: trait.strength,
-        })),
-        values: Array.from(selfCoreState.values.entries()).map(([name, value]) => ({
-          name,
-          importance: value.importance,
-        })),
-        coreMemories: selfCoreState.coreMemories.map(m => ({
-          content: m.content,
-          importance: m.importance,
-        })),
-      },
-      yinYang: {
-        balance: lastBalance || {
-          yinActivity: 0,
-          yangActivity: 0,
-          balance: 1,
-          bias: 'balanced' as const,
-          biasStrength: 0,
-          suggestion: '暂无数据',
-        },
-        yinStats: networkStats,
-        yangConceptCount: this.vsaSpace.getConceptCount?.() || 0,
-      },
-      suggestions,
-    };
+  getSelfCore() {
+    return this.neuronSystem.getSelfCore?.();
   }
   
   /**
-   * 获取处理统计
+   * 获取 Hebbian 网络
    */
-  getStats(): {
-    processedInputs: number;
-    isInitialized: boolean;
-  } {
-    return {
-      processedInputs: this.processedInputs,
-      isInitialized: this.isInitialized,
-    };
-  }
-  
-  /**
-   * 获取配置
-   */
-  getConfig(): ConsciousnessAGIConfig {
-    return { ...this.config };
-  }
-  
-  // ══════════════════════════════════════════════════════════════════
-  // 直接访问组件
-  // ══════════════════════════════════════════════════════════════════
-  
-  /**
-   * 获取Self Core
-   */
-  getSelfCore(): SelfCore {
-    return this.selfCore;
-  }
-  
-  /**
-   * 获取Hebbian网络
-   */
-  getHebbianNetwork(): HebbianNetwork {
-    return this.hebbianNetwork;
+  getHebbianNetwork() {
+    return this.neuronSystem.getHebbianNetwork?.();
   }
   
   /**
    * 获取阴阳桥梁
    */
-  getYinYangBridge(): YinYangBridge {
-    return this.yinYangBridge;
+  getYinYangBridge() {
+    return this.neuronSystem.getYinYangBridge?.();
   }
   
   /**
-   * 获取VSA空间
+   * 获取系统报告
    */
-  getVSASpace(): VSASemanticSpace {
-    return this.vsaSpace;
+  getSystemReport(): SystemReport {
+    const state = this.neuronSystem.getSystemState();
+    
+    const overallStatus = 
+      state.consciousnessLevel > 0.7 ? 'healthy' :
+      state.consciousnessLevel > 0.4 ? 'warning' : 'critical';
+    
+    return {
+      overallStatus,
+      selfCore: {
+        coherence: state.selfCoreState?.coherence || 0,
+        traits: [],
+        values: [],
+        coreMemories: [],
+      },
+      yinYang: {
+        balance: state.yinYangBalance || {
+          yinActivity: 0,
+          yangActivity: 0,
+          balance: 0,
+          bias: 'balanced',
+          biasStrength: 0,
+          suggestion: '',
+        },
+        yinStats: {
+          totalNeurons: state.yinSystemState?.neuronCount || 0,
+          totalSynapses: state.yinSystemState?.synapseCount || 0,
+          averageActivation: state.yinSystemState?.averageActivation || 0,
+          averageWeight: 0,
+          highlyActiveNeurons: 0,
+          strongSynapses: 0,
+          density: 0,
+        },
+        yangConceptCount: state.vsaStats.conceptCount,
+      },
+      suggestions: this.generateSuggestions(state),
+    };
+  }
+  
+  /**
+   * 生成建议
+   */
+  private generateSuggestions(state: SystemState): string[] {
+    const suggestions: string[] = [];
+    
+    if (state.consciousnessLevel < 0.5) {
+      suggestions.push('意识水平较低，建议增加交互以激活更多认知模块');
+    }
+    
+    if (state.yinYangBalance && state.yinYangBalance.balance < 0.5) {
+      suggestions.push(`阴阳系统不平衡，偏向${state.yinYangBalance.bias}系统`);
+    }
+    
+    if (state.neuronStats.predictionAccuracy < 0.6) {
+      suggestions.push('预测准确率较低，系统正在学习中');
+    }
+    
+    return suggestions;
+  }
+  
+  /**
+   * 获取底层 NeuronSystemV3 实例
+   */
+  getNeuronSystem(): NeuronSystemV3 {
+    return this.neuronSystem;
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 导出便捷函数
+// 单例函数
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * 获取Consciousness AGI实例
+ * 获取 ConsciousnessAGI 实例
  */
-export function getConsciousnessAGI(config?: Partial<ConsciousnessAGIConfig>): ConsciousnessAGI {
+export function getConsciousnessAGI(config?: ConsciousnessAGIConfig): ConsciousnessAGI {
   return ConsciousnessAGI.getInstance(config);
 }
 
 /**
- * 重置Consciousness AGI
+ * 重置 ConsciousnessAGI
  */
 export function resetConsciousnessAGI(): void {
   ConsciousnessAGI.reset();
