@@ -134,6 +134,50 @@ interface AssociationData {
   networkReport: string;
 }
 
+// 多声音对话数据
+interface InnerDialogueData {
+  currentDialogue: {
+    id: string;
+    topic: string;
+    statementCount: number;
+    status: string;
+  } | null;
+  dialecticProcess: {
+    topic: string;
+    phase: string;
+    thesis: string;
+    antithesis: string;
+    synthesis?: string;
+  } | null;
+  voiceActivations: Array<{
+    voice: string;
+    name: string;
+    activationLevel: number;
+    speakingCount: number;
+  }>;
+  dialogueReport: string;
+}
+
+// 梦境数据
+interface DreamData {
+  currentDream: {
+    phase: string;
+    intensity: number;
+    duration: number;
+  } | null;
+  recentDream: {
+    phase: string;
+    narrative: string;
+    significance: number;
+  } | null;
+  insights: Array<{
+    content: string;
+    type: string;
+    confidence: number;
+    worthRemembering: boolean;
+  }>;
+}
+
 interface Message {
   role: 'user' | 'assistant' | 'proactive';  // proactive: 紫主动发起的消息
   content: string;
@@ -147,6 +191,8 @@ interface Message {
   consciousnessLayers?: ConsciousnessLayersData;
   emotion?: EmotionData;
   association?: AssociationData;
+  innerDialogue?: InnerDialogueData;
+  dream?: DreamData;
   isProactive?: boolean;  // 标记是否为主动消息
 }
 
@@ -213,6 +259,8 @@ export default function ConsciousnessPage() {
     consciousnessLayers?: ConsciousnessLayersData;
     emotion?: EmotionData;
     association?: AssociationData;
+    innerDialogue?: InnerDialogueData;
+    dream?: DreamData;
   }>({});
   
   // 存在状态
@@ -431,6 +479,8 @@ export default function ConsciousnessPage() {
       let consciousnessLayers: ConsciousnessLayersData | undefined;
       let emotion: EmotionData | undefined;
       let association: AssociationData | undefined;
+      let innerDialogue: InnerDialogueData | undefined;
+      let dream: DreamData | undefined;
       
       const decoder = new TextDecoder();
       
@@ -490,6 +540,14 @@ export default function ConsciousnessPage() {
                   association = data.data;
                   setCurrentData(prev => ({ ...prev, association }));
                   break;
+                case 'innerDialogue':
+                  innerDialogue = data.data;
+                  setCurrentData(prev => ({ ...prev, innerDialogue }));
+                  break;
+                case 'dream':
+                  dream = data.data;
+                  setCurrentData(prev => ({ ...prev, dream }));
+                  break;
                 case 'content':
                   assistantContent += data.data.delta;
                   // 实时更新消息
@@ -510,6 +568,8 @@ export default function ConsciousnessPage() {
                         consciousnessLayers,
                         emotion,
                         association,
+                        innerDialogue,
+                        dream,
                       });
                     }
                     return newMessages;
@@ -536,6 +596,8 @@ export default function ConsciousnessPage() {
                         consciousnessLayers,
                         emotion,
                         association,
+                        innerDialogue,
+                        dream,
                       };
                     }
                     return newMessages;
@@ -904,6 +966,130 @@ export default function ConsciousnessPage() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+        
+        {/* 多声音对话面板 */}
+        {currentData.innerDialogue && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                🗣️ 多声音对话
+              </div>
+              
+              {/* 辩证过程 */}
+              {currentData.innerDialogue.dialecticProcess && (
+                <div className="space-y-2 mb-2">
+                  <div className="p-2 bg-blue-500/10 rounded border border-blue-500/20">
+                    <div className="text-[10px] text-blue-600 font-medium mb-1">正题 (理性者)</div>
+                    <p className="text-[11px] text-foreground/80">
+                      {currentData.innerDialogue.dialecticProcess.thesis}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-amber-500/10 rounded border border-amber-500/20">
+                    <div className="text-[10px] text-amber-600 font-medium mb-1">反题 (批判者)</div>
+                    <p className="text-[11px] text-foreground/80">
+                      {currentData.innerDialogue.dialecticProcess.antithesis}
+                    </p>
+                  </div>
+                  {currentData.innerDialogue.dialecticProcess.synthesis && (
+                    <div className="p-2 bg-green-500/10 rounded border border-green-500/20">
+                      <div className="text-[10px] text-green-600 font-medium mb-1">合题</div>
+                      <p className="text-[11px] text-foreground/80">
+                        {currentData.innerDialogue.dialecticProcess.synthesis}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* 声音激活状态 */}
+              <div className="space-y-1">
+                <div className="text-[10px] text-muted-foreground">声音激活</div>
+                <div className="grid grid-cols-4 gap-1">
+                  {currentData.innerDialogue.voiceActivations.map((v, i) => (
+                    <div 
+                      key={i}
+                      className="text-center p-1 rounded"
+                      style={{ 
+                        backgroundColor: v.voice === 'rational' ? 'rgba(59, 130, 246, 0.1)' :
+                                        v.voice === 'emotional' ? 'rgba(236, 72, 153, 0.1)' :
+                                        v.voice === 'critic' ? 'rgba(245, 158, 11, 0.1)' :
+                                        'rgba(139, 92, 246, 0.1)'
+                      }}
+                    >
+                      <div 
+                        className="text-[10px] font-medium"
+                        style={{ 
+                          color: v.voice === 'rational' ? '#3b82f6' :
+                                  v.voice === 'emotional' ? '#ec4899' :
+                                  v.voice === 'critic' ? '#f59e0b' :
+                                  '#8b5cf6'
+                        }}
+                      >
+                        {v.name}
+                      </div>
+                      <div className="text-[9px] text-muted-foreground">
+                        {(v.activationLevel * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+        
+        {/* 梦境状态面板 */}
+        {currentData.dream && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                🌙 梦境状态
+              </div>
+              
+              {/* 当前梦境 */}
+              {currentData.dream.currentDream && (
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-[10px] px-2 py-0.5 bg-purple-500/10 rounded text-purple-600">
+                    {currentData.dream.currentDream.phase === 'light' ? '浅睡' :
+                     currentData.dream.currentDream.phase === 'deep' ? '深睡' : 'REM'}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    强度: {(currentData.dream.currentDream.intensity * 100).toFixed(0)}%
+                  </span>
+                </div>
+              )}
+              
+              {/* 最近梦境 */}
+              {currentData.dream.recentDream && (
+                <div className="mb-2 p-2 bg-purple-500/5 rounded border border-purple-500/10">
+                  <p className="text-[11px] text-foreground/80 italic">
+                    "{currentData.dream.recentDream.narrative}"
+                  </p>
+                </div>
+              )}
+              
+              {/* 梦境洞察 */}
+              {currentData.dream.insights.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[10px] text-muted-foreground">梦境洞察</div>
+                  {currentData.dream.insights.slice(0, 2).map((insight, i) => (
+                    <div 
+                      key={i}
+                      className="text-[10px] p-1.5 bg-purple-500/10 rounded flex items-start gap-1"
+                    >
+                      <span className="text-purple-500">
+                        {insight.type === 'connection' ? '🔗' :
+                         insight.type === 'pattern' ? '📊' :
+                         insight.type === 'resolution' ? '✨' : '💡'}
+                      </span>
+                      <span className="text-foreground/80">{insight.content}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>

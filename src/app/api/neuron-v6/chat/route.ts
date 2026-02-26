@@ -184,6 +184,52 @@ export async function POST(request: NextRequest) {
             networkReport: result.associationState.networkReport,
           });
           
+          // 发送多声音对话状态
+          send('innerDialogue', {
+            currentDialogue: result.innerDialogueState.currentDialogue ? {
+              id: result.innerDialogueState.currentDialogue.id,
+              topic: result.innerDialogueState.currentDialogue.topic,
+              statementCount: result.innerDialogueState.currentDialogue.statements.length,
+              status: result.innerDialogueState.currentDialogue.status,
+            } : null,
+            dialecticProcess: result.innerDialogueState.dialecticProcess ? {
+              topic: result.innerDialogueState.dialecticProcess.topic,
+              phase: result.innerDialogueState.dialecticProcess.phase,
+              thesis: result.innerDialogueState.dialecticProcess.thesis.content.slice(0, 50),
+              antithesis: result.innerDialogueState.dialecticProcess.antithesis.content.slice(0, 50),
+              synthesis: result.innerDialogueState.dialecticProcess.synthesis?.slice(0, 100),
+            } : null,
+            voiceActivations: result.innerDialogueState.voiceActivations.map(v => ({
+              voice: v.voice,
+              name: v.voice === 'rational' ? '理性者' : 
+                    v.voice === 'emotional' ? '情感者' :
+                    v.voice === 'critic' ? '批判者' : '梦想家',
+              activationLevel: v.activationLevel,
+              speakingCount: v.speakingCount,
+            })),
+            dialogueReport: result.innerDialogueState.dialogueReport,
+          });
+          
+          // 发送梦境状态
+          send('dream', {
+            currentDream: result.dreamState.currentDream ? {
+              phase: result.dreamState.currentDream.phase,
+              intensity: result.dreamState.currentDream.intensity,
+              duration: result.dreamState.currentDream.duration,
+            } : null,
+            recentDream: result.dreamState.recentDream ? {
+              phase: result.dreamState.recentDream.phase,
+              narrative: result.dreamState.recentDream.narrative,
+              significance: result.dreamState.recentDream.significance,
+            } : null,
+            insights: result.dreamState.insights.map(i => ({
+              content: i.content,
+              type: i.type,
+              confidence: i.confidence,
+              worthRemembering: i.worthRemembering,
+            })),
+          });
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           

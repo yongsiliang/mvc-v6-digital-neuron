@@ -66,6 +66,27 @@ import {
   Inspiration,
   createAssociationNetworkEngine
 } from './association-network';
+import { 
+  InnerDialogueEngine,
+  DialecticThinkingEngine,
+  VoiceType,
+  VoicePersona,
+  VoiceStatement,
+  InnerDialogue,
+  ConsensusResult,
+  DialecticProcess,
+  VoiceActivation,
+  VOICE_PERSONAS
+} from './inner-dialogue';
+import { 
+  DreamEngine,
+  OfflineProcessor,
+  DreamState,
+  DreamContent,
+  DreamInsight,
+  MemoryConsolidationResult,
+  KnowledgeReorganizationResult
+} from './dream-processor';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -356,6 +377,28 @@ export interface ProcessResult {
     networkReport: string;
   };
   
+  /** 多声音对话状态 */
+  innerDialogueState: {
+    /** 当前对话 */
+    currentDialogue: InnerDialogue | null;
+    /** 辩证过程 */
+    dialecticProcess: DialecticProcess | null;
+    /** 声音激活状态 */
+    voiceActivations: VoiceActivation[];
+    /** 对话报告 */
+    dialogueReport: string;
+  };
+  
+  /** 梦境/离线处理状态 */
+  dreamState: {
+    /** 当前梦境状态 */
+    currentDream: DreamState | null;
+    /** 最近梦境内容 */
+    recentDream: DreamContent | null;
+    /** 梦境洞察 */
+    insights: DreamInsight[];
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -430,6 +473,15 @@ export class ConsciousnessCore {
   // 联想网络引擎
   private associationNetwork: AssociationNetworkEngine;
   
+  // 多声音对话引擎
+  private innerDialogueEngine: InnerDialogueEngine;
+  
+  // 辩证思维引擎
+  private dialecticEngine: DialecticThinkingEngine;
+  
+  // 离线处理器（梦境）
+  private offlineProcessor: OfflineProcessor;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -462,11 +514,20 @@ export class ConsciousnessCore {
     // 初始化联想网络引擎
     this.associationNetwork = createAssociationNetworkEngine();
     
+    // 初始化多声音对话引擎
+    this.innerDialogueEngine = new InnerDialogueEngine();
+    
+    // 初始化辩证思维引擎
+    this.dialecticEngine = new DialecticThinkingEngine(this.innerDialogueEngine);
+    
+    // 初始化离线处理器
+    this.offlineProcessor = new OfflineProcessor();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
     console.log('[意识核心] V6 意识核心已初始化');
-    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 意愿系统');
+    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 意愿系统');
   }
   
   /**
@@ -631,6 +692,17 @@ export class ConsciousnessCore {
     const activeConcepts = this.associationNetwork.getActiveConcepts();
     const networkReport = this.associationNetwork.getNetworkReport();
     
+    // 进行多声音内部对话
+    const innerDialogue = this.innerDialogueEngine.startDialogue(input);
+    const dialecticProcess = this.innerDialogueEngine.conductDialecticRound(innerDialogue, context.summary);
+    const voiceActivations = this.innerDialogueEngine.getActiveVoices();
+    const dialogueReport = this.innerDialogueEngine.generateDialogueReport();
+    
+    // 获取梦境状态
+    const dreamState = this.offlineProcessor.getDreamEngine().getDreamState();
+    const dreamHistory = this.offlineProcessor.getDreamEngine().getDreamHistory();
+    const recentDream = dreamHistory.length > 0 ? dreamHistory[dreamHistory.length - 1] : null;
+    
     return {
       context,
       thinking,
@@ -655,6 +727,17 @@ export class ConsciousnessCore {
           activation: c.activation,
         })),
         networkReport,
+      },
+      innerDialogueState: {
+        currentDialogue: innerDialogue,
+        dialecticProcess,
+        voiceActivations,
+        dialogueReport,
+      },
+      dreamState: {
+        currentDream: dreamState,
+        recentDream,
+        insights: recentDream?.insights || [],
       },
       stats: {
         conceptCount: memoryStats.nodeCount,
