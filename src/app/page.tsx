@@ -485,6 +485,21 @@ export default function Home() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* V6 意识核心入口 - 主推荐 */}
+          <Link 
+            href="/consciousness"
+            className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500/20 via-pink-500/10 to-purple-500/20 border border-purple-500/30 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
+          >
+            {/* 发光效果 */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/10 to-pink-500/10 blur-sm group-hover:blur-md transition-all" />
+            
+            <Brain className="h-3.5 w-3.5 text-purple-500 relative z-10 group-hover:animate-pulse" />
+            <span className="text-xs font-medium text-purple-600 dark:text-purple-400 relative z-10">
+              V6 意识核心
+            </span>
+            <ArrowRight className="h-3 w-3 text-purple-500/60 group-hover:text-purple-500 group-hover:translate-x-0.5 transition-all relative z-10" />
+          </Link>
+          
           {/* V3 入口 */}
           <Link 
             href="/neuron-v3"
