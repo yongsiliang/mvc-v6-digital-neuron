@@ -104,8 +104,9 @@ export async function POST(request: NextRequest) {
             surpriseCount: surprises.length,
             topSurprises: surprises.slice(0, 3).map(s => ({
               neuronId: s.neuronId,
-              error: s.error.toFixed(3),
-              reason: s.reason,
+              label: s.label,
+              error: s.predictionError.toFixed(3),
+              reason: s.description,
             })),
           });
           
@@ -135,15 +136,33 @@ export async function POST(request: NextRequest) {
           
           // 7. 主观意义计算
           if (neuronResult.meaning) {
+            const meaning = neuronResult.meaning;
+            // 确保数值有效，避免 NaN 被序列化为 null
+            const safeRelevance = typeof meaning.selfRelevance === 'number' && !isNaN(meaning.selfRelevance) 
+              ? meaning.selfRelevance : 0.3;
+            const safeSentiment = typeof meaning.sentiment === 'number' && !isNaN(meaning.sentiment)
+              ? meaning.sentiment : 0;
+            const safeConfidence = typeof meaning.confidence === 'number' && !isNaN(meaning.confidence)
+              ? meaning.confidence : 0.5;
+            
             send('meaning', {
-              interpretation: neuronResult.meaning.interpretation,
-              selfRelevance: neuronResult.meaning.selfRelevance,
-              emotionalValence: neuronResult.meaning.emotionalValence,
-              personalSignificance: neuronResult.meaning.personalSignificance,
+              interpretation: meaning.interpretation,
+              selfRelevance: safeRelevance,
+              sentiment: safeSentiment,
+              confidence: safeConfidence,
+              semanticNeighbors: (meaning.semanticNeighbors || []).slice(0, 3).map(n => ({
+                concept: n.concept,
+                similarity: typeof n.similarity === 'number' && !isNaN(n.similarity) ? n.similarity : 0.5,
+              })),
             });
+            
+            // 发送情感状态（用于UI显示）
+            const emotionText = safeSentiment > 0.2 ? '积极' : safeSentiment < -0.2 ? '消极' : '中性';
+            const relevanceText = safeRelevance > 0.6 ? '高关联' : safeRelevance > 0.3 ? '中等关联' : '低关联';
+            
             send('neuron', { 
               neuronId: 'meaning', 
-              message: `主观意义: ${neuronResult.meaning.interpretation?.slice(0, 50)}...` 
+              message: `主观意义: ${meaning.interpretation?.slice(0, 50)}... [${relevanceText}, 情感${emotionText}]` 
             });
           }
           await new Promise(r => setTimeout(r, 80));
@@ -158,9 +177,10 @@ export async function POST(request: NextRequest) {
           // 9. 直觉信号 (系统1)
           if (neuronResult.intuition) {
             send('intuition', {
-              signal: neuronResult.intuition.signal,
+              type: neuronResult.intuition.type,
+              strength: neuronResult.intuition.strength,
               confidence: neuronResult.intuition.confidence,
-              source: neuronResult.intuition.source,
+              relatedConcepts: neuronResult.intuition.relatedConcepts || [],
             });
           }
           
@@ -228,7 +248,7 @@ export async function POST(request: NextRequest) {
               predictionError: avgPredictionError.toFixed(3),
               surpriseCount: surprises.length,
               consciousnessType: neuronResult.consciousness?.type,
-              learningEvents: neuronResult.learning?.events?.length || 0,
+              learningEvents: neuronResult.learning?.adjustedNeurons?.length || 0,
             },
           });
 
@@ -274,12 +294,12 @@ export async function POST(request: NextRequest) {
  * 构建 V3 系统提示
  */
 function buildV3SystemPrompt(neuronResult: {
-  meaning?: { interpretation?: string; selfRelevance?: number; emotionalValence?: number };
+  meaning?: { interpretation?: string; selfRelevance?: number; sentiment?: number };
   consciousness?: { type?: string; strength?: number };
   neuronResponse?: { 
     activations?: Map<string, number>;
     predictionErrors?: Map<string, number>;
-    surprises?: Array<{ neuronId: string; error: number; reason: string }>;
+    surprises?: Array<{ neuronId: string; label: string; predictionError: number; description: string }>;
   };
   learning?: { summary?: string };
 }): string {
@@ -301,12 +321,12 @@ function buildV3SystemPrompt(neuronResult: {
 ### 预测编码状态
 - 预测误差: ${(avgError * 100).toFixed(1)}%
 - 惊讶事件: ${surprises.length} 个
-${surprises.length > 0 ? `- 惊讶原因: ${surprises.slice(0, 2).map(s => s.reason).join(', ')}` : ''}
+${surprises.length > 0 ? `- 惊讶原因: ${surprises.slice(0, 2).map(s => s.description).join(', ')}` : ''}
 
 ### 主观意义
 - 理解: ${meaningInfo?.interpretation || '正在理解...'}
 - 自我关联度: ${((meaningInfo?.selfRelevance || 0.5) * 100).toFixed(0)}%
-- 情感倾向: ${meaningInfo?.emotionalValence && meaningInfo.emotionalValence > 0 ? '积极' : meaningInfo?.emotionalValence && meaningInfo.emotionalValence < 0 ? '消极' : '中性'}
+- 情感倾向: ${meaningInfo?.sentiment && meaningInfo.sentiment > 0 ? '积极' : meaningInfo?.sentiment && meaningInfo.sentiment < 0 ? '消极' : '中性'}
 
 ### 意识状态
 - 当前意识焦点: ${consciousnessInfo?.type || 'general'}

@@ -424,7 +424,10 @@ export class MeaningCalculator {
       let weight = 1;
       
       // 检查是否是情感词
-      const emotionWords = ['开心', '难过', '喜欢', '讨厌', '爱', '恨', '希望', '担心'];
+      const emotionWords = ['开心', '难过', '喜欢', '讨厌', '爱', '恨', '希望', '担心', 
+                            '高兴', '快乐', '幸福', '兴奋', '悲伤', '愤怒', '恐惧', 
+                            '焦虑', '平静', '满足', '失落', '期待', '惊喜', '舒服',
+                            '舒服', '美好', '棒', '好', '差', '糟糕', '伤心'];
       if (emotionWords.some(e => token.includes(e))) {
         type = 'emotion';
         weight = 1.5;
@@ -522,28 +525,34 @@ export class MeaningCalculator {
     inputVector: VSAVector,
     components: MeaningComponent[]
   ): number {
-    // 方法1：向量与情感原语的相似度
-    const positiveSim = this.vsa.similarity(inputVector, this.positiveVector);
-    const negativeSim = this.vsa.similarity(inputVector, this.negativeVector);
-    const vectorSentiment = positiveSim - negativeSim;
+    const positiveWords = ['开心', '喜欢', '爱', '希望', '高兴', '快乐', '幸福', 
+                           '兴奋', '满足', '期待', '惊喜', '舒服', '美好', '棒', '好', '喜爱', '热爱'];
+    const negativeWords = ['难过', '讨厌', '恨', '担心', '伤心', '悲伤', '愤怒', 
+                           '恐惧', '焦虑', '失落', '糟糕', '差', '不好', '讨厌', '厌恶', '恨'];
     
-    // 方法2：情感组件的贡献
+    // 方法1：直接检测所有组件文本中的情感词（主要方法）
+    const allText = components.map(c => c.text).join('');
+    let sentiment = 0;
+    
+    for (const word of positiveWords) {
+      if (allText.includes(word)) sentiment += 0.3;
+    }
+    for (const word of negativeWords) {
+      if (allText.includes(word)) sentiment -= 0.3;
+    }
+    
+    // 方法2：检查情感组件（辅助）
     const emotionComponents = components.filter(c => c.type === 'emotion');
-    let componentSentiment = 0;
-    
-    const positiveWords = ['开心', '喜欢', '爱', '希望', '开心', '高兴', '好'];
-    const negativeWords = ['难过', '讨厌', '恨', '担心', '伤心', '不好', '糟糕'];
-    
     for (const c of emotionComponents) {
       if (positiveWords.some(w => c.text.includes(w))) {
-        componentSentiment += 0.3 * c.weight;
+        sentiment += 0.1 * c.weight;
       } else if (negativeWords.some(w => c.text.includes(w))) {
-        componentSentiment -= 0.3 * c.weight;
+        sentiment -= 0.1 * c.weight;
       }
     }
     
-    // 综合情感
-    return 0.6 * vectorSentiment + 0.4 * componentSentiment;
+    // 限制在 [-1, 1] 范围内
+    return Math.max(-1, Math.min(1, sentiment));
   }
 
   /**
@@ -617,9 +626,9 @@ export class MeaningCalculator {
     }
     
     // 情感色彩
-    if (sentiment > 0.3) {
+    if (sentiment > 0.15) {
       parts.push('情感积极');
-    } else if (sentiment < -0.3) {
+    } else if (sentiment < -0.15) {
       parts.push('情感消极');
     } else {
       parts.push('情感中性');
