@@ -6,7 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { Brain, Sparkles, MessageCircle, Activity, Timer } from 'lucide-react';
+import { Brain, Sparkles, MessageCircle, Activity, Timer, Network } from 'lucide-react';
+import { 
+  ConsciousnessDashboard, 
+  ConsciousnessVisualizationData 
+} from '@/components/visualization/consciousness-dashboard';
+import { ConsciousnessLayersVisual } from '@/components/visualization/consciousness-dashboard';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -385,8 +390,110 @@ export default function ConsciousnessPage() {
   const AUTO_REFLECT_INTERVAL = 60000; // 1分钟无新消息自动反思
   const PROACTIVE_CHECK_INTERVAL = 30000; // 30秒检查一次主动消息
   
+  // 可视化数据
+  const [visualizationData, setVisualizationData] = useState<ConsciousnessVisualizationData | null>(null);
+  const [showVisualization, setShowVisualization] = useState(false);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // 转换数据为可视化格式
+  const convertToVisualizationData = useCallback((): ConsciousnessVisualizationData | null => {
+    if (!currentData.association) return null;
+    
+    // 转换节点数据 - 使用正确的类型
+    const nodes: Array<{
+      id: string;
+      label: string;
+      type: 'concept' | 'emotion' | 'belief' | 'value' | 'memory';
+      activation: number;
+    }> = currentData.association.activeConcepts.map((c, i) => ({
+      id: `node-${i}`,
+      label: c.label,
+      type: 'concept' as const,
+      activation: c.activation,
+    }));
+    
+    // 添加情感节点
+    if (currentData.emotion?.dominantEmotion) {
+      nodes.push({
+        id: 'emotion-primary',
+        label: currentData.emotion.dominantEmotion.emotion,
+        type: 'emotion',
+        activation: currentData.emotion.dominantEmotion.intensity,
+      });
+    }
+    
+    // 添加价值节点
+    if (currentData.value?.coreValues) {
+      currentData.value.coreValues.slice(0, 3).forEach((v, i) => {
+        nodes.push({
+          id: `value-${i}`,
+          label: v.name,
+          type: 'value',
+          activation: v.weight,
+        });
+      });
+    }
+    
+    // 生成连接
+    const links = [];
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        if (Math.random() > 0.5) {
+          links.push({
+            source: nodes[i].id,
+            target: nodes[j].id,
+            strength: Math.random() * 0.5 + 0.3,
+            type: 'association' as const,
+          });
+        }
+      }
+    }
+    
+    // 意识流数据
+    const streams = currentData.consciousnessLayers?.layerResults.map(lr => ({
+      type: 'awareness' as const,
+      content: lr.output,
+      intensity: lr.activity,
+    })) || [];
+    
+    // 概念数据
+    const concepts = currentData.association.activeConcepts.map((c, i) => ({
+      id: `concept-${i}`,
+      label: c.label,
+      category: '认知',
+      connections: Math.floor(c.activation * 5),
+    }));
+    
+    // 认知负荷
+    const cognitiveLoad = {
+      intrinsic: currentData.metacognitionDeep?.cognitiveLoad?.intrinsicLoad || 0.3,
+      extraneous: currentData.metacognitionDeep?.cognitiveLoad?.extraneousLoad || 0.2,
+      germane: currentData.metacognitionDeep?.cognitiveLoad?.germaneLoad || 0.3,
+      threshold: 0.9,
+    };
+    
+    return {
+      network: { nodes, links },
+      streams,
+      concepts,
+      cognitiveLoad,
+      layers: currentData.consciousnessLayers?.layerResults.map(lr => ({
+        level: lr.level,
+        activity: lr.activity,
+        description: lr.output,
+      })) || [],
+    };
+  }, [currentData]);
+  
+  // 更新可视化数据
+  useEffect(() => {
+    const vizData = convertToVisualizationData();
+    if (vizData) {
+      setVisualizationData(vizData);
+    }
+  }, [convertToVisualizationData]);
   
   // 获取存在状态
   const fetchExistenceStatus = useCallback(async () => {
@@ -806,6 +913,16 @@ export default function ConsciousnessPage() {
                   <Sparkles className="w-4 h-4" />
                   <span>{existenceStatus.wisdomCount}</span>
                 </div>
+                {/* 可视化切换按钮 */}
+                <Button
+                  variant={showVisualization ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowVisualization(!showVisualization)}
+                  title="意识可视化"
+                >
+                  <Network className="w-4 h-4 mr-1" />
+                  {showVisualization ? '隐藏可视化' : '可视化'}
+                </Button>
               </div>
             )}
           </div>
@@ -1780,6 +1897,16 @@ export default function ConsciousnessPage() {
             </Card>
           </TabsContent>
         </Tabs>
+        
+        {/* 意识可视化面板 */}
+        {showVisualization && visualizationData && (
+          <div className="border-t">
+            <ConsciousnessDashboard 
+              data={visualizationData}
+              isLoading={false}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
