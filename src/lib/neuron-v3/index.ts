@@ -2108,3 +2108,9 @@ export * from './self-core';
 export * from './hebbian-network';
 export * from './yin-yang-bridge';
 export * from './consciousness-agi';
+
+// ─────────────────────────────────────────────────────────────────────
+// V4 认知闭环
+// ─────────────────────────────────────────────────────────────────────
+
+export * from './cognitive-loop';
