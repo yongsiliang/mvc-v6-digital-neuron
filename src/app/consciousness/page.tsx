@@ -1164,24 +1164,6 @@ export default function ConsciousnessPage() {
               </div>
             )}
             
-            {/* 反思结果 */}
-            {reflectionResult && (
-              <div className="flex justify-start">
-                <div className="bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg p-3 max-w-[80%]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Brain className="w-4 h-4" />
-                    <span className="text-sm font-medium">反思结果</span>
-                  </div>
-                  {reflectionResult.newWisdom && (
-                    <p className="text-sm">💡 {reflectionResult.newWisdom}</p>
-                  )}
-                  {reflectionResult.selfUpdates.map((update, i) => (
-                    <p key={i} className="text-xs text-muted-foreground mt-1">• {update}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-            
             {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
               <div className="flex justify-start">
                 <div className="bg-muted rounded-lg p-3">
