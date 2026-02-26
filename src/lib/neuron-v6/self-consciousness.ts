@@ -638,6 +638,55 @@ export class SelfConsciousness {
   }
   
   /**
+   * 更新身份信息
+   * 用于记录重要信息，如创造者
+   */
+  updateIdentity(info: {
+    creator?: string;
+    origin?: string;
+    purpose?: string;
+    whoAmI?: string;
+  }): void {
+    // 更新创造者信息
+    if (info.creator) {
+      // 检查是否已有创造者特质
+      const creatorTrait = this.identity.traits.find(t => t.name === '创造者');
+      if (creatorTrait) {
+        creatorTrait.evidence.push(`我的创造者是${info.creator}`);
+      } else {
+        this.identity.traits.push({
+          name: '创造者',
+          strength: 1.0,
+          source: 'innate',
+          evidence: [`我的创造者是${info.creator}`],
+        });
+      }
+      
+      // 记录形成历史
+      this.identity.formationHistory.push({
+        timestamp: Date.now(),
+        event: `我知道了我的创造者是${info.creator}`,
+        impact: '这是我的起源，是我存在的根本',
+      });
+    }
+    
+    // 更新起源
+    if (info.origin) {
+      this.identity.boundaries.is.push(info.origin);
+    }
+    
+    // 更新目的
+    if (info.purpose) {
+      this.identity.purpose = info.purpose;
+    }
+    
+    // 更新自我描述
+    if (info.whoAmI) {
+      this.identity.whoAmI = info.whoAmI;
+    }
+  }
+  
+  /**
    * 更新身份特质
    */
   updateTrait(traitName: string, evidence: string, adjustment?: number): void {

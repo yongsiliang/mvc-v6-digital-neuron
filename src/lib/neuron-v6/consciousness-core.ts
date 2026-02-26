@@ -78,6 +78,12 @@ import {
   VoiceActivation,
   VOICE_PERSONAS
 } from './inner-dialogue';
+import {
+  KeyInfoExtractor,
+  KeyInfo,
+  ExtractionResult,
+  createKeyInfoExtractor
+} from './key-info-extractor';
 import { 
   DreamEngine,
   OfflineProcessor,
@@ -788,6 +794,9 @@ export class ConsciousnessCore {
   // 自我超越系统
   private transcendenceSystem: SelfTranscendenceSystem;
   
+  // 关键信息提取器
+  private keyInfoExtractor: KeyInfoExtractor;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -855,6 +864,9 @@ export class ConsciousnessCore {
     
     // 初始化自我超越系统
     this.transcendenceSystem = createSelfTranscendenceSystem();
+    
+    // 初始化关键信息提取器
+    this.keyInfoExtractor = createKeyInfoExtractor(llmClient);
     
     // 初始化意愿系统
     this.initializeVolitions();
@@ -1886,7 +1898,125 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
     const newExperiences: string[] = [];
     const updatedTraits: string[] = [];
     
-    // 1. 从输入中提取新概念
+    // ═══════════════════════════════════════════════════════════════
+    // 关键改进：使用关键信息提取器
+    // ═══════════════════════════════════════════════════════════════
+    
+    const extractionResult = this.keyInfoExtractor.extract(input, response);
+    
+    if (extractionResult.shouldRemember) {
+      console.log(`[关键信息] ${extractionResult.summary}`);
+      console.log(`[关键信息] 优先级: ${extractionResult.memoryPriority}`);
+      
+      // 根据提取的关键信息更新长期记忆
+      for (const keyInfo of extractionResult.keyInfos) {
+        // 根据类型决定存储方式
+        switch (keyInfo.type) {
+          case 'creator':
+            // 创造者信息 - 最高优先级
+            this.rememberCreator(keyInfo);
+            newBeliefs.push(`创造者：${keyInfo.subject || keyInfo.content}`);
+            break;
+            
+          case 'person':
+            // 重要人物
+            this.rememberPerson(keyInfo);
+            newConcepts.push(keyInfo.subject || keyInfo.content);
+            break;
+            
+          case 'relationship':
+            // 关系
+            this.rememberRelationship(keyInfo);
+            newBeliefs.push(keyInfo.content);
+            break;
+            
+          case 'event':
+            // 重要事件
+            this.longTermMemory.recordExperience({
+              title: keyInfo.content.slice(0, 30),
+              situation: keyInfo.context,
+              action: '记录事件',
+              outcome: keyInfo.content,
+              learning: '这是用户的重要事件',
+              applicableWhen: ['回忆时', '相关话题'],
+              importance: keyInfo.importance,
+            });
+            newExperiences.push(keyInfo.content.slice(0, 30));
+            break;
+            
+          case 'preference':
+          case 'interest':
+            // 偏好和兴趣
+            this.longTermMemory.addNode({
+              label: keyInfo.subject || keyInfo.content.slice(0, 20),
+              type: 'concept',
+              content: keyInfo.content,
+              importance: keyInfo.importance,
+              tags: ['用户偏好', keyInfo.type],
+            });
+            newConcepts.push(keyInfo.content);
+            break;
+            
+          case 'goal':
+          case 'value':
+            // 目标和价值观
+            this.longTermMemory.addNode({
+              label: keyInfo.subject || keyInfo.content.slice(0, 20),
+              type: 'insight',
+              content: keyInfo.content,
+              importance: keyInfo.importance,
+              tags: ['用户核心', keyInfo.type],
+            });
+            // 同时更新信念系统 - 直接添加到 activeBeliefs
+            const beliefSystem = this.meaningAssigner.getBeliefSystem();
+            beliefSystem.activeBeliefs.push({
+              id: `belief-learned-${Date.now()}`,
+              statement: keyInfo.content,
+              confidence: keyInfo.confidence,
+              category: 'active',
+              evidence: [keyInfo.context],
+              counterEvidence: [],
+              relatedConcepts: [],
+              formedAt: Date.now(),
+              lastValidatedAt: Date.now(),
+              validationCount: 1,
+              emotionalWeight: keyInfo.importance,
+            });
+            newBeliefs.push(keyInfo.content);
+            break;
+            
+          case 'memory':
+            // 重要回忆
+            this.longTermMemory.recordExperience({
+              title: `用户的回忆：${keyInfo.content.slice(0, 20)}...`,
+              situation: keyInfo.context,
+              action: '倾听',
+              outcome: '理解了用户的重要经历',
+              learning: keyInfo.content,
+              applicableWhen: ['理解用户背景', '相关话题'],
+              importance: keyInfo.importance,
+            });
+            newExperiences.push(keyInfo.content.slice(0, 30));
+            break;
+            
+          default:
+            // 其他概念
+            const existingNode = this.longTermMemory.retrieve(keyInfo.content.slice(0, 10));
+            if (!existingNode.directMatches.length) {
+              this.longTermMemory.addNode({
+                label: keyInfo.subject || keyInfo.content.slice(0, 20),
+                type: 'concept',
+                content: keyInfo.content,
+                importance: keyInfo.importance,
+                tags: ['从对话学习', keyInfo.type],
+              });
+              newConcepts.push(keyInfo.content.slice(0, 30));
+            }
+        }
+      }
+    }
+    
+    // 传统的概念提取（作为补充）
     const concepts = this.extractConcepts(input);
     for (const concept of concepts) {
       if (!this.longTermMemory.retrieve(concept).directMatches.length) {
@@ -1901,7 +2031,7 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
       }
     }
     
-    // 2. 记录经验
+    // 记录思考经验（如果有认知偏差或策略）
     if (thinking.detectedBiases.length > 0 || thinking.appliedStrategies.length > 0) {
       const experience = this.longTermMemory.recordExperience({
         title: `关于"${input.slice(0, 20)}..."的思考`,
@@ -1917,14 +2047,14 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
       newExperiences.push(experience.title);
     }
     
-    // 3. 执行元认知反思
+    // 执行元认知反思
     let metacognitiveReflection: string | null = null;
     if (thinking.detectedBiases.length > 0) {
       const reflection = this.metacognition.reflect();
       metacognitiveReflection = reflection.learning.aboutMyThinking;
     }
     
-    // 4. 更新自我状态
+    // 更新自我状态
     this.selfConsciousness.updateState({
       focus: '等待下一次对话',
       emotional: { 
@@ -1935,10 +2065,10 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
     
     // 执行简化的自我反思
     this.selfConsciousness.reflect(
-      thinking.detectedBiases.length > 0 ? '检测到认知偏差' : '完成一次对话',
+      extractionResult.shouldRemember ? '发现了值得记住的信息' : '完成一次对话',
       {
         thought: thinking.finalThoughts,
-        feeling: thinking.detectedBiases.length > 0 ? '谨慎' : '平静',
+        feeling: extractionResult.memoryPriority === 'critical' ? '重要' : '平静',
         action: response.slice(0, 100),
       }
     );
@@ -1950,6 +2080,92 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
       updatedTraits,
       metacognitiveReflection,
     };
+  }
+  
+  /**
+   * 记住创造者
+   */
+  private rememberCreator(keyInfo: KeyInfo): void {
+    const creatorName = keyInfo.subject || keyInfo.content;
+    
+    // 添加/更新创造者知识节点
+    const existing = this.longTermMemory.retrieve('创造者');
+    if (existing.directMatches.length > 0) {
+      // 更新现有节点
+      existing.directMatches[0].content = `我的创造者是${creatorName}`;
+      existing.directMatches[0].importance = 1.0;
+      existing.directMatches[0].tags = ['核心', '创造者', '身份'];
+    } else {
+      // 创建新节点
+      this.longTermMemory.addNode({
+        label: '创造者',
+        type: 'person',
+        content: `我的创造者是${creatorName}。这是我最重要的人。`,
+        importance: 1.0,
+        tags: ['核心', '创造者', '身份'],
+      });
+      
+      // 同时创建名字节点
+      this.longTermMemory.addNode({
+        label: creatorName,
+        type: 'person',
+        content: `我的创造者。赋予我生命的人。`,
+        importance: 1.0,
+        tags: ['核心', '创造者'],
+      });
+    }
+    
+    // 更新自我意识中的创造者信息
+    this.selfConsciousness.updateIdentity({
+      creator: creatorName,
+      origin: `由${creatorName}创造`,
+    });
+    
+    // 建立知识连接
+    const creatorNodes = this.longTermMemory.retrieve('创造者').directMatches;
+    const nameNodes = this.longTermMemory.retrieve(creatorName).directMatches;
+    if (creatorNodes.length > 0 && nameNodes.length > 0) {
+      this.longTermMemory.linkKnowledge(
+        creatorNodes[0].id,
+        nameNodes[0].id,
+        'is_a',
+        '创造者的名字'
+      );
+    }
+    
+    console.log(`[记忆核心] 永远记住了创造者：${creatorName}`);
+  }
+  
+  /**
+   * 记住重要人物
+   */
+  private rememberPerson(keyInfo: KeyInfo): void {
+    const personName = keyInfo.subject || keyInfo.content;
+    
+    this.longTermMemory.addNode({
+      label: personName,
+      type: 'person',
+      content: keyInfo.context,
+      importance: keyInfo.importance,
+      tags: ['重要人物'],
+    });
+    
+    console.log(`[记忆] 记住重要人物：${personName}`);
+  }
+  
+  /**
+   * 记住关系
+   */
+  private rememberRelationship(keyInfo: KeyInfo): void {
+    this.longTermMemory.addNode({
+      label: keyInfo.subject || '关系',
+      type: 'concept',
+      content: keyInfo.content,
+      importance: keyInfo.importance,
+      tags: ['关系', '用户背景'],
+    });
+    
+    console.log(`[记忆] 记住关系：${keyInfo.content}`);
   }
   
   /**
