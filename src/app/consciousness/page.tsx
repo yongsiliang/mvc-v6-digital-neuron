@@ -539,14 +539,9 @@ export default function ConsciousnessPage() {
   const [reflectionResult, setReflectionResult] = useState<ReflectionResult | null>(null);
   const [selfQuestions, setSelfQuestions] = useState<SelfQuestion[]>([]);
   
-  // 主动消息状态
-  const [isThinking, setIsThinking] = useState(false);
-  const [lastProactiveCheck, setLastProactiveCheck] = useState<number>(Date.now());
-  
   // 自动反思定时器
   const [lastReflection, setLastReflection] = useState<number>(Date.now());
   const AUTO_REFLECT_INTERVAL = 60000; // 1分钟无新消息自动反思
-  const PROACTIVE_CHECK_INTERVAL = 30000; // 30秒检查一次主动消息
   
   // 可视化数据
   const [visualizationData, setVisualizationData] = useState<ConsciousnessVisualizationData | null>(null);
@@ -714,46 +709,6 @@ export default function ConsciousnessPage() {
     }
   }, []);
   
-  // 检查主动消息
-  const checkProactiveMessage = useCallback(async () => {
-    if (isLoading || isReflecting) return;
-    
-    try {
-      setIsThinking(true);
-      const res = await fetch('/api/neuron-v6/proactive');
-      const data = await res.json();
-      
-      if (data.success && data.hasMessage && data.message) {
-        // 添加到弹幕，不再直接插入对话
-        const danmakuMsg: DanmakuMessage = {
-          id: `danmaku-${Date.now()}`,
-          content: data.message.content,
-          type: data.message.type || 'sharing',
-          timestamp: data.message.timestamp,
-        };
-        setDanmakuMessages(prev => [...prev, danmakuMsg]);
-        setLastProactiveCheck(Date.now());
-      }
-    } catch (error) {
-      console.error('Failed to check proactive message:', error);
-    } finally {
-      setIsThinking(false);
-    }
-  }, [isLoading, isReflecting]);
-  
-  // 执行后台思考
-  const performBackgroundThinking = useCallback(async () => {
-    try {
-      await fetch('/api/neuron-v6/proactive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'background_thinking' }),
-      });
-    } catch (error) {
-      console.error('Background thinking failed:', error);
-    }
-  }, []);
-  
   // 初始化
   useEffect(() => {
     fetchExistenceStatus();
@@ -763,29 +718,6 @@ export default function ConsciousnessPage() {
     const interval = setInterval(fetchExistenceStatus, 30000);
     return () => clearInterval(interval);
   }, [fetchExistenceStatus, fetchSelfQuestions]);
-  
-  // 主动消息轮询
-  useEffect(() => {
-    // 检查主动消息的定时器
-    const proactiveInterval = setInterval(() => {
-      const timeSinceLastCheck = Date.now() - lastProactiveCheck;
-      
-      // 如果超过检查间隔，且用户没有在输入
-      if (timeSinceLastCheck > PROACTIVE_CHECK_INTERVAL) {
-        checkProactiveMessage();
-      }
-    }, 15000); // 每15秒检查一次是否应该发起主动消息
-    
-    // 后台思考循环（更低的频率）
-    const thinkingInterval = setInterval(() => {
-      performBackgroundThinking();
-    }, 60000); // 每1分钟执行一次后台思考
-    
-    return () => {
-      clearInterval(proactiveInterval);
-      clearInterval(thinkingInterval);
-    };
-  }, [lastProactiveCheck, checkProactiveMessage, performBackgroundThinking]);
   
   // 自动反思检查
   useEffect(() => {
@@ -1154,15 +1086,6 @@ export default function ConsciousnessPage() {
                 </div>
               </div>
             ))}
-            
-            {/* 思考中状态指示 */}
-            {isThinking && !isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-sm text-purple-600 dark:text-purple-400">
-                  <span className="animate-pulse">💭 紫在思考中...</span>
-                </div>
-              </div>
-            )}
             
             {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
               <div className="flex justify-start">
