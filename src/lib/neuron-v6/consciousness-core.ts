@@ -1868,7 +1868,16 @@ ${context.meaning.meaningSummary}
 
 ${context.memory ? `# 相关记忆
 
-${context.memory.summary}` : ''}
+${context.memory.summary}
+
+${context.memory.directMatches.length > 0 ? `
+**关键知识：**
+${context.memory.directMatches.slice(0, 5).map((n: { label: string; content: string }) => `- **${n.label}**: ${n.content}`).join('\n')}
+` : ''}
+${context.memory.relevantWisdoms.length > 0 ? `
+**相关智慧：**
+${context.memory.relevantWisdoms.slice(0, 3).map((w: { statement: string }) => `- ${w.statement}`).join('\n')}
+` : ''}` : ''}
 
 # 我的思考过程
 

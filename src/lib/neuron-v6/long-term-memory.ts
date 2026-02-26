@@ -519,9 +519,15 @@ export class LongTermMemory {
     const queryLower = query.toLowerCase();
     
     for (const node of this.nodes.values()) {
-      if (node.label.toLowerCase().includes(queryLower) ||
-          node.content.toLowerCase().includes(queryLower) ||
-          node.tags.some(t => t.toLowerCase().includes(queryLower))) {
+      // 修复：检查 query 是否包含 label/content，以及 label/content 是否包含 query
+      const labelLower = node.label.toLowerCase();
+      const contentLower = node.content.toLowerCase();
+      
+      if (queryLower.includes(labelLower) ||  // query 包含 label (如 "你的创造者是谁" 包含 "创造者")
+          labelLower.includes(queryLower) ||  // label 包含 query
+          contentLower.includes(queryLower) ||  // content 包含 query
+          queryLower.includes(contentLower) ||  // query 包含 content
+          node.tags.some(t => queryLower.includes(t.toLowerCase()) || t.toLowerCase().includes(queryLower))) {
         directMatches.push(node);
         node.accessCount++;
         node.lastAccessedAt = Date.now();

@@ -530,6 +530,7 @@ export default function ConsciousnessPage() {
         progress: number;
       }>;
     };
+    learning?: LearningData;
   }>({});
   
   // 存在状态
@@ -991,6 +992,7 @@ export default function ConsciousnessPage() {
                   break;
                 case 'learning':
                   learning = data.data;
+                  setCurrentData(prev => ({ ...prev, learning }));
                   break;
                 case 'complete':
                   // 最终更新完整消息

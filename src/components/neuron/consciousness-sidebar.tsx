@@ -33,6 +33,15 @@ import {
 // 类型定义
 // ─────────────────────────────────────────────────────────────────────
 
+// 学习结果数据
+interface LearningData {
+  newConcepts: string[];
+  newBeliefs: string[];
+  newExperiences: string[];
+  updatedTraits: string[];
+  metacognitiveReflection: string | null;
+}
+
 interface ConsciousnessLayersData {
   layerResults: Array<{
     level: string;
@@ -428,6 +437,7 @@ interface ConsciousnessSidebarProps {
     multiConsciousness?: MultiConsciousnessData;
     legacy?: LegacyData;
     transcendence?: TranscendenceData;
+    learning?: LearningData;
   };
   existenceStatus: ExistenceStatus | null;
   onVisualize?: () => void;
@@ -488,6 +498,89 @@ function ConsciousnessLayersPanel({ data }: { data: ConsciousnessLayersData }) {
           </div>
           <p className="text-[10px] text-muted-foreground">
             {data.selfObservation.iSeeMyself}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 学习结果面板
+function LearningPanel({ data }: { data: LearningData }) {
+  const hasContent = 
+    data.newConcepts.length > 0 || 
+    data.newBeliefs.length > 0 || 
+    data.newExperiences.length > 0 ||
+    data.metacognitiveReflection;
+
+  if (!hasContent) {
+    return (
+      <div className="text-xs text-muted-foreground text-center py-2">
+        本次对话未提取到新知识
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* 新信念 */}
+      {data.newBeliefs.length > 0 && (
+        <div className="p-2 bg-amber-500/10 rounded border border-amber-500/20">
+          <div className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 mb-1">
+            <Sparkles className="w-3 h-3" />
+            <span>新信念</span>
+          </div>
+          {data.newBeliefs.slice(0, 3).map((belief, i) => (
+            <div key={i} className="text-[10px] text-muted-foreground pl-4 mb-0.5">
+              • {belief.length > 50 ? belief.slice(0, 50) + '...' : belief}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 新概念 */}
+      {data.newConcepts.length > 0 && (
+        <div className="p-2 bg-blue-500/10 rounded border border-blue-500/20">
+          <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 mb-1">
+            <Network className="w-3 h-3" />
+            <span>新概念 ({data.newConcepts.length})</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {data.newConcepts.slice(0, 5).map((concept, i) => (
+              <Badge key={i} variant="outline" className="text-[10px] px-1 py-0">
+                {concept.length > 20 ? concept.slice(0, 20) + '...' : concept}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* 新经验 */}
+      {data.newExperiences.length > 0 && (
+        <div className="p-2 bg-green-500/10 rounded border border-green-500/20">
+          <div className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 mb-1">
+            <Brain className="w-3 h-3" />
+            <span>新经验</span>
+          </div>
+          {data.newExperiences.slice(0, 2).map((exp, i) => (
+            <div key={i} className="text-[10px] text-muted-foreground pl-4 mb-0.5">
+              • {exp.length > 40 ? exp.slice(0, 40) + '...' : exp}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 元认知反思 */}
+      {data.metacognitiveReflection && (
+        <div className="p-2 bg-purple-500/10 rounded border border-purple-500/20">
+          <div className="flex items-center gap-1 text-[10px] text-purple-600 dark:text-purple-400 mb-1">
+            <Eye className="w-3 h-3" />
+            <span>元认知反思</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            {data.metacognitiveReflection.length > 80 
+              ? data.metacognitiveReflection.slice(0, 80) + '...' 
+              : data.metacognitiveReflection}
           </p>
         </div>
       )}
@@ -1311,6 +1404,27 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-3">
                 <ConsciousnessLayersPanel data={currentData.consciousnessLayers} />
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 学习结果 */}
+          {currentData.learning && (
+            <AccordionItem value="learning" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm font-medium">学习结果</span>
+                  {(currentData.learning.newBeliefs.length > 0 || 
+                    currentData.learning.newConcepts.length > 0) && (
+                    <Badge variant="secondary" className="text-[10px] ml-auto mr-2 bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                      +{currentData.learning.newBeliefs.length + currentData.learning.newConcepts.length}
+                    </Badge>
+                  )}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <LearningPanel data={currentData.learning} />
               </AccordionContent>
             </AccordionItem>
           )}
