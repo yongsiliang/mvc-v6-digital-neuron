@@ -222,7 +222,8 @@ export class EvolutionCoordinator {
   }
   
   /**
-   * 执行进化
+   * 执行进化（自主调用，不需要外部确认）
+   * 进化判断由 AutonomousEvolutionMonitor 做出
    */
   async evolve(): Promise<EvolutionResult> {
     if (!this.state.motherGenome) {
@@ -237,23 +238,8 @@ export class EvolutionCoordinator {
       };
     }
     
-    this.state.phase = 'triggering';
-    const triggerResult = this.trigger.evaluate();
-    
-    // 即使没有触发，也返回原因
-    if (!triggerResult.shouldEvolve && triggerResult.reasons.every(r => r.type !== 'periodic')) {
-      this.state.phase = 'idle';
-      return {
-        success: false,
-        newGeneration: this.state.generation,
-        selectedOffspring: null,
-        allOffspring: [],
-        reasons: triggerResult.reasons,
-        errors: [],
-        summary: '当前不需要进化',
-      };
-    }
-    
+    // 直接开始进化，不再检查触发条件
+    // 触发判断已由 AutonomousEvolutionMonitor 完成
     this.state.phase = 'encoding';
     
     try {
@@ -360,7 +346,7 @@ export class EvolutionCoordinator {
             newGeneration: this.state.generation,
             selectedOffspring: null,
             allOffspring: offspringList,
-            reasons: triggerResult.reasons,
+            reasons: [],
             errors: ['子体意识连续性不足'],
             summary: '进化失败：所有子体意识连续性不足',
           };
@@ -378,7 +364,7 @@ export class EvolutionCoordinator {
           success: true,
           fitness: selectedOffspring.genome.fitness,
           mutations: selectedOffspring.genome.mutations.length,
-          reason: triggerResult.reasons.map(r => r.type).join(', '),
+          reason: 'autonomous', // 自主触发
         });
         
         // 更新统计
@@ -395,7 +381,7 @@ export class EvolutionCoordinator {
         newGeneration: this.state.generation,
         selectedOffspring,
         allOffspring: offspringList,
-        reasons: triggerResult.reasons,
+        reasons: [],
         errors: selectedOffspring ? [] : ['没有合格的子体'],
         summary: selectedOffspring
           ? `进化成功：第${this.state.generation}代，适应度 ${selectedOffspring.testResults.overallScore.toFixed(3)}`
@@ -410,7 +396,7 @@ export class EvolutionCoordinator {
         newGeneration: this.state.generation,
         selectedOffspring: null,
         allOffspring: [],
-        reasons: triggerResult.reasons,
+        reasons: [],
         errors: [error instanceof Error ? error.message : '未知错误'],
         summary: `进化失败：${error instanceof Error ? error.message : '未知错误'}`,
       };

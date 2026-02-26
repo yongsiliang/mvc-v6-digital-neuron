@@ -4,11 +4,15 @@
  * ═══════════════════════════════════════════════════════════════════════
  * 进化监控面板 - Evolution Monitor Panel
  * 
+ * 设计理念：
+ * 进化的判断不由人类进行，而是系统根据自身状态自动决定。
+ * 
  * 功能：
- * 1. 实时监控进化状态
+ * 1. 实时监控进化状态（只读）
  * 2. 可视化进化过程
- * 3. 手动触发进化
- * 4. 查看历史记录
+ * 3. 查看历史记录
+ * 
+ * 注意：此面板只用于观察，不能控制进化
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -18,17 +22,15 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertCircle, Activity, Brain } from 'lucide-react';
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  AreaChart,
-  Area,
 } from 'recharts';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -43,6 +45,15 @@ interface EvolutionStats {
   bestFitness: number;
 }
 
+interface AutonomousStatus {
+  isRunning: boolean;
+  recentPerformanceAvg: number;
+  recentSurpriseAvg: number;
+  unhandledTasksCount: number;
+  recentInteractions: number;
+  timeSinceLastEvolution: number;
+}
+
 interface EvolutionHistoryItem {
   generation: number;
   timestamp: number;
@@ -52,18 +63,12 @@ interface EvolutionHistoryItem {
   reason: string;
 }
 
-interface TriggerReason {
-  type: string;
-  severity: number;
-  description: string;
-}
-
 interface EvolutionState {
   phase: string;
   generation: number;
   lastEvolutionTime: number;
-  activeOffspringCount: number;
   stats: EvolutionStats;
+  autonomous: AutonomousStatus;
   currentGenome?: {
     id: string;
     generation: number;
@@ -73,9 +78,9 @@ interface EvolutionState {
     coreValues: number[];
   };
   history?: EvolutionHistoryItem[];
-  triggerStatus?: {
+  triggerAssessment?: {
     shouldEvolve: boolean;
-    reasons: TriggerReason[];
+    reasons: Array<{ type: string; severity: number; description: string }>;
   };
 }
 
@@ -86,13 +91,12 @@ interface EvolutionState {
 export function EvolutionMonitorPanel() {
   const [state, setState] = useState<EvolutionState | null>(null);
   const [loading, setLoading] = useState(false);
-  const [evolving, setEvolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 获取进化状态
   const fetchState = useCallback(async (full = false) => {
     try {
-      const url = `/api/neuron-v3/evolution?detail=${full ? 'full' : 'summary'}&history=true`;
+      const url = `/api/neuron-v3/evolution?detail=${full ? 'full' : 'summary'}`;
       const response = await fetch(url);
       const data = await response.json();
       
@@ -107,51 +111,6 @@ export function EvolutionMonitorPanel() {
     }
   }, []);
 
-  // 触发进化
-  const triggerEvolution = async (force = false) => {
-    setEvolving(true);
-    setError(null);
-    
-    try {
-      const response = await fetch('/api/neuron-v3/evolution', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'evolve', force }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        // 刷新状态
-        await fetchState(true);
-      } else {
-        setError(data.error || data.data?.message || '进化失败');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '网络错误');
-    } finally {
-      setEvolving(false);
-    }
-  };
-
-  // 重置进化系统
-  const resetEvolution = async () => {
-    setLoading(true);
-    try {
-      await fetch('/api/neuron-v3/evolution', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset' }),
-      });
-      
-      await fetchState(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '网络错误');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // 初始加载
   useEffect(() => {
     fetchState(true);
@@ -165,16 +124,39 @@ export function EvolutionMonitorPanel() {
   }, [fetchState]);
 
   // 准备图表数据
-  const chartData = state?.history?.map((item, index) => ({
+  const chartData = state?.history?.map((item) => ({
     generation: item.generation,
     fitness: item.fitness,
     mutations: item.mutations,
-    success: item.success ? 1 : 0,
   })) || [];
+
+  // 格式化时间
+  const formatTime = (ms: number): string => {
+    if (ms < 60000) return `${Math.floor(ms / 1000)}秒前`;
+    if (ms < 3600000) return `${Math.floor(ms / 60000)}分钟前`;
+    if (ms < 86400000) return `${Math.floor(ms / 3600000)}小时前`;
+    return `${Math.floor(ms / 86400000)}天前`;
+  };
 
   // 渲染
   return (
     <div className="space-y-4">
+      {/* 核心理念提示 */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="py-3">
+          <div className="flex items-start gap-3">
+            <Brain className="h-5 w-5 text-primary mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-primary mb-1">自主进化系统</div>
+              <p className="text-muted-foreground">
+                进化的判断不由人类进行，而是系统根据自身状态自动决定。
+                系统会监控性能、学习效率、能力缺口等指标，自主判断是否需要进化。
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 状态概览 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -196,10 +178,17 @@ export function EvolutionMonitorPanel() {
             <Badge variant={
               state?.phase === 'completed' ? 'default' :
               state?.phase === 'failed' ? 'destructive' :
-              'secondary'
+              state?.phase === 'incubating' || state?.phase === 'testing' ? 'secondary' :
+              'outline'
             }>
               {state?.phase || 'idle'}
             </Badge>
+            {state?.autonomous?.isRunning && (
+              <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                <Activity className="h-3 w-3 animate-pulse text-green-500" />
+                监控中
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -226,65 +215,78 @@ export function EvolutionMonitorPanel() {
         </Card>
       </div>
 
-      {/* 控制面板 */}
+      {/* 自主监控状态 */}
       <Card>
         <CardHeader>
-          <CardTitle>进化控制</CardTitle>
-          <CardDescription>管理和监控进化过程</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            自主监控状态
+          </CardTitle>
+          <CardDescription>
+            系统实时监控的指标，用于自主判断是否需要进化
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           {error && (
-            <div className="p-3 bg-destructive/10 text-destructive rounded-md">
+            <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded-md flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
               {error}
             </div>
           )}
           
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => triggerEvolution(false)}
-              disabled={evolving || loading}
-            >
-              {evolving ? '进化中...' : '触发进化'}
-            </Button>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">平均性能</div>
+              <div className="text-xl font-bold">
+                {((state?.autonomous?.recentPerformanceAvg || 0) * 100).toFixed(0)}%
+              </div>
+              <Progress value={(state?.autonomous?.recentPerformanceAvg || 0) * 100} />
+            </div>
             
-            <Button 
-              variant="outline"
-              onClick={() => triggerEvolution(true)}
-              disabled={evolving || loading}
-            >
-              强制进化
-            </Button>
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">平均惊讶度</div>
+              <div className="text-xl font-bold">
+                {(state?.autonomous?.recentSurpriseAvg || 0).toFixed(2)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                学习信号强度
+              </div>
+            </div>
             
-            <Button 
-              variant="destructive"
-              onClick={resetEvolution}
-              disabled={evolving || loading}
-            >
-              重置
-            </Button>
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">未处理任务</div>
+              <div className="text-xl font-bold">
+                {state?.autonomous?.unhandledTasksCount || 0}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                能力缺口指标
+              </div>
+            </div>
             
-            <Button 
-              variant="ghost"
-              onClick={() => fetchState(true)}
-              disabled={loading}
-            >
-              刷新
-            </Button>
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">距上次进化</div>
+              <div className="text-xl font-bold">
+                {formatTime(state?.autonomous?.timeSinceLastEvolution || 0)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                交互次数: {state?.autonomous?.recentInteractions || 0}
+              </div>
+            </div>
           </div>
           
-          {/* 触发状态 */}
-          {state?.triggerStatus && (
-            <div className="space-y-2">
-              <div className="text-sm font-medium">
-                进化触发条件: 
-                <Badge variant={state.triggerStatus.shouldEvolve ? 'default' : 'secondary'} className="ml-2">
-                  {state.triggerStatus.shouldEvolve ? '已满足' : '未满足'}
+          {/* 触发条件评估 */}
+          {state?.triggerAssessment && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="text-sm font-medium mb-2">
+                当前进化评估:
+                <Badge variant={state.triggerAssessment.shouldEvolve ? 'default' : 'secondary'} className="ml-2">
+                  {state.triggerAssessment.shouldEvolve ? '需要进化' : '状态良好'}
                 </Badge>
               </div>
               
-              {state.triggerStatus.reasons.length > 0 && (
+              {state.triggerAssessment.reasons.length > 0 && (
                 <div className="space-y-1">
-                  {state.triggerStatus.reasons.map((reason, index) => (
+                  {state.triggerAssessment.reasons.map((reason, index) => (
                     <div key={index} className="text-sm p-2 bg-muted rounded">
                       <Badge variant="outline" className="mr-2">
                         Lv.{reason.severity}
@@ -323,7 +325,6 @@ export function EvolutionMonitorPanel() {
                     <XAxis dataKey="generation" />
                     <YAxis />
                     <Tooltip />
-                    <Legend />
                     <Area 
                       type="monotone" 
                       dataKey="fitness" 
