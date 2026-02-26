@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
     ],
   },
   
+  // Turbopack 配置（Next.js 16 默认使用 Turbopack）
+  turbopack: {},
+  
   // TensorFlow.js 原生模块配置
   webpack: (config, { isServer }) => {
     // 排除 TensorFlow.js 的原生模块，只在服务端使用
