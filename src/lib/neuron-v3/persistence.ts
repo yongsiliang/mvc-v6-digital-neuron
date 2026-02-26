@@ -159,7 +159,7 @@ class NeuronV3Persistence {
 
       // 检查是否已存在状态记录
       const { data: existingState } = await client
-        .from('neuron_v3_states')
+        .from('neuron_v3_state')
         .select('id')
         .eq('user_id', this.userId)
         .single();
@@ -178,7 +178,7 @@ class NeuronV3Persistence {
       if (existingState) {
         // 更新现有记录
         const { error } = await client
-          .from('neuron_v3_states')
+          .from('neuron_v3_state')
           .update(stateData)
           .eq('id', existingState.id);
 
@@ -189,7 +189,7 @@ class NeuronV3Persistence {
       } else {
         // 创建新记录
         const { error } = await client
-          .from('neuron_v3_states')
+          .from('neuron_v3_state')
           .insert({
             ...stateData,
             created_at: new Date().toISOString(),
@@ -225,7 +225,7 @@ class NeuronV3Persistence {
       const client = getSupabaseClient();
 
       const { data, error } = await client
-        .from('neuron_v3_states')
+        .from('neuron_v3_state')
         .select('*')
         .eq('user_id', this.userId)
         .single();
@@ -480,7 +480,7 @@ class NeuronV3Persistence {
       const client = getSupabaseClient();
 
       const { error } = await client
-        .from('neuron_v3_states')
+        .from('neuron_v3_state')
         .delete()
         .eq('user_id', this.userId);
 
@@ -510,7 +510,7 @@ class NeuronV3Persistence {
       const client = getSupabaseClient();
 
       const { data, error } = await client
-        .from('neuron_v3_states')
+        .from('neuron_v3_state')
         .select('neurons, concepts, updated_at')
         .eq('user_id', this.userId)
         .single();

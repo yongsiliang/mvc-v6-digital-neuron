@@ -87,7 +87,7 @@ function extractConceptsFromLLMOutput(content: string): Array<{ name: string; im
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, history = [] } = body;
+    const { message, history: clientHistory = [] } = body;
 
     if (!message) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
@@ -109,6 +109,14 @@ export async function POST(request: NextRequest) {
     // 同时让神经元系统处理（保持兼容性）
     const neuronSystem = getNeuronSystemV3();
     const neuronResult = await neuronSystem.processInput(message);
+    
+    // 从持久化存储获取对话历史
+    const persistedMessages = neuronSystem.getRecentMessages(20);
+    
+    // 合并历史：优先使用持久化的历史
+    const history = persistedMessages.length > 0 
+      ? persistedMessages.map(m => ({ role: m.role, content: m.content }))
+      : clientHistory;
 
     // ══════════════════════════════════════════════════════════════════
     // Step 2: 构建 LLM 客户端和系统提示（阴→阳注入）
