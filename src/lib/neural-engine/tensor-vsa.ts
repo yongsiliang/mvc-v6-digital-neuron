@@ -286,7 +286,12 @@ export class TensorVSA {
   }
 
   generateRandomVector(): tf.Tensor1D {
-    return tf.randomUniform([this.dimension], -1, 1).step(0).mul(2).sub(1) as tf.Tensor1D;
+    // 生成 {-1, 1} 二值向量
+    const values: number[] = [];
+    for (let i = 0; i < this.dimension; i++) {
+      values.push(Math.random() > 0.5 ? 1 : -1);
+    }
+    return tf.tensor1d(values);
   }
 
   normalize(v: tf.Tensor1D): tf.Tensor1D {

@@ -107,8 +107,8 @@ export class NeuralEngineAdapter {
     this.config = {
       enableRealNeuralNetwork: true,
       useGPU: false,
-      vsaDimension: 10000,
-      maxNeurons: 1000,
+      vsaDimension: 512,  // 使用较小的维度进行测试，生产环境可增加
+      maxNeurons: 100,
       autoSyncWeights: true,
       learningRate: 0.01,
       ...config,
@@ -234,8 +234,11 @@ export class NeuralEngineAdapter {
       currentGoal?: string;
     }
   ): Promise<EnhancedProcessingResult> {
+    console.log('[NeuralEngineAdapter] processInput called, neuralEngine exists:', !!this.neuralEngine, 'initialized:', this.initialized);
+    
     if (!this.neuralEngine) {
       // 降级：返回模拟结果
+      console.log('[NeuralEngineAdapter] Falling back to simulation mode');
       return this.createSimulatedResult(inputVector);
     }
 
@@ -250,6 +253,8 @@ export class NeuralEngineAdapter {
       };
     } catch (error) {
       console.error('[NeuralEngineAdapter] Processing error:', error);
+      console.error('[NeuralEngineAdapter] Error stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('[NeuralEngineAdapter] Neural engine exists:', !!this.neuralEngine);
       return this.createSimulatedResult(inputVector);
     }
   }
@@ -299,15 +304,20 @@ export class NeuralEngineAdapter {
    */
   async applyReward(
     reward: number,
-    neuronIds?: string[]
+    neuronIds?: string[] | null
   ): Promise<void> {
     if (!this.neuralEngine) return;
 
     // 转换 V3 神经元 ID 到引擎 ID
-    const engineIds = neuronIds?.map(id => this.neuronIdMapping.get(id)).filter(Boolean) as string[];
+    let engineIds: string[] | undefined;
+    if (neuronIds && Array.isArray(neuronIds) && neuronIds.length > 0) {
+      engineIds = neuronIds
+        .map(id => this.neuronIdMapping.get(id))
+        .filter((id): id is string => id !== undefined);
+    }
 
     await this.neuralEngine.applyReward(reward, {
-      neuronIds: engineIds.length > 0 ? engineIds : undefined,
+      neuronIds: engineIds,
     });
   }
 

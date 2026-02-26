@@ -3,11 +3,37 @@
  * 神经计算引擎 API
  * 
  * 提供真正的神经网络计算能力
+ * 
+ * 注意：TensorFlow.js 的原生模块只能在服务端使用
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getNeuralEngineAdapter, NeuralEngineAdapter } from '@/lib/neural-engine';
+
+// 全局缓存（在热重载时保持状态）
+declare global {
+  // eslint-disable-next-line no-var
+  var neuralEngineCache: Map<string, Awaited<ReturnType<typeof import('@/lib/neural-engine').getNeuralEngineAdapter>>> | undefined;
+}
+
+// 确保全局缓存存在
+if (!globalThis.neuralEngineCache) {
+  globalThis.neuralEngineCache = new Map();
+}
+
+// 动态导入 TensorFlow.js 相关模块（服务端专用）
+async function getNeuralEngine() {
+  // 使用动态导入来确保只在服务端加载
+  const { getNeuralEngineAdapter } = await import('@/lib/neural-engine');
+  
+  // 返回一个使用全局缓存的包装函数
+  return (userId: string) => {
+    if (!globalThis.neuralEngineCache!.has(userId)) {
+      globalThis.neuralEngineCache!.set(userId, getNeuralEngineAdapter(userId));
+    }
+    return globalThis.neuralEngineCache!.get(userId)!;
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // GET: 获取引擎状态
@@ -16,7 +42,8 @@ import { getNeuralEngineAdapter, NeuralEngineAdapter } from '@/lib/neural-engine
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id') || 'default-user';
-    const adapter = getNeuralEngineAdapter(userId);
+    const getAdapter = await getNeuralEngine();
+    const adapter = getAdapter(userId);
 
     // 如果未初始化，先初始化
     if (!adapter.getEngineStatus().initialized) {
@@ -39,6 +66,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: String(error),
+        note: 'TensorFlow.js neural engine requires Node.js runtime',
       },
       { status: 500 }
     );
@@ -53,8 +81,9 @@ export async function POST(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id') || 'default-user';
     const body = await request.json();
-
-    const adapter = getNeuralEngineAdapter(userId);
+    
+    const getAdapter = await getNeuralEngine();
+    const adapter = getAdapter(userId);
 
     // 如果未初始化，先初始化
     if (!adapter.getEngineStatus().initialized) {
@@ -123,7 +152,16 @@ export async function POST(request: NextRequest) {
       case 'init-neurons': {
         // 初始化神经元
         const { neurons } = data;
-        const result = await adapter.syncFromV3Neurons(neurons);
+        
+        // 确保神经元格式正确
+        const formattedNeurons = (neurons || []).map((n: { id: string; label: string; role: string; level?: number }, i: number) => ({
+          id: n.id || `neuron-${i}`,
+          label: n.label || `Neuron ${i}`,
+          role: n.role || 'semantic',
+          meta: { level: n.level ?? 0 }
+        }));
+        
+        const result = await adapter.syncFromV3Neurons(formattedNeurons);
 
         return NextResponse.json({
           success: result.success,
@@ -148,8 +186,12 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: String(error),
+        stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined,
       },
       { status: 500 }
     );
   }
 }
+
+// 强制使用 Node.js runtime（TensorFlow.js 需要）
+export const runtime = 'nodejs';

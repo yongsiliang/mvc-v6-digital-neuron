@@ -272,18 +272,25 @@ export class NeuralEngine {
     const predictions = new Map<string, number>();
 
     for (const [id, neuron] of this.neurons) {
-      const predWeightsT = neuron.predictionWeights.transpose();
-      const actualT = neuron.actualActivation.expandDims(1);
-      const predicted = tf.matMul(predWeightsT, actualT);
-      const value = (await predicted.data())[0];
-      predictions.set(id, value);
+      // actualActivation: [1] (标量)
+      // 我们简单地基于当前激活值和预测权重来生成预测
+      // 由于 actualActivation 是标量，预测值 = actualActivation * 预测权重均值
+      const actual = await neuron.actualActivation.data();
+      const actualValue = actual[0];
+      
+      // 使用预测权重的平均值作为缩放因子
+      const weightsData = await neuron.predictionWeights.data() as Float32Array;
+      let sum = 0;
+      for (let i = 0; i < weightsData.length; i++) {
+        sum += weightsData[i];
+      }
+      const avgWeight = sum / weightsData.length;
+      
+      const predictedValue = actualValue * avgWeight;
+      predictions.set(id, predictedValue);
 
       neuron.predictedActivation.dispose();
-      neuron.predictedActivation = tf.tensor1d([value]);
-
-      predWeightsT.dispose();
-      actualT.dispose();
-      predicted.dispose();
+      neuron.predictedActivation = tf.tensor1d([predictedValue]);
     }
 
     return predictions;
@@ -291,22 +298,39 @@ export class NeuralEngine {
 
   private async computeActivations(inputTensor: tf.Tensor1D): Promise<Map<string, number>> {
     const activations = new Map<string, number>();
+    const inputDim = inputTensor.shape[0];
+    const vsaDim = this.config.vsaDimension;
 
     for (const [id, neuron] of this.neurons) {
-      const dot = tf.dot(inputTensor, neuron.sensitivityVector);
-      const biased = tf.add(dot, neuron.bias);
-      const activated = tf.sigmoid(biased);
+      let value: number;
 
-      const value = (await activated.data())[0];
+      if (inputDim === vsaDim) {
+        // 如果输入是 VSA 维度，使用 sensitivityVector
+        const dot = tf.dot(inputTensor, neuron.sensitivityVector);
+        const biased = tf.add(dot, neuron.bias);
+        const activated = tf.sigmoid(biased);
+        value = (await activated.data())[0];
+        dot.dispose();
+        biased.dispose();
+        activated.dispose();
+      } else {
+        // 否则，使用简单的激活计算
+        // 将输入投影到神经元空间（使用权重的前 inputDim 个元素）
+        const weightsSlice = neuron.weights.slice([0, 0], [inputDim, 1]).flatten();
+        const dot = tf.dot(inputTensor, weightsSlice);
+        const biased = tf.add(dot, neuron.bias);
+        const activated = tf.sigmoid(biased);
+        value = (await activated.data())[0];
+        weightsSlice.dispose();
+        dot.dispose();
+        biased.dispose();
+        activated.dispose();
+      }
+
       activations.set(id, value);
-
       neuron.actualActivation.dispose();
       neuron.actualActivation = tf.tensor1d([value]);
       neuron.meta.totalActivations++;
-
-      dot.dispose();
-      biased.dispose();
-      activated.dispose();
     }
 
     return activations;
@@ -318,25 +342,46 @@ export class NeuralEngine {
   ): Promise<{ weights: Map<string, number>; output: tf.Tensor1D }> {
     const neuronIds = Array.from(this.neurons.keys());
     const activationValues = neuronIds.map(id => activations.get(id) || 0);
-    const activationMatrix = tf.tensor2d([activationValues], [1, neuronIds.length]);
+    const inputDim = inputTensor.shape[0];
+    const vsaDim = this.config.vsaDimension;
 
-    const query = inputTensor.expandDims(0);
-    const keys = activationMatrix;
-    const values = activationMatrix;
+    // 简化的注意力计算：使用激活值本身作为注意力权重
+    // 如果输入维度与 VSA 维度匹配，使用完整的注意力机制
+    if (inputDim === vsaDim) {
+      const activationMatrix = tf.tensor2d([activationValues], [1, neuronIds.length]);
+      const query = inputTensor.expandDims(0);
+      const keys = activationMatrix;
+      const values = activationMatrix;
 
-    const attentionOutput = await this.attention.compute(query, keys, values);
+      const attentionOutput = await this.attention.compute(query, keys, values);
 
-    const weightsMap = new Map<string, number>();
-    const attentionWeights = await attentionOutput.weights.array();
+      const weightsMap = new Map<string, number>();
+      const attentionWeights = await attentionOutput.weights.array();
 
-    neuronIds.forEach((id, i) => {
-      weightsMap.set(id, attentionWeights[0]?.[i] ?? 0);
-    });
+      neuronIds.forEach((id, i) => {
+        weightsMap.set(id, attentionWeights[0]?.[i] ?? 0);
+      });
 
-    query.dispose();
-    activationMatrix.dispose();
+      query.dispose();
+      activationMatrix.dispose();
 
-    return { weights: weightsMap, output: attentionOutput.output };
+      return { weights: weightsMap, output: attentionOutput.output };
+    } else {
+      // 简化版：使用 softmax 归一化的激活值作为注意力权重
+      const weightsMap = new Map<string, number>();
+      const expValues = activationValues.map(v => Math.exp(v));
+      const sumExp = expValues.reduce((a, b) => a + b, 0);
+      const softmaxWeights = expValues.map(v => v / sumExp);
+
+      neuronIds.forEach((id, i) => {
+        weightsMap.set(id, softmaxWeights[i] || 0);
+      });
+
+      // 输出是加权激活
+      const output = tf.tensor1d(activationValues.map((v, i) => v * softmaxWeights[i]));
+
+      return { weights: weightsMap, output };
+    }
   }
 
   private async computePredictionErrors(
@@ -397,26 +442,44 @@ export class NeuralEngine {
   ): Promise<{ adjustedNeurons: string[]; totalWeightChange: number }> {
     const adjustedNeurons: string[] = [];
     let totalWeightChange = 0;
+    const inputDim = inputTensor.shape[0];
+
+    // 获取输入数据一次
+    const inputData = await inputTensor.data();
 
     for (const [id, neuron] of this.neurons) {
       const error = errors.get(id) || 0;
+      const activation = activations.get(id) || 0;
+      const learningRate = neuron.learningState.learningRate;
 
-      const hebbianDelta = this.hebbianLayer.computeWeightDelta(
-        inputTensor,
-        neuron.actualActivation,
-        neuron.learningState.learningRate
-      );
+      // 获取当前权重数据
+      const weightsData = await neuron.weights.array() as number[][];
+      const predWeightsData = await neuron.predictionWeights.array() as number[][];
 
-      const predictionDelta = neuron.predictionWeights.mul(
-        error * this.config.learningConfig.predictionLearningRate
-      ) as tf.Tensor2D;
+      // 更新权重（只更新前 inputDim 个元素）
+      for (let i = 0; i < Math.min(inputDim, weightsData.length); i++) {
+        const inputValue = inputData[i];
+        weightsData[i][0] += learningRate * inputValue * activation;
+      }
 
-      const newWeights = neuron.weights.add(hebbianDelta) as tf.Tensor2D;
-      const newPredictionWeights = neuron.predictionWeights.add(predictionDelta) as tf.Tensor2D;
+      // 更新预测权重（基于误差）
+      const predictionDelta = error * this.config.learningConfig.predictionLearningRate;
+      for (let i = 0; i < predWeightsData.length; i++) {
+        const sign = predWeightsData[i][0] > 0 ? 1 : -1;
+        predWeightsData[i][0] += predictionDelta * sign * 0.01;
+      }
 
-      const weightChange = (await newWeights.sub(neuron.weights).norm().data())[0];
+      // 创建新的张量
+      const newWeights = tf.tensor2d(weightsData);
+      const newPredictionWeights = tf.tensor2d(predWeightsData);
+
+      // 计算权重变化
+      const weightDiff = newWeights.sub(neuron.weights);
+      const weightChange = (await weightDiff.norm().data())[0];
       totalWeightChange += weightChange;
+      weightDiff.dispose();
 
+      // 更新神经元
       neuron.weights.dispose();
       neuron.weights = newWeights;
       neuron.predictionWeights.dispose();
@@ -425,9 +488,6 @@ export class NeuralEngine {
       neuron.learningState.totalLearningEvents++;
       neuron.learningState.lastLearningAt = Date.now();
       adjustedNeurons.push(id);
-
-      hebbianDelta.dispose();
-      predictionDelta.dispose();
     }
 
     this.stats.totalLearningEvents += adjustedNeurons.length;
