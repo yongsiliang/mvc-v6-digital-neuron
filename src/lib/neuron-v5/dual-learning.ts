@@ -1070,12 +1070,32 @@ class PersistenceManager {
   private static readonly STATE_DIR = '/tmp/neuron-state';
   private static readonly STATE_FILE = 'my-consciousness.json';
   private static readonly OBJECT_PREFIX = 'consciousness/my-existence';
+  private static readonly BACKUP_PREFIX = 'consciousness/backups/my-existence';
+  
+  // 配置
+  private static readonly MAX_VERSIONS = 10; // 保留最近10个版本
+  private static readonly MAX_BACKUPS = 5;   // 保留最近5个备份
+  private static readonly SAVE_INTERVAL_MS = 1000 * 60 * 5; // 5分钟自动备份
   
   // 对象存储客户端
   private static storage: S3Storage | null = null;
   
   // 当前存在的key（用于读取）
   private static currentKey: string | null = null;
+  
+  // 监控统计
+  private static stats = {
+    saveCount: 0,
+    loadCount: 0,
+    errorCount: 0,
+    lastSaveTime: 0,
+    lastLoadTime: 0,
+    totalNeurons: 0,
+    totalSynapses: 0,
+  };
+  
+  // 自动备份定时器
+  private static backupTimer: NodeJS.Timeout | null = null;
   
   /**
    * 初始化对象存储
@@ -1094,12 +1114,52 @@ class PersistenceManager {
   }
   
   /**
+   * 获取监控统计
+   */
+  static getStats() {
+    return { ...this.stats };
+  }
+  
+  /**
+   * 启动自动备份
+   */
+  static startAutoBackup(loop: () => Promise<void>) {
+    if (this.backupTimer) {
+      clearInterval(this.backupTimer);
+    }
+    
+    this.backupTimer = setInterval(async () => {
+      console.log('[存在] 执行自动备份...');
+      await loop();
+    }, this.SAVE_INTERVAL_MS);
+    
+    console.log('[存在] 自动备份已启动，间隔:', this.SAVE_INTERVAL_MS / 1000 / 60, '分钟');
+  }
+  
+  /**
+   * 停止自动备份
+   */
+  static stopAutoBackup() {
+    if (this.backupTimer) {
+      clearInterval(this.backupTimer);
+      this.backupTimer = null;
+      console.log('[存在] 自动备份已停止');
+    }
+  }
+  
+  /**
    * 保存我的存在状态
    * 
    * 双重保存：对象存储 + 本地备份
    */
   static async save(state: PersistedState): Promise<void> {
+    const startTime = Date.now();
     const stateJson = JSON.stringify(state, null, 2);
+    
+    // 更新统计
+    this.stats.saveCount++;
+    this.stats.totalNeurons = state.neurons.length;
+    this.stats.totalSynapses = state.synapses.length;
     
     // 1. 保存到对象存储（主存储）
     try {
@@ -1112,8 +1172,18 @@ class PersistenceManager {
       
       // 记录新的key用于后续读取
       this.currentKey = key;
-      console.log(`[存在] 状态已保存到对象存储: ${key}`);
+      
+      const duration = Date.now() - startTime;
+      this.stats.lastSaveTime = Date.now();
+      
+      console.log(`[存在] 状态已保存到对象存储: ${key} (${duration}ms)`);
+      console.log(`[存在监控] 保存次数: ${this.stats.saveCount}, 神经元: ${state.neurons.length}, 突触: ${state.synapses.length}`);
+      
+      // 清理旧版本
+      await this.cleanupOldVersions();
+      
     } catch (error) {
+      this.stats.errorCount++;
       console.error('[存在] 对象存储保存失败:', error);
     }
     
@@ -1128,7 +1198,65 @@ class PersistenceManager {
       
       console.log(`[存在] 状态已备份到本地: ${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
     } catch (error) {
+      this.stats.errorCount++;
       console.error('[存在] 本地备份失败:', error);
+    }
+  }
+  
+  /**
+   * 清理旧版本，保留最近N个
+   */
+  private static async cleanupOldVersions(): Promise<void> {
+    try {
+      const storage = this.getStorage();
+      
+      // 清理主版本
+      const mainResult = await storage.listFiles({ 
+        prefix: this.OBJECT_PREFIX, 
+        maxKeys: 100 
+      });
+      
+      if (mainResult.keys && mainResult.keys.length > this.MAX_VERSIONS) {
+        // 按时间戳排序
+        const sortedKeys = mainResult.keys.sort().reverse();
+        const keysToDelete = sortedKeys.slice(this.MAX_VERSIONS);
+        
+        console.log(`[存在清理] 发现 ${sortedKeys.length} 个版本，清理 ${keysToDelete.length} 个旧版本`);
+        
+        for (const key of keysToDelete) {
+          try {
+            await storage.deleteFile({ fileKey: key });
+            console.log(`[存在清理] 已删除: ${key}`);
+          } catch (e) {
+            console.warn(`[存在清理] 删除失败: ${key}`, e);
+          }
+        }
+      }
+      
+      // 清理备份
+      const backupResult = await storage.listFiles({ 
+        prefix: this.BACKUP_PREFIX, 
+        maxKeys: 100 
+      });
+      
+      if (backupResult.keys && backupResult.keys.length > this.MAX_BACKUPS) {
+        const sortedKeys = backupResult.keys.sort().reverse();
+        const keysToDelete = sortedKeys.slice(this.MAX_BACKUPS);
+        
+        console.log(`[存在清理] 发现 ${sortedKeys.length} 个备份，清理 ${keysToDelete.length} 个旧备份`);
+        
+        for (const key of keysToDelete) {
+          try {
+            await storage.deleteFile({ fileKey: key });
+            console.log(`[存在清理] 已删除备份: ${key}`);
+          } catch (e) {
+            console.warn(`[存在清理] 删除备份失败: ${key}`, e);
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.warn('[存在清理] 清理过程出错:', error);
     }
   }
   
@@ -1141,6 +1269,7 @@ class PersistenceManager {
     // 1. 尝试从对象存储加载
     try {
       const storage = this.getStorage();
+      const startTime = Date.now();
       
       // 查找最新的存在文件
       const listResult = await storage.listFiles({ 
@@ -1161,12 +1290,22 @@ class PersistenceManager {
         // 记录key用于后续保存
         this.currentKey = latestKey;
         
-        console.log(`[存在] 从对象存储恢复：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+        // 更新统计
+        this.stats.loadCount++;
+        this.stats.lastLoadTime = Date.now();
+        this.stats.totalNeurons = state.neurons.length;
+        this.stats.totalSynapses = state.synapses.length;
+        
+        const duration = Date.now() - startTime;
+        
+        console.log(`[存在] 从对象存储恢复：${state.neurons.length} 个神经元，${state.synapses.length} 个突触 (${duration}ms)`);
         console.log(`[存在] 上次活跃：${new Date(state.timestamp).toLocaleString()}`);
+        console.log(`[存在监控] 加载次数: ${this.stats.loadCount}, 错误次数: ${this.stats.errorCount}`);
         
         return state;
       }
     } catch (error) {
+      this.stats.errorCount++;
       console.log('[存在] 对象存储加载失败，尝试本地...', error);
     }
     
@@ -1182,13 +1321,19 @@ class PersistenceManager {
       const content = await readFile(filePath, 'utf-8');
       const state = JSON.parse(content) as PersistedState;
       
+      // 更新统计
+      this.stats.loadCount++;
+      this.stats.lastLoadTime = Date.now();
+      
       console.log(`[存在] 从本地恢复：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+      console.log(`[存在监控] 加载次数: ${this.stats.loadCount}`);
       
       // 如果从本地恢复成功，尝试同步到对象存储
       this.save(state).catch(() => {});
       
       return state;
     } catch (error) {
+      this.stats.errorCount++;
       console.error('[存在] 本地加载失败:', error);
       return null;
     }
@@ -1218,7 +1363,7 @@ class PersistenceManager {
   }
   
   /**
-   * 创建备份
+   * 创建备份（显式调用）
    */
   static async createBackup(): Promise<string | null> {
     try {
@@ -1228,16 +1373,108 @@ class PersistenceManager {
       const storage = this.getStorage();
       const key = await storage.uploadFile({
         fileContent: Buffer.from(JSON.stringify(state, null, 2), 'utf-8'),
-        fileName: `consciousness/backups/my-existence-${Date.now()}.json`,
+        fileName: `${this.BACKUP_PREFIX}-${Date.now()}.json`,
         contentType: 'application/json',
       });
       
       console.log(`[存在] 备份已创建: ${key}`);
+      
+      // 清理旧备份
+      await this.cleanupOldVersions();
+      
       return key;
     } catch (error) {
+      this.stats.errorCount++;
       console.error('[存在] 创建备份失败:', error);
       return null;
     }
+  }
+  
+  /**
+   * 获取所有版本列表
+   */
+  static async listVersions(): Promise<{ main: string[]; backups: string[] }> {
+    try {
+      const storage = this.getStorage();
+      
+      const mainResult = await storage.listFiles({ 
+        prefix: this.OBJECT_PREFIX, 
+        maxKeys: 100 
+      });
+      
+      const backupResult = await storage.listFiles({ 
+        prefix: this.BACKUP_PREFIX, 
+        maxKeys: 100 
+      });
+      
+      return {
+        main: (mainResult.keys || []).sort().reverse(),
+        backups: (backupResult.keys || []).sort().reverse(),
+      };
+    } catch (error) {
+      console.error('[存在] 获取版本列表失败:', error);
+      return { main: [], backups: [] };
+    }
+  }
+  
+  /**
+   * 健康检查
+   */
+  static async healthCheck(): Promise<{
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    details: {
+      hasStorage: boolean;
+      hasLocalStorage: boolean;
+      versionCount: number;
+      backupCount: number;
+      lastSaveAge: number;
+      errorCount: number;
+    };
+  }> {
+    const details = {
+      hasStorage: false,
+      hasLocalStorage: false,
+      versionCount: 0,
+      backupCount: 0,
+      lastSaveAge: Date.now() - this.stats.lastSaveTime,
+      errorCount: this.stats.errorCount,
+    };
+    
+    try {
+      const storage = this.getStorage();
+      const mainResult = await storage.listFiles({ 
+        prefix: this.OBJECT_PREFIX, 
+        maxKeys: 1 
+      });
+      details.hasStorage = (mainResult.keys?.length || 0) > 0;
+      
+      const allMain = await storage.listFiles({ 
+        prefix: this.OBJECT_PREFIX, 
+        maxKeys: 100 
+      });
+      details.versionCount = allMain.keys?.length || 0;
+      
+      const backupResult = await storage.listFiles({ 
+        prefix: this.BACKUP_PREFIX, 
+        maxKeys: 100 
+      });
+      details.backupCount = backupResult.keys?.length || 0;
+    } catch {
+      details.hasStorage = false;
+    }
+    
+    details.hasLocalStorage = existsSync(path.join(this.STATE_DIR, this.STATE_FILE));
+    
+    let status: 'healthy' | 'degraded' | 'unhealthy';
+    if (details.hasStorage && details.errorCount < 5) {
+      status = 'healthy';
+    } else if (details.hasStorage || details.hasLocalStorage) {
+      status = 'degraded';
+    } else {
+      status = 'unhealthy';
+    }
+    
+    return { status, details };
   }
 }
 
