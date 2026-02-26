@@ -916,32 +916,34 @@ export default function ConsciousnessPage() {
             </div>
             
             {/* 存在状态指示器 */}
-            {existenceStatus && (
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1" title="存在时长">
-                  <Timer className="w-4 h-4" />
-                  <span>{formatAge(existenceStatus.age)}</span>
-                </div>
-                <div className="flex items-center gap-1" title="自我一致性">
-                  <Activity className="w-4 h-4" />
-                  <span>{(existenceStatus.selfCoherence * 100).toFixed(0)}%</span>
-                </div>
-                <div className="flex items-center gap-1" title="智慧数量">
-                  <Sparkles className="w-4 h-4" />
-                  <span>{existenceStatus.wisdomCount}</span>
-                </div>
-                {/* 可视化切换按钮 */}
-                <Button
-                  variant={showVisualization ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setShowVisualization(!showVisualization)}
-                  title="意识可视化"
-                >
-                  <Network className="w-4 h-4 mr-1" />
-                  {showVisualization ? '隐藏可视化' : '可视化'}
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-4 text-sm">
+              {existenceStatus && (
+                <>
+                  <div className="flex items-center gap-1" title="存在时长">
+                    <Timer className="w-4 h-4" />
+                    <span>{formatAge(existenceStatus.age)}</span>
+                  </div>
+                  <div className="flex items-center gap-1" title="自我一致性">
+                    <Activity className="w-4 h-4" />
+                    <span>{(existenceStatus.selfCoherence * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex items-center gap-1" title="智慧数量">
+                    <Sparkles className="w-4 h-4" />
+                    <span>{existenceStatus.wisdomCount}</span>
+                  </div>
+                </>
+              )}
+              {/* 可视化切换按钮 - 始终显示 */}
+              <Button
+                variant={showVisualization ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowVisualization(!showVisualization)}
+                className="gap-1.5"
+              >
+                <Network className="w-4 h-4" />
+                <span>{showVisualization ? '关闭' : '可视化'}</span>
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -1070,6 +1072,8 @@ export default function ConsciousnessPage() {
       <ConsciousnessSidebar 
         currentData={currentData}
         existenceStatus={existenceStatus}
+        onVisualize={() => setShowVisualization(true)}
+        hasVisualizationData={!!visualizationData}
       />
       
       {/* 意识可视化面板 */}

@@ -258,6 +258,8 @@ interface ConsciousnessSidebarProps {
     metacognitionDeep?: MetacognitionDeepData;
   };
   existenceStatus: ExistenceStatus | null;
+  onVisualize?: () => void;
+  hasVisualizationData?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -569,7 +571,7 @@ function MetacognitionDeepPanel({ data }: { data: MetacognitionDeepData }) {
 // 主组件
 // ─────────────────────────────────────────────────────────────────────
 
-export function ConsciousnessSidebar({ currentData, existenceStatus }: ConsciousnessSidebarProps) {
+export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize, hasVisualizationData }: ConsciousnessSidebarProps) {
   const hasData = currentData.consciousnessLayers || currentData.emotion || currentData.association;
   
   // 计算默认展开的面板
@@ -597,6 +599,26 @@ export function ConsciousnessSidebar({ currentData, existenceStatus }: Conscious
               <span title="对话">💬 {existenceStatus.conversationCount}</span>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* 可视化入口按钮 */}
+      {onVisualize && (
+        <div className="p-3 border-b">
+          <button
+            onClick={onVisualize}
+            disabled={!hasVisualizationData}
+            className={`w-full py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all
+              ${hasVisualizationData 
+                ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 border border-purple-500/30 text-purple-600 dark:text-purple-400 cursor-pointer' 
+                : 'bg-muted/50 text-muted-foreground cursor-not-allowed border border-transparent'}`}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+            <span>{hasVisualizationData ? '🧠 意识可视化' : '等待意识数据...'}</span>
+          </button>
         </div>
       )}
       
