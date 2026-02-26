@@ -17,7 +17,7 @@ import { ProactivityPanel } from '@/components/neuron/proactivity-panel';
 import { MemoryPanel } from '@/components/neuron/memory-panel';
 import { SubjectiveMeaning, Decision, SelfRepresentation, LogEntry } from '@/lib/neuron';
 import { useNeuronClient } from '@/hooks/useNeuronClient';
-import { Brain, MessageCircle, Activity, User, Database, Loader2, Sparkles, ArrowRight } from 'lucide-react';
+import { Brain, MessageCircle, Activity, User, Database, Loader2, Sparkles, ArrowRight, Dna } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -372,6 +372,21 @@ export default function Home() {
               V3
             </span>
             <ArrowRight className="h-3 w-3 text-primary/60 group-hover:text-primary group-hover:translate-x-0.5 transition-all relative z-10" />
+          </Link>
+          
+          {/* 进化监控入口 */}
+          <Link 
+            href="/neuron-v3/evolution"
+            className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10"
+          >
+            {/* 发光效果 */}
+            <div className="absolute inset-0 rounded-full bg-emerald-500/5 blur-sm group-hover:blur-md group-hover:bg-emerald-500/10 transition-all" />
+            
+            <Dna className="h-3.5 w-3.5 text-emerald-500 relative z-10 group-hover:animate-pulse" />
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 relative z-10">
+              进化
+            </span>
+            <ArrowRight className="h-3 w-3 text-emerald-500/60 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all relative z-10" />
           </Link>
           
           {/* 持久化状态指示器 */}
