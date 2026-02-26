@@ -167,8 +167,8 @@ const DEFAULT_CONFIG: HebbianNetworkConfig = {
   preferenceDimension: 128,
   defaultLearningRate: 0.01,
   activationHistoryLength: 20,
-  spreadSteps: 3,
-  spreadDecay: 0.5,
+  spreadSteps: 5,           // 增加扩散步数：让激活传播更远
+  spreadDecay: 0.7,         // 降低衰减率：让激活传播更强
   weightNormTarget: 1.0,
   minSynapseWeight: 0.05,
   maxSynapses: 10000,
@@ -510,9 +510,31 @@ export class HebbianNetwork {
   activateByInput(inputVector: number[]): Map<string, number> {
     const activations = new Map<string, number>();
     
+    // 先计算所有相似度，找到最大值用于归一化
+    let maxSimilarity = 0;
+    const similarities = new Map<string, number>();
+    
     for (const [id, neuron] of this.neurons) {
       const similarity = this.cosineSimilarity(inputVector, neuron.preferenceVector);
-      const activation = Math.max(0, similarity - neuron.bias);
+      similarities.set(id, similarity);
+      if (similarity > maxSimilarity) {
+        maxSimilarity = similarity;
+      }
+    }
+    
+    // 使用相对激活：激活值 = (similarity / maxSimilarity) - bias
+    // 这确保至少有一些神经元会被激活
+    for (const [id, neuron] of this.neurons) {
+      const similarity = similarities.get(id) || 0;
+      // 相对激活 + 绝对激活的混合
+      const relativeActivation = maxSimilarity > 0 ? similarity / maxSimilarity : 0;
+      const absoluteActivation = (similarity + 1) / 2;  // 将 [-1,1] 映射到 [0,1]
+      
+      // 混合使用相对和绝对激活
+      const activation = Math.max(0, 
+        relativeActivation * 0.7 + absoluteActivation * 0.3 - neuron.bias * 0.5
+      );
+      
       this.setActivation(id, activation);
       activations.set(id, activation);
     }

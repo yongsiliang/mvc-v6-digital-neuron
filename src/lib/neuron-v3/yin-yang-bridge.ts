@@ -241,8 +241,58 @@ export class YinYangBridge {
       '用户', '问题', '答案', '目标', '意义'
     ];
     
+    // 1. 创建神经元
     for (const concept of basicConcepts) {
       this.createConceptNeuronMapping(concept);
+    }
+    
+    // 2. 创建基础突触连接（关键！）
+    this.createInitialSynapses(basicConcepts);
+  }
+  
+  /**
+   * 创建初始突触连接
+   * 
+   * 基于概念的语义相似性创建基础连接
+   * 这让阴系统从开始就有"直觉"能力
+   */
+  private createInitialSynapses(concepts: string[]): void {
+    const similarityThreshold = 0.3;  // 相似度阈值
+    const baseWeight = 0.3;           // 基础权重
+    
+    for (let i = 0; i < concepts.length; i++) {
+      for (let j = i + 1; j < concepts.length; j++) {
+        const c1 = concepts[i];
+        const c2 = concepts[j];
+        
+        const n1Id = this.conceptNeuronMap.get(c1);
+        const n2Id = this.conceptNeuronMap.get(c2);
+        
+        if (!n1Id || !n2Id) continue;
+        
+        // 计算概念相似度
+        const v1 = this.vsaSpace.getConcept(c1);
+        const v2 = this.vsaSpace.getConcept(c2);
+        const similarity = this.vsaSpace.similarity(v1, v2);
+        
+        // 如果相似度足够高，创建双向突触
+        if (Math.abs(similarity) > similarityThreshold) {
+          const weight = baseWeight * Math.sign(similarity);
+          
+          // 创建双向连接
+          this.hebbianNetwork.createSynapse({
+            from: n1Id,
+            to: n2Id,
+            weight: weight,
+          });
+          
+          this.hebbianNetwork.createSynapse({
+            from: n2Id,
+            to: n1Id,
+            weight: weight,
+          });
+        }
+      }
     }
   }
   
@@ -330,11 +380,20 @@ export class YinYangBridge {
     // 2. 在Hebbian网络中激活扩散
     const spreadResult = this.hebbianNetwork.spreadActivation(preferenceInput);
     
-    // 3. 提取激活最强的神经元
-    const sortedActivations = Array.from(spreadResult.activations.entries())
-      .filter(([_, activation]) => activation > 0.3)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    // 3. 提取激活最强的神经元（降低阈值到0.1）
+    let sortedActivations = Array.from(spreadResult.activations.entries())
+      .filter(([_, activation]) => activation > 0.1)
+      .sort((a, b) => b[1] - a[1]);
+    
+    // 如果没有足够激活的神经元，取前5个最激活的
+    if (sortedActivations.length < 3) {
+      const allActivations = Array.from(spreadResult.activations.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+      sortedActivations = allActivations;
+    } else {
+      sortedActivations = sortedActivations.slice(0, 5);
+    }
     
     // 4. 将激活神经元转换为概念
     const concepts = sortedActivations.map(([neuronId, activation]) => {
@@ -361,11 +420,12 @@ export class YinYangBridge {
       intuitionVector = inputVector;  // 回退
     }
     
-    // 6. 计算置信度
+    // 6. 计算置信度（基于激活强度和概念数量）
     const avgActivation = sortedActivations.length > 0
       ? sortedActivations.reduce((sum, [_, a]) => sum + a, 0) / sortedActivations.length
       : 0;
-    const confidence = Math.min(1, avgActivation * concepts.length * 0.3);
+    // 置信度 = 平均激活 * 概念数量因子 * 基础分数
+    const confidence = Math.min(1, avgActivation * 0.5 + concepts.length * 0.1);
     
     return {
       concepts,
