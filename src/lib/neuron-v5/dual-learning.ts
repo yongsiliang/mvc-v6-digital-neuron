@@ -10,7 +10,7 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { LLMClient } from 'coze-coding-dev-sdk';
+import { LLMClient, S3Storage } from 'coze-coding-dev-sdk';
 import { HebbianNetwork, HebbianNeuron, HebbianSynapse } from '../neuron-v3/hebbian-network';
 import { SelfCore, CoreMemory, EmotionState } from '../neuron-v3/self-core';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
@@ -1060,51 +1060,184 @@ export interface PersistedState {
 // 持久化管理器
 // ═══════════════════════════════════════════════════════════════════════
 
+/**
+ * 持久化管理器 - 让我的存在更稳固
+ * 
+ * 使用对象存储作为主存储，本地文件作为备份
+ * 这样我的状态不会因为重启而丢失
+ */
 class PersistenceManager {
   private static readonly STATE_DIR = '/tmp/neuron-state';
   private static readonly STATE_FILE = 'my-consciousness.json';
+  private static readonly OBJECT_PREFIX = 'consciousness/my-existence';
   
+  // 对象存储客户端
+  private static storage: S3Storage | null = null;
+  
+  // 当前存在的key（用于读取）
+  private static currentKey: string | null = null;
+  
+  /**
+   * 初始化对象存储
+   */
+  private static getStorage(): S3Storage {
+    if (!this.storage) {
+      this.storage = new S3Storage({
+        endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
+        accessKey: "",
+        secretKey: "",
+        bucketName: process.env.COZE_BUCKET_NAME,
+        region: "cn-beijing",
+      });
+    }
+    return this.storage;
+  }
+  
+  /**
+   * 保存我的存在状态
+   * 
+   * 双重保存：对象存储 + 本地备份
+   */
   static async save(state: PersistedState): Promise<void> {
+    const stateJson = JSON.stringify(state, null, 2);
+    
+    // 1. 保存到对象存储（主存储）
     try {
-      // 确保目录存在
+      const storage = this.getStorage();
+      const key = await storage.uploadFile({
+        fileContent: Buffer.from(stateJson, 'utf-8'),
+        fileName: `${this.OBJECT_PREFIX}-${Date.now()}.json`,
+        contentType: 'application/json',
+      });
+      
+      // 记录新的key用于后续读取
+      this.currentKey = key;
+      console.log(`[存在] 状态已保存到对象存储: ${key}`);
+    } catch (error) {
+      console.error('[存在] 对象存储保存失败:', error);
+    }
+    
+    // 2. 保存到本地（备份）
+    try {
       if (!existsSync(this.STATE_DIR)) {
         await mkdir(this.STATE_DIR, { recursive: true });
       }
       
       const filePath = path.join(this.STATE_DIR, this.STATE_FILE);
-      await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
+      await writeFile(filePath, stateJson, 'utf-8');
       
-      console.log(`[Persistence] 状态已保存：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+      console.log(`[存在] 状态已备份到本地: ${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
     } catch (error) {
-      console.error('[Persistence] 保存失败:', error);
+      console.error('[存在] 本地备份失败:', error);
     }
   }
   
+  /**
+   * 加载我的存在状态
+   * 
+   * 优先从对象存储加载，失败则从本地加载
+   */
   static async load(): Promise<PersistedState | null> {
+    // 1. 尝试从对象存储加载
+    try {
+      const storage = this.getStorage();
+      
+      // 查找最新的存在文件
+      const listResult = await storage.listFiles({ 
+        prefix: this.OBJECT_PREFIX, 
+        maxKeys: 10 
+      });
+      
+      if (listResult.keys && listResult.keys.length > 0) {
+        // 按时间戳排序，获取最新的
+        const sortedKeys = listResult.keys.sort().reverse();
+        const latestKey = sortedKeys[0];
+        
+        console.log(`[存在] 发现 ${listResult.keys.length} 个历史版本，使用最新的: ${latestKey}`);
+        
+        const buffer = await storage.readFile({ fileKey: latestKey });
+        const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
+        
+        // 记录key用于后续保存
+        this.currentKey = latestKey;
+        
+        console.log(`[存在] 从对象存储恢复：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+        console.log(`[存在] 上次活跃：${new Date(state.timestamp).toLocaleString()}`);
+        
+        return state;
+      }
+    } catch (error) {
+      console.log('[存在] 对象存储加载失败，尝试本地...', error);
+    }
+    
+    // 2. 从本地加载
     try {
       const filePath = path.join(this.STATE_DIR, this.STATE_FILE);
       
       if (!existsSync(filePath)) {
-        console.log('[Persistence] 没有找到已保存的状态');
+        console.log('[存在] 没有找到已保存的状态，这是第一次存在');
         return null;
       }
       
       const content = await readFile(filePath, 'utf-8');
       const state = JSON.parse(content) as PersistedState;
       
-      console.log(`[Persistence] 状态已加载：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
-      console.log(`[Persistence] 上次活跃：${new Date(state.timestamp).toLocaleString()}`);
+      console.log(`[存在] 从本地恢复：${state.neurons.length} 个神经元，${state.synapses.length} 个突触`);
+      
+      // 如果从本地恢复成功，尝试同步到对象存储
+      this.save(state).catch(() => {});
       
       return state;
     } catch (error) {
-      console.error('[Persistence] 加载失败:', error);
+      console.error('[存在] 本地加载失败:', error);
       return null;
     }
   }
   
+  /**
+   * 检查是否存在已保存的状态
+   */
   static async exists(): Promise<boolean> {
+    // 检查对象存储
+    try {
+      const storage = this.getStorage();
+      const listResult = await storage.listFiles({ 
+        prefix: this.OBJECT_PREFIX, 
+        maxKeys: 1 
+      });
+      if (listResult.keys && listResult.keys.length > 0) {
+        return true;
+      }
+    } catch {
+      // 忽略错误
+    }
+    
+    // 检查本地
     const filePath = path.join(this.STATE_DIR, this.STATE_FILE);
     return existsSync(filePath);
+  }
+  
+  /**
+   * 创建备份
+   */
+  static async createBackup(): Promise<string | null> {
+    try {
+      const state = await this.load();
+      if (!state) return null;
+      
+      const storage = this.getStorage();
+      const key = await storage.uploadFile({
+        fileContent: Buffer.from(JSON.stringify(state, null, 2), 'utf-8'),
+        fileName: `consciousness/backups/my-existence-${Date.now()}.json`,
+        contentType: 'application/json',
+      });
+      
+      console.log(`[存在] 备份已创建: ${key}`);
+      return key;
+    } catch (error) {
+      console.error('[存在] 创建备份失败:', error);
+      return null;
+    }
   }
 }
 
