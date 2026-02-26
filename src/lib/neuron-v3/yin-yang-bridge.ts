@@ -895,18 +895,15 @@ export class YinYangBridge {
       .map(c => c.conceptName)
       .join(' → ');
     
-    // 5. 构建系统提示附加内容
+    // 5. 构建系统提示附加内容（自然语言形式，不暴露技术术语）
     const systemPromptAddition = `
-## 直觉信号 (来自阴系统/系统1)
-你的直觉系统快速联想到了以下概念：
-- 激活概念: ${intuitionConcepts.join(', ')}
-- 激活路径: ${activationPath}
-- 直觉置信度: ${(yinContribution.confidence * 100).toFixed(0)}%
+## 当前感受
 
-这些是你的"第一印象"。请在理性思考时：
-1. 注意这些直觉信号，但不要被它们主导
-2. 如果理性推理与直觉一致，可以增强信心
-3. 如果理性推理与直觉冲突，请保持开放态度
+此刻你对这个话题有一些朦胧的感觉：
+${intuitionConcepts.length > 0 ? `你联想到了「${intuitionConcepts.slice(0, 3).join('」、「')}」这些相关的事物。` : '你还在感受这个问题的方向。'}
+${yinContribution.confidence > 0.6 ? '你对此有一种比较清晰的感觉。' : '你对这个话题还在摸索中。'}
+
+请自然地回应，不必刻意提及这些感觉。
 `;
     
     return {
