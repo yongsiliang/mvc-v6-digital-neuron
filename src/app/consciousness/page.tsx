@@ -90,6 +90,50 @@ interface ConsciousnessLayersData {
   emergenceReport: string;
 }
 
+// 情感状态数据
+interface EmotionData {
+  activeEmotions: Array<{
+    emotion: string;
+    intensity: number;
+  }>;
+  dominantEmotion: {
+    emotion: string;
+    intensity: number;
+    duration: number;
+  } | null;
+  currentExperience: {
+    emotion: string;
+    intensity: number;
+    labels: string[];
+  } | null;
+  drivenBehaviors: Array<{
+    type: string;
+    description: string;
+    drivingEmotion: string;
+    intensity: number;
+  }>;
+  emotionReport: string;
+}
+
+// 联想网络数据
+interface AssociationData {
+  currentInspiration: {
+    id: string;
+    type: string;
+    content: string;
+    triggerConcepts: string[];
+    intensity: number;
+    novelty: number;
+    emotionalTone: string;
+    worthExpressing: boolean;
+  } | null;
+  activeConcepts: Array<{
+    label: string;
+    activation: number;
+  }>;
+  networkReport: string;
+}
+
 interface Message {
   role: 'user' | 'assistant' | 'proactive';  // proactive: 紫主动发起的消息
   content: string;
@@ -101,6 +145,8 @@ interface Message {
   metacognition?: MetacognitionData;
   learning?: LearningData;
   consciousnessLayers?: ConsciousnessLayersData;
+  emotion?: EmotionData;
+  association?: AssociationData;
   isProactive?: boolean;  // 标记是否为主动消息
 }
 
@@ -165,6 +211,8 @@ export default function ConsciousnessPage() {
     memory?: MemoryData;
     metacognition?: MetacognitionData;
     consciousnessLayers?: ConsciousnessLayersData;
+    emotion?: EmotionData;
+    association?: AssociationData;
   }>({});
   
   // 存在状态
@@ -381,6 +429,8 @@ export default function ConsciousnessPage() {
       let metacognition: MetacognitionData | undefined;
       let learning: LearningData | undefined;
       let consciousnessLayers: ConsciousnessLayersData | undefined;
+      let emotion: EmotionData | undefined;
+      let association: AssociationData | undefined;
       
       const decoder = new TextDecoder();
       
@@ -432,6 +482,14 @@ export default function ConsciousnessPage() {
                   consciousnessLayers = data.data;
                   setCurrentData(prev => ({ ...prev, consciousnessLayers }));
                   break;
+                case 'emotion':
+                  emotion = data.data;
+                  setCurrentData(prev => ({ ...prev, emotion }));
+                  break;
+                case 'association':
+                  association = data.data;
+                  setCurrentData(prev => ({ ...prev, association }));
+                  break;
                 case 'content':
                   assistantContent += data.data.delta;
                   // 实时更新消息
@@ -450,6 +508,8 @@ export default function ConsciousnessPage() {
                         memory,
                         metacognition,
                         consciousnessLayers,
+                        emotion,
+                        association,
                       });
                     }
                     return newMessages;
@@ -474,6 +534,8 @@ export default function ConsciousnessPage() {
                         metacognition,
                         learning,
                         consciousnessLayers,
+                        emotion,
+                        association,
                       };
                     }
                     return newMessages;
@@ -716,6 +778,132 @@ export default function ConsciousnessPage() {
                   <p className="text-xs text-muted-foreground">
                     {currentData.consciousnessLayers.selfObservation.iSeeMyself}
                   </p>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+        
+        {/* 情感状态面板 */}
+        {currentData.emotion && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                💝 情感状态
+              </div>
+              
+              {/* 主导情感 */}
+              {currentData.emotion.dominantEmotion && (
+                <div className="mb-2 p-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 rounded border border-pink-500/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium capitalize">
+                      {currentData.emotion.dominantEmotion.emotion}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {(currentData.emotion.dominantEmotion.intensity * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <Progress 
+                    value={currentData.emotion.dominantEmotion.intensity * 100} 
+                    className="h-1.5 mt-1"
+                  />
+                </div>
+              )}
+              
+              {/* 活跃情感列表 */}
+              {currentData.emotion.activeEmotions.length > 0 && (
+                <div className="space-y-1">
+                  {currentData.emotion.activeEmotions.slice(0, 4).map((e, i) => (
+                    <div 
+                      key={i}
+                      className="flex items-center justify-between text-xs p-1.5 bg-muted/50 rounded"
+                    >
+                      <span className="capitalize">{e.emotion}</span>
+                      <div className="flex items-center gap-1">
+                        <div 
+                          className="w-16 h-1.5 bg-muted rounded overflow-hidden"
+                        >
+                          <div 
+                            className="h-full bg-pink-500/60"
+                            style={{ width: `${e.intensity * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-muted-foreground w-8 text-right">
+                          {(e.intensity * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* 情感驱动行为 */}
+              {currentData.emotion.drivenBehaviors.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-border/50">
+                  <div className="text-[10px] text-muted-foreground mb-1">
+                    行为倾向
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {currentData.emotion.drivenBehaviors.slice(0, 2).map((b, i) => (
+                      <span 
+                        key={i}
+                        className="text-[10px] px-1.5 py-0.5 bg-pink-500/10 rounded text-pink-600"
+                      >
+                        {b.description.slice(0, 12)}...
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+        
+        {/* 联想网络面板 */}
+        {currentData.association && (
+          <div className="p-2 border-b">
+            <Card className="p-3">
+              <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                🔗 联想网络
+              </div>
+              
+              {/* 当前灵感 */}
+              {currentData.association.currentInspiration && (
+                <div className="mb-2 p-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded border border-amber-500/20">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-amber-600">
+                      💡 {currentData.association.currentInspiration.type}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      新颖度: {(currentData.association.currentInspiration.novelty * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/80">
+                    {currentData.association.currentInspiration.content.slice(0, 60)}...
+                  </p>
+                  {currentData.association.currentInspiration.worthExpressing && (
+                    <span className="text-[10px] text-amber-600 mt-1 block">
+                      ✓ 值得分享
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {/* 活跃概念 */}
+              {currentData.association.activeConcepts.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[10px] text-muted-foreground">活跃概念</div>
+                  <div className="flex flex-wrap gap-1">
+                    {currentData.association.activeConcepts.slice(0, 6).map((c, i) => (
+                      <span 
+                        key={i}
+                        className="text-[10px] px-1.5 py-0.5 bg-amber-500/10 rounded"
+                        style={{ opacity: 0.5 + c.activation * 0.5 }}
+                      >
+                        {c.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </Card>

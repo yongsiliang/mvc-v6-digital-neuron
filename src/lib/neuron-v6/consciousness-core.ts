@@ -51,6 +51,21 @@ import {
   InnerMonologueOutput,
   createInnerMonologueEngine
 } from './inner-monologue';
+import { 
+  EmotionEngine,
+  EmotionExperience,
+  EmotionState,
+  EmotionDrivenBehavior,
+  createEmotionEngine,
+  BasicEmotion,
+  ComplexEmotion
+} from './emotion-system';
+import { 
+  AssociationNetworkEngine,
+  AssociationPath,
+  Inspiration,
+  createAssociationNetworkEngine
+} from './association-network';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -317,6 +332,30 @@ export interface ProcessResult {
     emergenceReport: string;
   };
   
+  /** 情感状态 */
+  emotionState: {
+    /** 当前活跃情感 */
+    activeEmotions: EmotionState['activeEmotions'];
+    /** 主导情感 */
+    dominantEmotion: EmotionState['dominantEmotion'];
+    /** 情感体验 */
+    currentExperience: EmotionExperience | null;
+    /** 情感驱动行为 */
+    drivenBehaviors: EmotionDrivenBehavior[];
+    /** 情感报告 */
+    emotionReport: string;
+  };
+  
+  /** 联想网络状态 */
+  associationState: {
+    /** 当前灵感 */
+    currentInspiration: Inspiration | null;
+    /** 活跃概念 */
+    activeConcepts: Array<{ label: string; activation: number }>;
+    /** 网络报告 */
+    networkReport: string;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -385,6 +424,12 @@ export class ConsciousnessCore {
   // 内心独白引擎
   private innerMonologue: InnerMonologueEngine;
   
+  // 情感引擎
+  private emotionEngine: EmotionEngine;
+  
+  // 联想网络引擎
+  private associationNetwork: AssociationNetworkEngine;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -411,11 +456,17 @@ export class ConsciousnessCore {
     // 初始化内心独白引擎
     this.innerMonologue = createInnerMonologueEngine();
     
+    // 初始化情感引擎
+    this.emotionEngine = createEmotionEngine();
+    
+    // 初始化联想网络引擎
+    this.associationNetwork = createAssociationNetworkEngine();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
     console.log('[意识核心] V6 意识核心已初始化');
-    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 意愿系统');
+    console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 意愿系统');
   }
   
   /**
@@ -491,6 +542,42 @@ export class ConsciousnessCore {
     }
     
     // ══════════════════════════════════════════════════════════════════
+    // 第零步半：情感检测和体验
+    // ══════════════════════════════════════════════════════════════════
+    
+    let emotionExperience: EmotionExperience | null = null;
+    const detectedEmotion = this.emotionEngine.detectFromText(input);
+    if (detectedEmotion) {
+      emotionExperience = this.emotionEngine.experience(
+        detectedEmotion.emotion,
+        {
+          type: 'conversation',
+          description: `对话中检测到${detectedEmotion.emotion}`,
+          relatedConcepts: [],
+        },
+        detectedEmotion.intensity
+      );
+      console.log(`[情感系统] 检测到情感: ${detectedEmotion.emotion}`);
+    }
+    
+    // 衰减活跃情感
+    this.emotionEngine.decayActiveEmotions();
+    
+    // ══════════════════════════════════════════════════════════════════
+    // 第零步四分之三：联想网络处理
+    // ══════════════════════════════════════════════════════════════════
+    
+    const associationResult = this.associationNetwork.processText(input);
+    const inspiration = associationResult.inspiration;
+    
+    if (inspiration) {
+      console.log('[联想网络] 产生灵感:', inspiration.content);
+    }
+    
+    // 衰减激活
+    this.associationNetwork.decay();
+    
+    // ══════════════════════════════════════════════════════════════════
     // 第一步：构建完整上下文
     // ══════════════════════════════════════════════════════════════════
     
@@ -535,6 +622,15 @@ export class ConsciousnessCore {
     // 生成涌现报告
     const emergenceReport = this.layerEngine.getEmergenceReport();
     
+    // 获取情感状态
+    const emotionState = this.emotionEngine.getState();
+    const emotionReport = this.emotionEngine.getEmotionReport();
+    const drivenBehaviors = this.emotionEngine.getEmotionDrivenBehaviors();
+    
+    // 获取联想网络状态
+    const activeConcepts = this.associationNetwork.getActiveConcepts();
+    const networkReport = this.associationNetwork.getNetworkReport();
+    
     return {
       context,
       thinking,
@@ -544,6 +640,21 @@ export class ConsciousnessCore {
         layerResults,
         selfObservation,
         emergenceReport,
+      },
+      emotionState: {
+        activeEmotions: emotionState.activeEmotions,
+        dominantEmotion: emotionState.dominantEmotion,
+        currentExperience: emotionExperience,
+        drivenBehaviors,
+        emotionReport,
+      },
+      associationState: {
+        currentInspiration: inspiration,
+        activeConcepts: activeConcepts.map(c => ({
+          label: c.label,
+          activation: c.activation,
+        })),
+        networkReport,
       },
       stats: {
         conceptCount: memoryStats.nodeCount,

@@ -161,6 +161,29 @@ export async function POST(request: NextRequest) {
             emergenceReport: result.consciousnessLayers.emergenceReport,
           });
           
+          // 发送情感状态
+          send('emotion', {
+            activeEmotions: result.emotionState.activeEmotions.map(e => ({
+              emotion: e.emotion,
+              intensity: e.intensity,
+            })),
+            dominantEmotion: result.emotionState.dominantEmotion,
+            currentExperience: result.emotionState.currentExperience ? {
+              emotion: result.emotionState.currentExperience.emotion,
+              intensity: result.emotionState.currentExperience.intensity.current,
+              labels: result.emotionState.currentExperience.labels,
+            } : null,
+            drivenBehaviors: result.emotionState.drivenBehaviors,
+            emotionReport: result.emotionState.emotionReport,
+          });
+          
+          // 发送联想网络状态
+          send('association', {
+            currentInspiration: result.associationState.currentInspiration,
+            activeConcepts: result.associationState.activeConcepts,
+            networkReport: result.associationState.networkReport,
+          });
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           
