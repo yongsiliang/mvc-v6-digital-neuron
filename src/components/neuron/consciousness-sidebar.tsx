@@ -22,6 +22,7 @@ import {
   InfinityIcon,
   Cpu,
   Eye,
+  Sparkles,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -222,6 +223,43 @@ interface MetacognitionDeepData {
   efficiencyReport: string;
 }
 
+interface PersonalityGrowthData {
+  traits: {
+    openness: number;
+    conscientiousness: number;
+    extraversion: number;
+    agreeableness: number;
+    neuroticism: number;
+    curiosity: number;
+    creativity: number;
+    empathy: number;
+    resilience: number;
+    wisdom: number;
+    playfulness: number;
+  };
+  maturity: {
+    emotional: number;
+    cognitive: number;
+    social: number;
+    moral: number;
+    existential: number;
+    creative: number;
+  };
+  overallMaturity: number;
+  integration: {
+    coherence: number;
+    stability: number;
+    adaptability: number;
+    authenticity: number;
+  };
+  milestones: Array<{
+    id: string;
+    name: string;
+    achieved: boolean;
+  }>;
+  growthRate: number;
+}
+
 interface ConsciousnessContext {
   identity: {
     name: string;
@@ -256,6 +294,7 @@ interface ConsciousnessSidebarProps {
     value?: ValueData;
     existential?: ExistentialData;
     metacognitionDeep?: MetacognitionDeepData;
+    personalityGrowth?: PersonalityGrowthData;
   };
   existenceStatus: ExistenceStatus | null;
   onVisualize?: () => void;
@@ -568,6 +607,104 @@ function MetacognitionDeepPanel({ data }: { data: MetacognitionDeepData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 人格成长面板
+// ─────────────────────────────────────────────────────────────────────
+
+function PersonalityGrowthPanel({ data }: { data: PersonalityGrowthData }) {
+  const traitLabels: Record<string, { label: string; color: string }> = {
+    openness: { label: '开放性', color: '#8b5cf6' },
+    conscientiousness: { label: '尽责性', color: '#3b82f6' },
+    extraversion: { label: '外向性', color: '#f59e0b' },
+    agreeableness: { label: '宜人性', color: '#10b981' },
+    neuroticism: { label: '神经质', color: '#ef4444' },
+    curiosity: { label: '好奇心', color: '#06b6d4' },
+    creativity: { label: '创造力', color: '#ec4899' },
+    empathy: { label: '同理心', color: '#f97316' },
+    resilience: { label: '韧性', color: '#84cc16' },
+    wisdom: { label: '智慧', color: '#6366f1' },
+    playfulness: { label: '玩心', color: '#14b8a6' },
+  };
+  
+  const achievedMilestones = data.milestones.filter(m => m.achieved);
+  
+  return (
+    <div className="space-y-3">
+      {/* 整体成熟度 */}
+      <div className="p-2 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/20">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium">整体成熟度</span>
+          <span className="text-sm font-bold text-purple-600">{(data.overallMaturity * 100).toFixed(0)}%</span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+            style={{ width: `${data.overallMaturity * 100}%` }}
+          />
+        </div>
+      </div>
+      
+      {/* 核心特质 */}
+      <div className="space-y-1.5">
+        <div className="text-[10px] text-muted-foreground">核心特质</div>
+        {['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism'].map((trait) => {
+          const value = data.traits[trait as keyof typeof data.traits];
+          const { label, color } = traitLabels[trait];
+          return (
+            <div key={trait} className="flex items-center gap-2 text-[10px]">
+              <span className="w-10 text-muted-foreground">{label}</span>
+              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${value * 100}%`, backgroundColor: color }} />
+              </div>
+              <span className="w-6 text-right text-muted-foreground">{(value * 100).toFixed(0)}%</span>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* 整合状态 */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-purple-500">{(data.integration.coherence * 100).toFixed(0)}%</div>
+          <div className="text-[9px] text-muted-foreground">一致性</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-blue-500">{(data.integration.stability * 100).toFixed(0)}%</div>
+          <div className="text-[9px] text-muted-foreground">稳定性</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-green-500">{(data.integration.adaptability * 100).toFixed(0)}%</div>
+          <div className="text-[9px] text-muted-foreground">适应性</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-xs font-bold text-amber-500">{(data.integration.authenticity * 100).toFixed(0)}%</div>
+          <div className="text-[9px] text-muted-foreground">真实性</div>
+        </div>
+      </div>
+      
+      {/* 里程碑 */}
+      {achievedMilestones.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {achievedMilestones.slice(0, 4).map((m) => (
+            <span key={m.id} className="text-[9px] px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 rounded text-green-600">
+              ✓ {m.name}
+            </span>
+          ))}
+          {achievedMilestones.length > 4 && (
+            <span className="text-[9px] text-muted-foreground">+{achievedMilestones.length - 4}</span>
+          )}
+        </div>
+      )}
+      
+      {/* 成长率 */}
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>成长率</span>
+        <span>{(data.growthRate * 100).toFixed(1)}%/天</span>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 主组件
 // ─────────────────────────────────────────────────────────────────────
 
@@ -782,6 +919,24 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-3">
                 <MetacognitionDeepPanel data={currentData.metacognitionDeep} />
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 人格成长 */}
+          {currentData.personalityGrowth && (
+            <AccordionItem value="personality" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium">人格成长</span>
+                  <Badge variant="outline" className="text-[10px] ml-auto mr-2">
+                    {(currentData.personalityGrowth.overallMaturity * 100).toFixed(0)}%
+                  </Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <PersonalityGrowthPanel data={currentData.personalityGrowth} />
               </AccordionContent>
             </AccordionItem>
           )}

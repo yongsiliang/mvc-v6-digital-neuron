@@ -377,6 +377,38 @@ export default function ConsciousnessPage() {
     value?: ValueData;
     existential?: ExistentialData;
     metacognitionDeep?: MetacognitionDeepData;
+    personalityGrowth?: {
+      traits: {
+        openness: number;
+        conscientiousness: number;
+        extraversion: number;
+        agreeableness: number;
+        neuroticism: number;
+        curiosity: number;
+        creativity: number;
+        empathy: number;
+        resilience: number;
+        wisdom: number;
+        playfulness: number;
+      };
+      maturity: {
+        emotional: number;
+        cognitive: number;
+        social: number;
+        moral: number;
+        existential: number;
+        creative: number;
+      };
+      overallMaturity: number;
+      integration: {
+        coherence: number;
+        stability: number;
+        adaptability: number;
+        authenticity: number;
+      };
+      milestones: Array<{ id: string; name: string; achieved: boolean }>;
+      growthRate: number;
+    };
   }>({});
   
   // 存在状态
@@ -789,6 +821,9 @@ export default function ConsciousnessPage() {
                 case 'metacognitionDeep':
                   metacognitionDeep = data.data;
                   setCurrentData(prev => ({ ...prev, metacognitionDeep }));
+                  break;
+                case 'personalityGrowth':
+                  setCurrentData(prev => ({ ...prev, personalityGrowth: data.data }));
                   break;
                 case 'content':
                   assistantContent += data.data.delta;

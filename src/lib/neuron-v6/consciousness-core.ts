@@ -128,6 +128,17 @@ import {
   MetacognitionState,
   MetacognitiveMonitoring
 } from './metacognition-deepening';
+import { 
+  PersonalityGrowthSystem,
+  BigFiveTraits,
+  CoreTraits,
+  MaturityDimensions,
+  PersonalityIntegration,
+  MaturityMilestone,
+  TraitChange,
+  PersonalityState,
+  DEFAULT_CORE_TRAITS,
+} from './personality-growth';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -494,6 +505,22 @@ export interface ProcessResult {
     efficiencyReport: string;
   };
   
+  /** 人格成长状态 */
+  personalityGrowth?: {
+    /** 核心特质 */
+    traits: CoreTraits;
+    /** 成熟度指标 */
+    maturity: MaturityDimensions;
+    /** 整体成熟度 */
+    overallMaturity: number;
+    /** 人格整合状态 */
+    integration: PersonalityIntegration;
+    /** 里程碑 */
+    milestones: MaturityMilestone[];
+    /** 成长速率 */
+    growthRate: number;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -589,6 +616,9 @@ export class ConsciousnessCore {
   // 元认知深化引擎
   private metacognitionDeepEngine: MetacognitionDeepeningEngine;
   
+  // 人格成长系统
+  private personalityGrowthSystem: PersonalityGrowthSystem;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -641,6 +671,9 @@ export class ConsciousnessCore {
     
     // 初始化元认知深化引擎
     this.metacognitionDeepEngine = new MetacognitionDeepeningEngine();
+    
+    // 初始化人格成长系统
+    this.personalityGrowthSystem = new PersonalityGrowthSystem();
     
     // 初始化意愿系统
     this.initializeVolitions();
@@ -977,6 +1010,37 @@ export class ConsciousnessCore {
           })),
           recentMonitoring,
           efficiencyReport,
+        };
+      })(),
+      
+      // 人格成长处理
+      personalityGrowth: (() => {
+        // 获取当前特质
+        const currentTraits = this.personalityGrowthSystem.getState().traits;
+        const traitToEvolve: keyof CoreTraits = 'openness';
+        const previousValue = currentTraits[traitToEvolve];
+        const newValue = Math.min(1, previousValue + 0.01);
+        
+        // 更新特质（通过 updateTrait 方法会自动处理涟漪效应）
+        this.personalityGrowthSystem.updateTrait(
+          traitToEvolve,
+          newValue,
+          '对话互动促进了开放性的微弱增长'
+        );
+        
+        // 更新成熟度
+        this.personalityGrowthSystem.updateMaturity('cognitive', 0.005);
+        
+        // 获取完整状态
+        const state = this.personalityGrowthSystem.getState();
+        
+        return {
+          traits: state.traits,
+          maturity: state.maturity,
+          overallMaturity: state.overallMaturity,
+          integration: state.integration,
+          milestones: state.milestones,
+          growthRate: state.growthRate,
         };
       })(),
       

@@ -269,6 +269,22 @@ export async function POST(request: NextRequest) {
             efficiencyReport: result.metacognitionDeepState.efficiencyReport,
           });
           
+          // 发送人格成长状态
+          if (result.personalityGrowth) {
+            send('personalityGrowth', {
+              traits: result.personalityGrowth.traits,
+              maturity: result.personalityGrowth.maturity,
+              overallMaturity: result.personalityGrowth.overallMaturity,
+              integration: result.personalityGrowth.integration,
+              milestones: result.personalityGrowth.milestones.map((m: { id: string; name: string; achieved: boolean }) => ({
+                id: m.id,
+                name: m.name,
+                achieved: m.achieved,
+              })),
+              growthRate: result.personalityGrowth.growthRate,
+            });
+          }
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           
