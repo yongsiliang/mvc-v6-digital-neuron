@@ -164,6 +164,9 @@ export interface SelfCoherenceReport {
  * Self Core状态
  */
 export interface SelfCoreState {
+  /** 名字 */
+  name: string;
+  
   /** 自我向量（在VSA空间中） */
   selfVector: VSAVector;
   
@@ -314,6 +317,7 @@ export class SelfCore {
     ]);
     
     return {
+      name: '紫',
       selfVector,
       traits,
       values,
