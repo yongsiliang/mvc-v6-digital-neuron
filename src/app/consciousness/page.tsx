@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Brain, Sparkles, MessageCircle, Activity, Timer } from 'lucide-react';
@@ -231,11 +230,19 @@ export default function ConsciousnessPage() {
     return () => clearInterval(checkReflection);
   }, [messages, lastReflection, performReflection]);
 
+  // 自动滚动到底部
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, reflectionResult]);
+
+  // 流式输出时也滚动
+  useEffect(() => {
+    if (isLoading && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [isLoading]);
 
   const sendMessage = async () => {
     if (input.trim() === '' || isLoading) return;
@@ -437,7 +444,10 @@ export default function ConsciousnessPage() {
         </header>
 
         {/* 消息列表 */}
-        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+        <div 
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-4"
+        >
           <div className="space-y-4">
             {messages.map((message, index) => (
               <div
@@ -482,7 +492,7 @@ export default function ConsciousnessPage() {
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* 输入区域 */}
         <div className="border-t p-4">
