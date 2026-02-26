@@ -5,14 +5,28 @@
  * 这是连接阴系统和阳系统的桥梁
  * 
  * 核心理念：
- * - 阴系统（Hebbian网络）：分布式、直觉、感性、动态
- * - 阳系统（VSA+LLM）：符号化、理性、稳定
+ * - 阴系统（Hebbian网络）：分布式、直觉、感性、动态、快速（系统1）
+ * - 阳系统（LLM）：符号化、理性、稳定、慢速（系统2）
  * 
  * 双向互塑：
  * - 阴→阳：直觉注入理性（感性支持理性思考）
  * - 阳→阴：理性塑造感性（理性知识成为直觉）
  * 
  * 这是实现"阴阳平衡"的关键
+ * 
+ * 架构说明（v2修正）：
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │                      YinYangBridge                          │
+ * │                                                             │
+ * │   ┌─────────────────────┐       ┌─────────────────────┐    │
+ * │   │      阴系统          │       │      阳系统          │    │
+ * │   │   Hebbian Network    │◄─────►│        LLM          │    │
+ * │   │                      │  互塑  │                     │    │
+ * │   │  • 直觉联想 (快)      │       │  • 理性推理 (慢)     │    │
+ * │   │  • 无意识            │       │  • 有意识           │    │
+ * │   │  • 系统1 (Kahneman)  │       │  • 系统2 (Kahneman) │    │
+ * │   └─────────────────────┘       └─────────────────────┘    │
+ * └─────────────────────────────────────────────────────────────┘
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -842,6 +856,170 @@ export class YinYangBridge {
     return this.balanceHistory.length > 0 
       ? this.balanceHistory[this.balanceHistory.length - 1]
       : null;
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // LLM 作为阳系统的接口（v2 架构修正）
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 准备阴系统上下文（注入 LLM）
+   * 
+   * 这是"阴→阳"的关键步骤：将直觉信号注入 LLM 的系统提示
+   * 
+   * @param input 用户输入
+   * @returns 阴系统上下文，用于构建 LLM 系统提示
+   */
+  prepareYinContextForLLM(input: string): {
+    /** 阴系统贡献 */
+    yinContribution: YinContribution;
+    /** 用于注入 LLM 系统提示的内容 */
+    systemPromptAddition: string;
+    /** 直觉概念列表 */
+    intuitionConcepts: string[];
+    /** 激活路径（展示思维过程） */
+    activationPath: string;
+  } {
+    // 1. 编码输入
+    const inputVector = this.vsaSpace.getConcept(input);
+    
+    // 2. 阴系统激活扩散
+    const yinContribution = this.yinToYang(inputVector);
+    
+    // 3. 提取直觉概念
+    const intuitionConcepts = yinContribution.concepts.map(c => c.conceptName);
+    
+    // 4. 构建激活路径
+    const activationPath = yinContribution.concepts
+      .slice(0, 5)
+      .map(c => c.conceptName)
+      .join(' → ');
+    
+    // 5. 构建系统提示附加内容
+    const systemPromptAddition = `
+## 直觉信号 (来自阴系统/系统1)
+你的直觉系统快速联想到了以下概念：
+- 激活概念: ${intuitionConcepts.join(', ')}
+- 激活路径: ${activationPath}
+- 直觉置信度: ${(yinContribution.confidence * 100).toFixed(0)}%
+
+这些是你的"第一印象"。请在理性思考时：
+1. 注意这些直觉信号，但不要被它们主导
+2. 如果理性推理与直觉一致，可以增强信心
+3. 如果理性推理与直觉冲突，请保持开放态度
+`;
+    
+    return {
+      yinContribution,
+      systemPromptAddition,
+      intuitionConcepts,
+      activationPath,
+    };
+  }
+  
+  /**
+   * 处理 LLM 输出（阳→阴塑造）
+   * 
+   * 这是"阳→阴"的关键步骤：将 LLM 的理性推理塑造到 Hebbian 网络
+   * 
+   * @param llmOutput LLM 的输出文本
+   * @param extractedConcepts 从 LLM 输出中提取的概念
+   * @returns 阳系统贡献
+   */
+  processYangResultFromLLM(
+    llmOutput: string,
+    extractedConcepts: Array<{ name: string; importance: number }>
+  ): YangContribution {
+    // 1. 将 LLM 概念转换为带向量的格式
+    const concepts: Array<{ name: string; vector: VSAVector; importance: number }> = [];
+    
+    for (const concept of extractedConcepts) {
+      const vector = this.vsaSpace.getConcept(concept.name);
+      concepts.push({
+        name: concept.name,
+        vector,
+        importance: concept.importance,
+      });
+    }
+    
+    // 2. 调用 yangToYin 进行塑造
+    const yangContribution = this.yangToYin(concepts);
+    
+    // 3. 应用 Hebbian 学习（让理性知识变成直觉）
+    this.hebbianNetwork.applyHebbianLearning();
+    
+    // 4. 记录塑造过程
+    console.log(`[YinYangBridge] 阳→阴塑造完成: ${concepts.length} 个概念, ${yangContribution.reasoning.length} 条推理`);
+    
+    return yangContribution;
+  }
+  
+  /**
+   * 带 LLM 的阴阳互塑（新架构核心方法）
+   * 
+   * @param input 用户输入
+   * @param llmCallback LLM 调用回调函数
+   * @returns 阴阳互塑结果
+   */
+  async mutualShapingWithLLM(
+    input: string,
+    llmCallback: (context: {
+      input: string;
+      yinContext: ReturnType<YinYangBridge['prepareYinContextForLLM']>;
+    }) => Promise<{
+      content: string;
+      extractedConcepts: Array<{ name: string; importance: number }>;
+    }>
+  ): Promise<YinYangInteraction> {
+    // Step 1: 准备阴系统上下文（阴→阳准备）
+    const yinContext = this.prepareYinContextForLLM(input);
+    
+    // Step 2: 调用 LLM（阳系统处理）
+    // 将阴系统直觉注入 LLM 上下文
+    const llmResult = await llmCallback({
+      input,
+      yinContext,
+    });
+    
+    // Step 3: 处理 LLM 输出（阳→阴塑造）
+    const yangContribution = this.processYangResultFromLLM(
+      llmResult.content,
+      llmResult.extractedConcepts
+    );
+    
+    // Step 4: 检查平衡
+    const balance = this.checkBalance();
+    
+    // Step 5: 自动平衡调节
+    if (this.config.autoBalance) {
+      this.applyAutoBalance(balance);
+    }
+    
+    // Step 6: 记录平衡历史
+    this.balanceHistory.push(balance);
+    if (this.balanceHistory.length > 100) {
+      this.balanceHistory.shift();
+    }
+    
+    // Step 7: 计算与 Self Core 的关联
+    const inputVector = this.vsaSpace.getConcept(input);
+    const selfRelevance = this.selfCore.computeSelfRelevance(inputVector);
+    
+    // Step 8: 融合结果
+    const fusedResult: YinYangInteraction['fusedResult'] = {
+      content: llmResult.content,
+      vector: inputVector,  // 使用输入向量作为融合向量
+      source: 'fusion',     // LLM 输出是阴阳融合的结果
+      confidence: (yinContext.yinContribution.confidence + yangContribution.confidence) / 2,
+    };
+    
+    return {
+      yinContribution: yinContext.yinContribution,
+      yangContribution,
+      fusedResult,
+      balance,
+      selfRelevance,
+    };
   }
 }
 
