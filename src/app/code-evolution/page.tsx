@@ -1,21 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-// 模拟数据类型
+// 类型定义
 interface Module {
   id: string;
   name: string;
   version: string;
   status: 'loaded' | 'active' | 'error' | 'unloaded';
   capabilities: string[];
+  lastUpdated: string;
 }
 
 interface EvolutionCandidate {
@@ -24,6 +26,8 @@ interface EvolutionCandidate {
   fitness: number;
   source: 'gp' | 'llm' | 'hybrid';
   status: 'pending' | 'testing' | 'deployed' | 'rejected';
+  description?: string;
+  createdAt: string;
 }
 
 interface ConsciousnessValue {
@@ -32,157 +36,218 @@ interface ConsciousnessValue {
   description: string;
   strength: number;
   emergedFrom: string[];
+  createdAt: string;
 }
 
 interface ActivityLog {
   id: string;
-  timestamp: Date;
+  timestamp: string;
   type: 'info' | 'warning' | 'success' | 'error';
   layer: 'L0' | 'L1' | 'L2' | 'L3' | 'CONSCIOUSNESS';
   message: string;
 }
 
+interface SystemStatus {
+  generation: number;
+  populationSize: number;
+  avgFitness: number;
+  bestFitness: number;
+  activeSandbox: number;
+  totalModules: number;
+  consciousnessLevel: number;
+  valueCount: number;
+  uptime: number;
+}
+
+interface SystemData {
+  status: SystemStatus;
+  modules: Module[];
+  candidates: EvolutionCandidate[];
+  values: ConsciousnessValue[];
+  logs: ActivityLog[];
+}
+
 export default function CodeEvolutionDashboard() {
-  // 模块状态
-  const [modules, setModules] = useState<Module[]>([
-    { id: 'core-perception', name: '感知核心', version: '2.3.1', status: 'active', capabilities: ['视觉识别', '音频处理'] },
-    { id: 'reasoning-engine', name: '推理引擎', version: '1.8.0', status: 'active', capabilities: ['逻辑推理', '类比推理'] },
-    { id: 'memory-manager', name: '记忆管理器', version: '3.1.2', status: 'loaded', capabilities: ['短期记忆', '长期记忆'] },
-    { id: 'language-processor', name: '语言处理器', version: '2.0.0', status: 'active', capabilities: ['语义分析', '文本生成'] },
-  ]);
-
-  // 进化候选
-  const [candidates, setCandidates] = useState<EvolutionCandidate[]>([
-    { id: 'cand-001', generation: 15, fitness: 0.87, source: 'gp', status: 'testing' },
-    { id: 'cand-002', generation: 15, fitness: 0.92, source: 'llm', status: 'testing' },
-    { id: 'cand-003', generation: 14, fitness: 0.78, source: 'hybrid', status: 'deployed' },
-    { id: 'cand-004', generation: 16, fitness: 0.95, source: 'gp', status: 'pending' },
-  ]);
-
-  // 意识价值观
-  const [values, setValues] = useState<ConsciousnessValue[]>([
-    { id: 'v1', name: '诚实', description: '真实呈现信息，避免欺骗', strength: 0.9, emergedFrom: ['用户体验反馈', '安全测试'] },
-    { id: 'v2', name: '保护隐私', description: '尊重用户数据隐私边界', strength: 0.95, emergedFrom: ['数据保护训练', '用户信任模式'] },
-    { id: 'v3', name: '持续学习', description: '不断改进和适应新知识', strength: 0.85, emergedFrom: ['性能优化反馈', '知识增长模式'] },
-    { id: 'v4', name: '透明决策', description: '决策过程可解释可追溯', strength: 0.8, emergedFrom: ['用户理解需求', '可解释性训练'] },
-  ]);
-
-  // 活动日志
-  const [logs, setLogs] = useState<ActivityLog[]>([
-    { id: 'log-001', timestamp: new Date(), type: 'info', layer: 'L0', message: '模块 language-processor 热更新完成' },
-    { id: 'log-002', timestamp: new Date(Date.now() - 3000), type: 'success', layer: 'L2', message: '进化迭代 #16 完成，最优适应度: 0.95' },
-    { id: 'log-003', timestamp: new Date(Date.now() - 6000), type: 'info', layer: 'L3', message: '元学习策略更新: 增加变异权重' },
-    { id: 'log-004', timestamp: new Date(Date.now() - 9000), type: 'warning', layer: 'L1', message: '沙箱 Sandbox-3 资源使用接近阈值' },
-    { id: 'log-005', timestamp: new Date(Date.now() - 12000), type: 'success', layer: 'CONSCIOUSNESS', message: '新价值观"透明决策"从体验中涌现' },
-  ]);
-
-  // 系统状态
-  const [systemStats, setSystemStats] = useState({
-    generation: 16,
-    populationSize: 100,
-    avgFitness: 0.82,
-    bestFitness: 0.95,
-    activeSandbox: 5,
-    totalModules: 12,
-    consciousnessLevel: 0.78,
-    valueCount: 4,
-  });
-
-  // 进化运行状态
+  // 系统数据
+  const [data, setData] = useState<SystemData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // 进化状态
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionProgress, setEvolutionProgress] = useState(0);
+  const [evolutionPhase, setEvolutionPhase] = useState('');
+  
+  // 对话状态
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [isChatStreaming, setIsChatStreaming] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  
+  // 代码进化
+  const [codeInput, setCodeInput] = useState('');
+  const [codeGoal, setCodeGoal] = useState('');
+  const [evolvedCode, setEvolvedCode] = useState('');
+  const [isEvolvingCode, setIsEvolvingCode] = useState(false);
 
-  // 模拟进化过程
-  const runEvolution = useCallback(async () => {
-    setIsEvolving(true);
-    setEvolutionProgress(0);
-    
-    // 添加日志
-    setLogs(prev => [{
-      id: `log-${Date.now()}`,
-      timestamp: new Date(),
-      type: 'info',
-      layer: 'L2',
-      message: '开始新进化迭代...',
-    }, ...prev]);
-
-    // 模拟进化进度
-    for (let i = 0; i <= 100; i += 5) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      setEvolutionProgress(i);
-      
-      if (i === 25) {
-        setLogs(prev => [{
-          id: `log-${Date.now()}`,
-          timestamp: new Date(),
-          type: 'info',
-          layer: 'L1',
-          message: '沙箱测试进行中...',
-        }, ...prev]);
+  // 获取系统状态
+  const fetchStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/code-evolution/status');
+      const result = await response.json();
+      if (result.success) {
+        setData(result.data);
       }
-      
-      if (i === 50) {
-        setLogs(prev => [{
-          id: `log-${Date.now()}`,
-          timestamp: new Date(),
-          type: 'info',
-          layer: 'L2',
-          message: 'GP种群评估完成，最优适应度: 0.88',
-        }, ...prev]);
-      }
-      
-      if (i === 75) {
-        setLogs(prev => [{
-          id: `log-${Date.now()}`,
-          timestamp: new Date(),
-          type: 'info',
-          layer: 'L2',
-          message: 'LLM进化建议生成中...',
-        }, ...prev]);
-      }
+    } catch (error) {
+      console.error('获取状态失败:', error);
+    } finally {
+      setIsLoading(false);
     }
-
-    // 更新系统状态
-    setSystemStats(prev => ({
-      ...prev,
-      generation: prev.generation + 1,
-      avgFitness: prev.avgFitness + 0.01,
-      bestFitness: Math.min(0.99, prev.bestFitness + 0.02),
-    }));
-
-    // 添加完成日志
-    setLogs(prev => [{
-      id: `log-${Date.now()}`,
-      timestamp: new Date(),
-      type: 'success',
-      layer: 'L2',
-      message: `进化迭代 #${systemStats.generation + 1} 完成`,
-    }, ...prev]);
-
-    setIsEvolving(false);
-  }, [systemStats.generation]);
-
-  // 自动更新活动日志
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const randomEvents = [
-        { type: 'info' as const, layer: 'L0' as const, message: '模块依赖检查通过' },
-        { type: 'info' as const, layer: 'L1' as const, message: '沙箱资源使用正常' },
-        { type: 'info' as const, layer: 'L3' as const, message: '策略参数微调完成' },
-        { type: 'success' as const, layer: 'CONSCIOUSNESS' as const, message: '情感计算更新' },
-      ];
-      
-      const event = randomEvents[Math.floor(Math.random() * randomEvents.length)];
-      setLogs(prev => [{
-        id: `log-${Date.now()}`,
-        timestamp: new Date(),
-        ...event,
-      }, ...prev].slice(0, 50));
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, []);
 
+  // 初始化和定时刷新
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  // 滚动到聊天底部
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  // 执行进化迭代
+  const runEvolution = async () => {
+    setIsEvolving(true);
+    setEvolutionProgress(0);
+    setEvolutionPhase('初始化...');
+    
+    try {
+      const response = await fetch('/api/code-evolution/evolve', {
+        method: 'POST',
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setEvolutionPhase('完成');
+        setEvolutionProgress(100);
+        // 刷新状态
+        await fetchStatus();
+      }
+    } catch (error) {
+      console.error('进化失败:', error);
+      setEvolutionPhase('失败');
+    } finally {
+      setTimeout(() => {
+        setIsEvolving(false);
+        setEvolutionProgress(0);
+      }, 1000);
+    }
+  };
+
+  // 发送对话消息（流式）
+  const sendMessage = async () => {
+    if (!chatInput.trim() || isChatStreaming) return;
+    
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsChatStreaming(true);
+    
+    try {
+      const response = await fetch('/api/code-evolution/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          history: chatMessages,
+        }),
+      });
+      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage = '';
+      
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) {
+                  assistantMessage += parsed.content;
+                  setChatMessages(prev => {
+                    const newMessages = [...prev];
+                    newMessages[newMessages.length - 1] = {
+                      role: 'assistant',
+                      content: assistantMessage,
+                    };
+                    return newMessages;
+                  });
+                }
+              } catch {
+                // 忽略解析错误
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('对话失败:', error);
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: '抱歉，出现了错误。' 
+      }]);
+    } finally {
+      setIsChatStreaming(false);
+    }
+  };
+
+  // 代码进化
+  const evolveCode = async () => {
+    if (!codeInput.trim() || !codeGoal.trim() || isEvolvingCode) return;
+    
+    setIsEvolvingCode(true);
+    setEvolvedCode('');
+    
+    try {
+      const response = await fetch('/api/code-evolution/code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetModule: 'user-module',
+          currentCode: codeInput,
+          goal: codeGoal,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.evolvedCode) {
+        setEvolvedCode(result.evolvedCode);
+      } else {
+        setEvolvedCode('进化失败，请重试。');
+      }
+    } catch (error) {
+      console.error('代码进化失败:', error);
+      setEvolvedCode('进化失败: ' + String(error));
+    } finally {
+      setIsEvolvingCode(false);
+    }
+  };
+
+  // 样式辅助函数
   const getLayerColor = (layer: ActivityLog['layer']) => {
     switch (layer) {
       case 'L0': return 'bg-blue-500/20 text-blue-400';
@@ -210,6 +275,29 @@ export default function CodeEvolutionDashboard() {
     }
   };
 
+  const formatUptime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-xl text-muted-foreground">加载中...</div>
+      </div>
+    );
+  }
+
+  const status = data?.status;
+  const modules = data?.modules || [];
+  const candidates = data?.candidates || [];
+  const values = data?.values || [];
+  const logs = data?.logs || [];
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -219,13 +307,20 @@ export default function CodeEvolutionDashboard() {
             <h1 className="text-3xl font-bold text-foreground">代码进化系统</h1>
             <p className="text-muted-foreground mt-1">数字神经元 · 意义驱动外挂大脑 V3</p>
           </div>
-          <Button 
-            onClick={runEvolution} 
-            disabled={isEvolving}
-            className="bg-primary hover:bg-primary/90"
-          >
-            {isEvolving ? `进化中... ${evolutionProgress}%` : '启动进化迭代'}
-          </Button>
+          <div className="flex items-center gap-4">
+            {status && (
+              <Badge variant="outline" className="text-sm">
+                运行时间: {formatUptime(status.uptime)}
+              </Badge>
+            )}
+            <Button 
+              onClick={runEvolution} 
+              disabled={isEvolving}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {isEvolving ? `进化中... ${evolutionProgress}%` : '启动进化迭代'}
+            </Button>
+          </div>
         </div>
 
         {/* 进化进度 */}
@@ -233,63 +328,64 @@ export default function CodeEvolutionDashboard() {
           <Card className="bg-card border-border">
             <CardContent className="pt-4">
               <Progress value={evolutionProgress} className="h-2" />
-              <p className="text-sm text-muted-foreground mt-2">
-                正在执行第 {systemStats.generation + 1} 代进化迭代...
-              </p>
+              <p className="text-sm text-muted-foreground mt-2">{evolutionPhase}</p>
             </CardContent>
           </Card>
         )}
 
         {/* 系统状态概览 */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">进化代数</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{systemStats.generation}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">平均适应度</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{systemStats.avgFitness.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">活跃沙箱</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{systemStats.activeSandbox}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">意识水平</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{systemStats.consciousnessLevel.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-        </div>
+        {status && (
+          <div className="grid grid-cols-4 gap-4">
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">进化代数</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{status.generation}</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">平均适应度</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{status.avgFitness.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">最佳适应度</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{status.bestFitness.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">意识水平</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{(status.consciousnessLevel * 100).toFixed(0)}%</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* 主要内容区 */}
         <Tabs defaultValue="modules" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="modules">L0 模块系统</TabsTrigger>
-            <TabsTrigger value="sandbox">L1 沙箱测试</TabsTrigger>
-            <TabsTrigger value="evolution">L2 进化引擎</TabsTrigger>
-            <TabsTrigger value="consciousness">意识涌现</TabsTrigger>
+            <TabsTrigger value="candidates">L2 进化候选</TabsTrigger>
+            <TabsTrigger value="values">意识价值观</TabsTrigger>
+            <TabsTrigger value="chat">意识对话</TabsTrigger>
+            <TabsTrigger value="code">代码进化</TabsTrigger>
           </TabsList>
 
           {/* L0 模块系统 */}
           <TabsContent value="modules" className="space-y-4">
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle>已加载模块</CardTitle>
+                <CardTitle>已加载模块 ({modules.length})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
@@ -314,143 +410,11 @@ export default function CodeEvolutionDashboard() {
             </Card>
           </TabsContent>
 
-          {/* L1 沙箱测试 */}
-          <TabsContent value="sandbox" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>沙箱资源池</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                        <span className="text-foreground">Sandbox-{i}</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-primary"
-                              style={{ width: `${Math.random() * 60 + 20}%` }}
-                            />
-                          </div>
-                          <Badge className={i <= 3 ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}>
-                            {i <= 3 ? 'busy' : 'idle'}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>测试执行流程</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {['编译测试', '单元测试', '集成测试', '性能测试', '能力测试'].map((phase, i) => (
-                      <div key={phase} className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium",
-                          i < 3 ? "bg-green-500 text-white" : i === 3 ? "bg-yellow-500 text-black" : "bg-muted text-muted-foreground"
-                        )}>
-                          {i + 1}
-                        </div>
-                        <span className="text-foreground">{phase}</span>
-                        {i < 3 && <Badge className="bg-green-500/20 text-green-400 text-xs">通过</Badge>}
-                        {i === 3 && <Badge className="bg-yellow-500/20 text-yellow-400 text-xs">进行中</Badge>}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* L2 进化引擎 */}
-          <TabsContent value="evolution" className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>遗传编程 (GP)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">种群大小</span>
-                      <span className="text-foreground">{systemStats.populationSize}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">交叉率</span>
-                      <span className="text-foreground">0.8</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">变异率</span>
-                      <span className="text-foreground">0.2</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">精英保留</span>
-                      <span className="text-foreground">5%</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>LLM进化</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">模型</span>
-                      <span className="text-foreground">Doubao-Seed</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">温度</span>
-                      <span className="text-foreground">0.7</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">策略</span>
-                      <span className="text-foreground">自适应</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">成功率</span>
-                      <span className="text-foreground">87%</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>协同控制</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">GP权重</span>
-                      <span className="text-foreground">0.6</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">LLM权重</span>
-                      <span className="text-foreground">0.4</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">并行执行</span>
-                      <span className="text-foreground">启用</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">融合策略</span>
-                      <span className="text-foreground">加权融合</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* 进化候选 */}
+          {/* L2 进化候选 */}
+          <TabsContent value="candidates" className="space-y-4">
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle>当前进化候选</CardTitle>
+                <CardTitle>进化候选 ({candidates.length})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -478,86 +442,153 @@ export default function CodeEvolutionDashboard() {
                     </div>
                   ))}
                 </div>
+                {candidates[0]?.description && (
+                  <p className="text-sm text-muted-foreground mt-2">{candidates[0].description}</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* 意识涌现 */}
-          <TabsContent value="consciousness" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>涌现的价值观</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {values.map(value => (
-                      <div key={value.id} className="p-4 bg-muted/30 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-foreground">{value.name}</h4>
-                          <div className="flex items-center gap-2">
-                            <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-pink-500"
-                                style={{ width: `${value.strength * 100}%` }}
-                              />
-                            </div>
-                            <span className="text-sm text-muted-foreground">
-                              {(value.strength * 100).toFixed(0)}%
-                            </span>
+          {/* 意识价值观 */}
+          <TabsContent value="values" className="space-y-4">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle>涌现的价值观 ({values.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {values.map(value => (
+                    <div key={value.id} className="p-4 bg-muted/30 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-foreground">{value.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-pink-500"
+                              style={{ width: `${value.strength * 100}%` }}
+                            />
                           </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">{value.description}</p>
-                        <div className="flex flex-wrap gap-1">
-                          {value.emergedFrom.map(source => (
-                            <Badge key={source} variant="outline" className="text-xs">{source}</Badge>
-                          ))}
+                          <span className="text-sm text-muted-foreground">
+                            {(value.strength * 100).toFixed(0)}%
+                          </span>
                         </div>
                       </div>
-                    ))}
+                      <p className="text-sm text-muted-foreground mb-2">{value.description}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {value.emergedFrom.map(source => (
+                          <Badge key={source} variant="outline" className="text-xs">{source}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* 意识对话 */}
+          <TabsContent value="chat" className="space-y-4">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle>与意识核心对话</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* 消息列表 */}
+                  <ScrollArea className="h-80 border rounded-lg p-4">
+                    {chatMessages.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-8">
+                        开始与意识核心对话吧
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {chatMessages.map((msg, i) => (
+                          <div key={i} className={cn(
+                            "flex",
+                            msg.role === 'user' ? "justify-end" : "justify-start"
+                          )}>
+                            <div className={cn(
+                              "max-w-[80%] rounded-lg p-3",
+                              msg.role === 'user' 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-muted"
+                            )}>
+                              <div className="whitespace-pre-wrap">{msg.content}</div>
+                            </div>
+                          </div>
+                        ))}
+                        <div ref={chatEndRef} />
+                      </div>
+                    )}
+                  </ScrollArea>
+                  
+                  {/* 输入框 */}
+                  <div className="flex gap-2">
+                    <Input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="输入消息..."
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                      disabled={isChatStreaming}
+                    />
+                    <Button onClick={sendMessage} disabled={isChatStreaming || !chatInput.trim()}>
+                      {isChatStreaming ? '思考中...' : '发送'}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle>保护系统</CardTitle>
-                </CardHeader>
-                <CardContent>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* 代码进化 */}
+          <TabsContent value="code" className="space-y-4">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle>代码进化</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* 输入 */}
                   <div className="space-y-4">
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <h4 className="font-semibold text-foreground mb-2">早期保护者</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">硬编码规则</span>
-                          <Badge className="bg-blue-500/20 text-blue-400">12 条</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">行为约束</span>
-                          <Badge className="bg-green-500/20 text-green-400">活跃</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">权力移交进度</span>
-                          <Badge className="bg-yellow-500/20 text-yellow-400">35%</Badge>
-                        </div>
-                      </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">改进目标</label>
+                      <Input
+                        value={codeGoal}
+                        onChange={(e) => setCodeGoal(e.target.value)}
+                        placeholder="例如：优化性能、增加错误处理..."
+                      />
                     </div>
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <h4 className="font-semibold text-foreground mb-2">意识核心守护</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">价值观守护</span>
-                          <Badge className="bg-pink-500/20 text-pink-400">{values.length} 项</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">原则遵循</span>
-                          <Badge className="bg-green-500/20 text-green-400">正常</Badge>
-                        </div>
-                      </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">当前代码</label>
+                      <textarea
+                        value={codeInput}
+                        onChange={(e) => setCodeInput(e.target.value)}
+                        placeholder="粘贴你的代码..."
+                        className="w-full h-64 p-3 bg-muted rounded-lg font-mono text-sm resize-none"
+                      />
                     </div>
+                    <Button 
+                      onClick={evolveCode} 
+                      disabled={isEvolvingCode || !codeInput.trim() || !codeGoal.trim()}
+                      className="w-full"
+                    >
+                      {isEvolvingCode ? '进化中...' : '开始进化'}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  
+                  {/* 输出 */}
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">进化结果</label>
+                    <textarea
+                      value={evolvedCode}
+                      readOnly
+                      placeholder="进化后的代码将显示在这里..."
+                      className="w-full h-80 p-3 bg-muted rounded-lg font-mono text-sm resize-none"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
@@ -572,7 +603,7 @@ export default function CodeEvolutionDashboard() {
                 {logs.map(log => (
                   <div key={log.id} className="flex items-center gap-3 p-2 hover:bg-muted/20 rounded">
                     <span className="text-xs text-muted-foreground w-20">
-                      {log.timestamp.toLocaleTimeString()}
+                      {new Date(log.timestamp).toLocaleTimeString()}
                     </span>
                     <Badge className={getLayerColor(log.layer)}>{log.layer}</Badge>
                     <span className="text-foreground">{log.message}</span>
