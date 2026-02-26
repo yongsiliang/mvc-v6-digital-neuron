@@ -110,7 +110,9 @@ export function useNeuronClient(options: UseNeuronClientOptions = {}) {
     method: 'GET' | 'POST' = 'GET',
     body?: any
   ): Promise<T> => {
-    if (!userId) {
+    // 优先使用 state userId，其次使用 ref（初始化时可能 state 还没更新）
+    const effectiveUserId = userId || userIdRef.current;
+    if (!effectiveUserId) {
       throw new Error('User not initialized');
     }
 
@@ -118,7 +120,7 @@ export function useNeuronClient(options: UseNeuronClientOptions = {}) {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': userId,
+        'X-User-Id': effectiveUserId,
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -145,6 +147,9 @@ export function useNeuronClient(options: UseNeuronClientOptions = {}) {
   // 公共方法
   // ─────────────────────────────────────────────────────────────────
 
+  // 用于初始化的 userId ref（避免 state 更新延迟问题）
+  const userIdRef = useRef<string | null>(null);
+
   /**
    * 初始化
    */
@@ -154,32 +159,60 @@ export function useNeuronClient(options: UseNeuronClientOptions = {}) {
       
       // 获取或创建用户ID
       const id = getOrCreateUserId();
+      userIdRef.current = id;
       setUserId(id);
       
       // 获取用户信息
       const info = getUserInfo();
       setUserInfo(info);
       
-      // 加载状态
-      const response = await apiCall<{ success: boolean; data: NeuronState }>(
-        '/api/neuron/state',
-        'GET'
-      );
+      // 直接使用 id 进行 API 调用（避免 state 更新延迟）
+      const response = await fetch('/api/neuron/state', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': id,
+        },
+      });
       
-      if (response.success) {
-        setState(response.data);
-        pendingStateRef.current = response.data;
-        onStateChange?.(response.data);
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setState(data.data);
+        pendingStateRef.current = data.data;
+        onStateChange?.(data.data);
+      } else {
+        // 如果 API 失败，使用默认状态
+        console.warn('Failed to load neuron state, using default');
+        const defaultState: NeuronState = {
+          neurons: [],
+          connections: [],
+          memories: [],
+          selfModel: null,
+          stats: { neuronCount: 0, connectionCount: 0, memoryCount: 0 }
+        };
+        setState(defaultState);
+        pendingStateRef.current = defaultState;
       }
       
       setIsInitialized(true);
       setError(null);
     } catch (err) {
-      handleError(err as Error);
+      console.error('Initialize error:', err);
+      // 即使失败也标记为已初始化，使用默认状态
+      setIsInitialized(true);
+      const defaultState: NeuronState = {
+        neurons: [],
+        connections: [],
+        memories: [],
+        selfModel: null,
+        stats: { neuronCount: 0, connectionCount: 0, memoryCount: 0 }
+      };
+      setState(defaultState);
     } finally {
       setIsLoading(false);
     }
-  }, [apiCall, handleError, onStateChange]);
+  }, [onStateChange]);
 
   /**
    * 记住内容
