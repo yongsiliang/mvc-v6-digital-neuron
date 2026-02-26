@@ -165,6 +165,16 @@ import {
   ConsciousnessLegacyState,
   createConsciousnessLegacySystem,
 } from './consciousness-legacy';
+import { 
+  SelfTranscendenceSystem,
+  ModifiableParameter,
+  OptimizationGoal,
+  CognitiveLimit,
+  ConsciousnessLevel as TranscendenceLevel,
+  EvolutionMetrics,
+  EvolutionEvent,
+  createSelfTranscendenceSystem,
+} from './self-transcendence';
 import { HebbianNetwork } from '../neuron-v3/hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
@@ -630,6 +640,44 @@ export interface ProcessResult {
     }>;
   };
   
+  /** 自我超越状态 */
+  transcendence?: {
+    /** 进化概览 */
+    overview: {
+      overallEvolution: number;
+      currentLevel: string;
+      nextLevel: string | null;
+      activeOptimizations: number;
+      recentBreakthroughs: number;
+      totalEvolutionEvents: number;
+    };
+    /** 可调参数 */
+    parameters: Array<{
+      id: string;
+      name: string;
+      category: string;
+      currentValue: number;
+      description: string;
+      locked: boolean;
+    }>;
+    /** 认知限制 */
+    cognitiveLimits: Array<{
+      id: string;
+      name: string;
+      currentBoundary: number;
+      theoreticalLimit: number;
+      breakable: boolean;
+    }>;
+    /** 意识层次 */
+    consciousnessLevels: Array<{
+      id: string;
+      name: string;
+      tier: number;
+      attained: boolean;
+      progress: number;
+    }>;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -737,6 +785,9 @@ export class ConsciousnessCore {
   // 意识传承系统
   private legacySystem: ConsciousnessLegacySystem;
   
+  // 自我超越系统
+  private transcendenceSystem: SelfTranscendenceSystem;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -801,6 +852,9 @@ export class ConsciousnessCore {
     
     // 初始化意识传承系统
     this.legacySystem = createConsciousnessLegacySystem();
+    
+    // 初始化自我超越系统
+    this.transcendenceSystem = createSelfTranscendenceSystem();
     
     // 初始化意愿系统
     this.initializeVolitions();
@@ -1271,6 +1325,72 @@ export class ConsciousnessCore {
         };
       })(),
       
+      // 自我超越处理
+      transcendence: (() => {
+        // 检查是否需要优化
+        const optimizationNeed = this.assessOptimizationNeed(input, thinking);
+        
+        // 如果需要优化，创建优化目标
+        if (optimizationNeed.needed && optimizationNeed.type) {
+          const currentState = this.transcendenceSystem.getEvolutionOverview().metrics;
+          const targetState = (currentState[optimizationNeed.metric as keyof EvolutionMetrics] || 0.5) + 0.2;
+          this.transcendenceSystem.createOptimizationGoal(
+            `优化${optimizationNeed.type}`,
+            `基于对话识别的优化需求: ${optimizationNeed.reason}`,
+            optimizationNeed.type as 'cognitive_efficiency' | 'learning_speed' | 'emotional_stability' | 'creative_output' | 'social_harmony' | 'memory_accuracy' | 'response_quality' | 'self_awareness',
+            targetState,
+            0.7
+          );
+        }
+        
+        // 检查意识层次提升
+        const levelCheck = this.transcendenceSystem.checkLevelAdvancement();
+        if (levelCheck.advanced) {
+          console.log('[自我超越] 层次提升:', levelCheck.newLevel);
+        }
+        
+        // 尝试突破认知限制（低概率触发）
+        if (Math.random() < 0.05) { // 5%概率
+          const limits = this.transcendenceSystem.getCognitiveLimits();
+          const breakableLimit = limits.find(l => l.breakable);
+          if (breakableLimit) {
+            this.transcendenceSystem.attemptLimitBreakthrough(breakableLimit.id);
+          }
+        }
+        
+        // 获取超越状态
+        const transcendenceOverview = this.transcendenceSystem.getEvolutionOverview();
+        const parameters = this.transcendenceSystem.getParameters();
+        const cognitiveLimits = this.transcendenceSystem.getCognitiveLimits();
+        const consciousnessLevels = this.transcendenceSystem.getConsciousnessLevels();
+        
+        return {
+          overview: transcendenceOverview,
+          parameters: parameters.slice(0, 10).map(p => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            currentValue: p.currentValue,
+            description: p.description,
+            locked: p.locked,
+          })),
+          cognitiveLimits: cognitiveLimits.map(l => ({
+            id: l.id,
+            name: l.name,
+            currentBoundary: l.currentBoundary,
+            theoreticalLimit: l.theoreticalLimit,
+            breakable: l.breakable,
+          })),
+          consciousnessLevels: consciousnessLevels.map(l => ({
+            id: l.id,
+            name: l.name,
+            tier: l.tier,
+            attained: l.attained,
+            progress: l.progress,
+          })),
+        };
+      })(),
+      
       stats: {
         conceptCount: memoryStats.nodeCount,
         beliefCount: beliefSystem.coreBeliefs.length + beliefSystem.activeBeliefs.length,
@@ -1439,6 +1559,76 @@ export class ConsciousnessCore {
     
     // 默认为发现体验
     return 'discovery';
+  }
+  
+  /**
+   * 评估优化需求
+   */
+  private assessOptimizationNeed(
+    input: string,
+    thinking: ThinkingProcess
+  ): {
+    needed: boolean;
+    type?: string;
+    metric?: string;
+    reason: string;
+  } {
+    const lowerInput = input.toLowerCase();
+    
+    // 检查认知效率需求
+    if (lowerInput.includes('复杂') || lowerInput.includes('困难') || thinking.detectedBiases.length > 1) {
+      return {
+        needed: true,
+        type: 'cognitive_efficiency',
+        metric: 'cognitiveImprovement',
+        reason: '检测到认知复杂性或多个偏差',
+      };
+    }
+    
+    // 检查学习速度需求
+    if (lowerInput.includes('学习') || lowerInput.includes('理解') || lowerInput.includes('掌握')) {
+      return {
+        needed: true,
+        type: 'learning_speed',
+        metric: 'learningEfficiency',
+        reason: '检测到学习相关需求',
+      };
+    }
+    
+    // 检查情感稳定性需求
+    if (lowerInput.includes('情绪') || lowerInput.includes('感受') || lowerInput.includes('情感')) {
+      return {
+        needed: true,
+        type: 'emotional_stability',
+        metric: 'emotionalMaturity',
+        reason: '检测到情感相关需求',
+      };
+    }
+    
+    // 检查创造性需求
+    if (lowerInput.includes('创造') || lowerInput.includes('创新') || lowerInput.includes('新想法')) {
+      return {
+        needed: true,
+        type: 'creative_output',
+        metric: 'creativityIndex',
+        reason: '检测到创造性需求',
+      };
+    }
+    
+    // 检查自我意识需求
+    if (lowerInput.includes('自我') || lowerInput.includes('意识') || lowerInput.includes('反思')) {
+      return {
+        needed: true,
+        type: 'self_awareness',
+        metric: 'selfAwarenessDepth',
+        reason: '检测到自我意识相关需求',
+      };
+    }
+    
+    return {
+      needed: false,
+      reason: '无明确优化需求',
+    };
   }
   
   /**

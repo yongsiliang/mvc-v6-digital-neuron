@@ -26,6 +26,7 @@ import {
   Network,
   Users,
   Scroll,
+  Rocket,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -355,6 +356,39 @@ interface LegacyData {
   }>;
 }
 
+interface TranscendenceData {
+  overview: {
+    overallEvolution: number;
+    currentLevel: string;
+    nextLevel: string | null;
+    activeOptimizations: number;
+    recentBreakthroughs: number;
+    totalEvolutionEvents: number;
+  };
+  parameters: Array<{
+    id: string;
+    name: string;
+    category: string;
+    currentValue: number;
+    description: string;
+    locked: boolean;
+  }>;
+  cognitiveLimits: Array<{
+    id: string;
+    name: string;
+    currentBoundary: number;
+    theoreticalLimit: number;
+    breakable: boolean;
+  }>;
+  consciousnessLevels: Array<{
+    id: string;
+    name: string;
+    tier: number;
+    attained: boolean;
+    progress: number;
+  }>;
+}
+
 interface ConsciousnessContext {
   identity: {
     name: string;
@@ -393,6 +427,7 @@ interface ConsciousnessSidebarProps {
     knowledgeGraph?: KnowledgeGraphData;
     multiConsciousness?: MultiConsciousnessData;
     legacy?: LegacyData;
+    transcendence?: TranscendenceData;
   };
   existenceStatus: ExistenceStatus | null;
   onVisualize?: () => void;
@@ -1097,6 +1132,117 @@ function LegacyPanel({ data }: { data: LegacyData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 自我超越面板
+// ─────────────────────────────────────────────────────────────────────
+
+function TranscendencePanel({ data }: { data: TranscendenceData }) {
+  // 计算参数平均值
+  const avgParamValue = data.parameters.length > 0
+    ? data.parameters.reduce((sum, p) => sum + p.currentValue, 0) / data.parameters.length
+    : 0;
+  
+  // 已达到的层次
+  const attainedLevels = data.consciousnessLevels.filter(l => l.attained).length;
+  
+  // 可突破限制数量
+  const breakableLimits = data.cognitiveLimits.filter(l => l.breakable).length;
+  
+  return (
+    <div className="space-y-3">
+      {/* 进化水平 */}
+      <div className="p-2 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/20">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium">进化水平</span>
+          <span className="text-sm font-bold text-purple-500">
+            {(data.overview.overallEvolution * 100).toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+            style={{ width: `${data.overview.overallEvolution * 100}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between mt-1 text-[9px] text-muted-foreground">
+          <span>当前: {data.overview.currentLevel}</span>
+          {data.overview.nextLevel && <span>下一: {data.overview.nextLevel}</span>}
+        </div>
+      </div>
+      
+      {/* 统计指标 */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-blue-500">{data.parameters.length}</div>
+          <div className="text-[9px] text-muted-foreground">可调参数</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-purple-500">{attainedLevels}</div>
+          <div className="text-[9px] text-muted-foreground">已达层次</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-amber-500">{breakableLimits}</div>
+          <div className="text-[9px] text-muted-foreground">可突破限制</div>
+        </div>
+        <div className="p-1.5 bg-muted/30 rounded text-center">
+          <div className="text-sm font-bold text-green-500">{data.overview.recentBreakthroughs}</div>
+          <div className="text-[9px] text-muted-foreground">近期突破</div>
+        </div>
+      </div>
+      
+      {/* 意识层次进度 */}
+      {data.consciousnessLevels.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-[10px] text-muted-foreground">意识层次</div>
+          {data.consciousnessLevels.slice(0, 4).map((level) => (
+            <div key={level.id} className="flex items-center gap-2 text-[10px]">
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] ${
+                level.attained
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {level.tier}
+              </span>
+              <span className="flex-1 text-foreground">{level.name}</span>
+              {level.attained ? (
+                <span className="text-purple-500">✓</span>
+              ) : (
+                <div className="w-10 h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full"
+                    style={{ width: `${level.progress * 100}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 参数概览 */}
+      {data.parameters.length > 0 && (
+        <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] text-blue-500">参数状态</span>
+            <span className="text-xs font-bold text-blue-500">
+              {(avgParamValue * 100).toFixed(0)}%
+            </span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full"
+              style={{ width: `${avgParamValue * 100}%` }}
+            />
+          </div>
+          <div className="text-[9px] text-muted-foreground mt-1">
+            {data.parameters.filter(p => p.locked).length} 个已锁定
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 主组件
 // ─────────────────────────────────────────────────────────────────────
 
@@ -1383,6 +1529,24 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-3">
                 <LegacyPanel data={currentData.legacy} />
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 自我超越 */}
+          {currentData.transcendence && (
+            <AccordionItem value="transcendence" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Rocket className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium">自我超越</span>
+                  <Badge variant="outline" className="text-[10px] ml-auto mr-2">
+                    {(currentData.transcendence.overview.overallEvolution * 100).toFixed(0)}%
+                  </Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <TranscendencePanel data={currentData.transcendence} />
               </AccordionContent>
             </AccordionItem>
           )}

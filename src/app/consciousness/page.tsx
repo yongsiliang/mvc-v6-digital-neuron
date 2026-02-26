@@ -498,6 +498,38 @@ export default function ConsciousnessPage() {
         weight: number;
       }>;
     };
+    transcendence?: {
+      overview: {
+        overallEvolution: number;
+        currentLevel: string;
+        nextLevel: string | null;
+        activeOptimizations: number;
+        recentBreakthroughs: number;
+        totalEvolutionEvents: number;
+      };
+      parameters: Array<{
+        id: string;
+        name: string;
+        category: string;
+        currentValue: number;
+        description: string;
+        locked: boolean;
+      }>;
+      cognitiveLimits: Array<{
+        id: string;
+        name: string;
+        currentBoundary: number;
+        theoreticalLimit: number;
+        breakable: boolean;
+      }>;
+      consciousnessLevels: Array<{
+        id: string;
+        name: string;
+        tier: number;
+        attained: boolean;
+        progress: number;
+      }>;
+    };
   }>({});
   
   // 存在状态
@@ -922,6 +954,9 @@ export default function ConsciousnessPage() {
                   break;
                 case 'legacy':
                   setCurrentData(prev => ({ ...prev, legacy: data.data }));
+                  break;
+                case 'transcendence':
+                  setCurrentData(prev => ({ ...prev, transcendence: data.data }));
                   break;
                 case 'content':
                   assistantContent += data.data.delta;

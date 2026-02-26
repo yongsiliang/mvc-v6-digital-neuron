@@ -317,6 +317,16 @@ export async function POST(request: NextRequest) {
             });
           }
           
+          // 发送自我超越状态
+          if (result.transcendence) {
+            send('transcendence', {
+              overview: result.transcendence.overview,
+              parameters: result.transcendence.parameters,
+              cognitiveLimits: result.transcendence.cognitiveLimits,
+              consciousnessLevels: result.transcendence.consciousnessLevels,
+            });
+          }
+          
           // 流式发送响应
           send('status', { stage: 'responding', message: '回复中...' });
           
