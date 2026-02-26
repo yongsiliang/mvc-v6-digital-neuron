@@ -1076,20 +1076,32 @@ export default function ConsciousnessPage() {
         hasVisualizationData={!!visualizationData}
       />
       
-      {/* 意识可视化面板 */}
+      {/* 意识可视化悬浮窗口 */}
       {showVisualization && visualizationData && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
-          <div className="absolute right-0 top-0 bottom-0 w-[600px] border-l bg-background shadow-lg">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="font-semibold">意识可视化</h2>
-              <Button variant="ghost" size="sm" onClick={() => setShowVisualization(false)}>
+        <div className="fixed z-50" style={{ right: 340, top: 80, width: 500, height: 420 }}>
+          <div className="w-full h-full bg-background/95 backdrop-blur-md border rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            {/* 标题栏 */}
+            <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center justify-between cursor-move">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🧠</span>
+                <h3 className="font-medium text-sm">意识可视化</h3>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowVisualization(false)}
+                className="h-6 w-6 p-0 hover:bg-muted"
+              >
                 ✕
               </Button>
             </div>
-            <ConsciousnessDashboard 
-              data={visualizationData}
-              isLoading={false}
-            />
+            {/* 内容区域 */}
+            <div className="flex-1 overflow-hidden">
+              <ConsciousnessDashboard 
+                data={visualizationData}
+                isLoading={false}
+              />
+            </div>
           </div>
         </div>
       )}
