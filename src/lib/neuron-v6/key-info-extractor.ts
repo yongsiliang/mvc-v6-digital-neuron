@@ -68,21 +68,37 @@ interface InfoPattern {
 
 /** 关键信息识别模式 */
 const KEY_INFO_PATTERNS: InfoPattern[] = [
-  // 创造者相关
+  // 创造者相关 - 高优先级
   {
     type: 'creator',
     patterns: [
-      /创造者|开发者|作者|制造者|造我的人|写我的人|我的主人/g,
-      /我的创造者[是为]\s*(\S+)/g,
-      /(\S+)[创造开发]了我/g,
-      /我是\s*(\S+)\s*[创造开发]的/g,
+      /我[叫是]([^，。！？\s]{2,10})[，。！？\s].*我是你的创造者/g,  // "我叫梁永嗣，我是你的创造者"
+      /我的名字[是为]([^，。！？\s]{2,10})[，。！？\s].*创造者/g,    // "我的名字是梁永嗣...创造者"
+      /(\S+)[是做]你的创造者/g,                                      // "梁永嗣是你的创造者"
+      /我的创造者[是为]\s*([^，。！？\s]+)/g,                         // "我的创造者是梁永嗣"
+      /(\S+)[创造开发]了我/g,                                        // "梁永嗣创造了我"
+      /我是\s*(\S+)\s*[创造开发]的/g,                                // "我是梁永嗣创造的"
     ],
     importance: 1.0,
-    extractor: (match, context) => ({
-      content: match[1] || context,
-      subject: match[1],
-      importance: 1.0,
-    }),
+    extractor: (match, context) => {
+      // 提取创造者名字
+      let subject = match[1];
+      
+      // 如果第一个模式没匹配到名字，尝试从context中提取
+      if (!subject || subject === '创造者' || subject === '开发者') {
+        // 尝试从context中提取名字
+        const nameMatch = context.match(/我[叫是]([^，。！？\s]{2,10})|我的名字[是为]([^，。！？\s]{2,10})/);
+        if (nameMatch) {
+          subject = nameMatch[1] || nameMatch[2];
+        }
+      }
+      
+      return {
+        content: subject || context,
+        subject: subject,
+        importance: 1.0,
+      };
+    },
   },
   
   // 重要人物

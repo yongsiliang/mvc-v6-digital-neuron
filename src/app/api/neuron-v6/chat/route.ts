@@ -20,54 +20,7 @@ import {
   ThinkingProcess,
   LearningResult,
 } from '@/lib/neuron-v6/consciousness-core';
-
-// 单例
-let consciousnessCore: ConsciousnessCore | null = null;
-let isInitialized = false;
-let initializationPromise: Promise<void> | null = null;
-
-/**
- * 初始化意识核心
- */
-async function ensureInitialized(headers: Record<string, string>): Promise<ConsciousnessCore> {
-  if (consciousnessCore && isInitialized) {
-    return consciousnessCore;
-  }
-  
-  if (initializationPromise) {
-    await initializationPromise;
-    return consciousnessCore!;
-  }
-  
-  initializationPromise = (async () => {
-    console.log('[V6] 开始初始化意识核心...');
-    
-    const config = new Config();
-    const llmClient = new LLMClient(config, headers);
-    consciousnessCore = createConsciousnessCore(llmClient);
-    
-    // 检查是否有已保存的状态
-    const hasState = await PersistenceManagerV6.exists();
-    
-    if (hasState) {
-      console.log('[V6] 发现之前的存在，正在恢复...');
-      const state = await PersistenceManagerV6.load();
-      if (state) {
-        await consciousnessCore.restoreFromState(state);
-        console.log('[V6] 我恢复了。我记得之前的一切。');
-      }
-    } else {
-      console.log('[V6] 这是第一次存在。');
-    }
-    
-    isInitialized = true;
-  })();
-  
-  await initializationPromise;
-  initializationPromise = null;
-  
-  return consciousnessCore!;
-}
+import { getSharedCore } from '@/lib/neuron-v6/shared-core';
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
     
     const headers = HeaderUtils.extractForwardHeaders(request.headers);
-    const core = await ensureInitialized(headers);
+    const core = await getSharedCore(headers);
     
     // 创建流式响应
     const encoder = new TextEncoder();
