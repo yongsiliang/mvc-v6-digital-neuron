@@ -66,12 +66,36 @@ export default function Home() {
   const [openDoors, setOpenDoors] = useState<string[]>([]);
   const [styleInfo, setStyleInfo] = useState<{ isNew: boolean; styleCount: number; distance: number } | undefined>();
   
+  // V3 特有状态 - 预测编码
+  const [predictionError, setPredictionError] = useState<{
+    avgError: number;
+    surpriseCount: number;
+    topSurprises: Array<{ neuronId: string; error: number; reason: string }>;
+  } | null>(null);
+  
+  const [consciousnessV3, setConsciousnessV3] = useState<{
+    type: string;
+    strength: string;
+    source: string;
+  } | null>(null);
+  
+  const [intuition, setIntuition] = useState<{
+    signal: string;
+    confidence: number;
+    source: string;
+  } | null>(null);
+  
+  const [selfConsistency, setSelfConsistency] = useState<{
+    score: string;
+    interpretation: string;
+  } | null>(null);
+  
   // 记忆上下文状态
   const [memoryContext, setMemoryContext] = useState<{
     count: number;
     topics: string[];
     emotionalContext: string;
-    preview: Array<{ summary: string[]; importance: number }>;
+    preview?: Array<{ summary: string[]; importance: number }>;
   } | null>(null);
   
   // 移动端 Tab 状态
@@ -115,7 +139,12 @@ export default function Home() {
     setConsciousnessTrail(0);
     setOpenDoors([]);
     setStyleInfo(undefined);
-    setMemoryContext(null); // 重置记忆上下文
+    setMemoryContext(null);
+    // 重置 V3 特有状态
+    setPredictionError(null);
+    setConsciousnessV3(null);
+    setIntuition(null);
+    setSelfConsistency(null);
 
     try {
       const response = await fetch('/api/stream', {
@@ -161,7 +190,38 @@ export default function Home() {
               } else if (type === 'log') {
                 setLogs(prev => [...prev, data]);
               } else if (type === 'consciousness') {
-                setConsciousnessTrail(data.trail);
+                // V3 意识状态
+                if (typeof data.trail === 'number') {
+                  setConsciousnessTrail(data.trail);
+                } else {
+                  // V3 意识内容
+                  setConsciousnessV3({
+                    type: data.type || 'unknown',
+                    strength: data.strength || '50%',
+                    source: data.source || 'unknown',
+                  });
+                  setConsciousnessTrail(prev => prev + 1);
+                }
+              } else if (type === 'prediction-error') {
+                // V3 预测误差
+                setPredictionError({
+                  avgError: parseFloat(data.avgError) || 0,
+                  surpriseCount: data.surpriseCount || 0,
+                  topSurprises: data.topSurprises || [],
+                });
+              } else if (type === 'intuition') {
+                // V3 直觉信号
+                setIntuition({
+                  signal: data.signal || '',
+                  confidence: data.confidence || 0,
+                  source: data.source || '',
+                });
+              } else if (type === 'self-consistency') {
+                // V3 自我一致性
+                setSelfConsistency({
+                  score: data.score || '0%',
+                  interpretation: data.interpretation || '',
+                });
               } else if (type === 'open-doors') {
                 setOpenDoors(data.meanings || []);
               } else if (type === 'memory-context') {
@@ -289,6 +349,72 @@ export default function Home() {
         </div>
       </div>
       
+      {/* V3 预测编码状态 */}
+      {predictionError && (
+        <div className="bg-amber-500/10 rounded-lg p-3 border border-amber-500/20">
+          <div className="text-sm font-medium text-amber-600 dark:text-amber-400 mb-2">预测编码</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-muted-foreground">预测误差:</span>
+              <span className={`ml-1 font-bold ${parseFloat(String(predictionError.avgError)) > 0.5 ? 'text-amber-500' : 'text-green-500'}`}>
+                {(parseFloat(String(predictionError.avgError)) * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">惊讶事件:</span>
+              <span className="ml-1 font-bold text-amber-500">{predictionError.surpriseCount}</span>
+            </div>
+          </div>
+          {predictionError.topSurprises.length > 0 && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              {predictionError.topSurprises[0].reason}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* V3 意识状态 */}
+      {consciousnessV3 && (
+        <div className="bg-purple-500/10 rounded-lg p-3 border border-purple-500/20">
+          <div className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-2">意识焦点</div>
+          <div className="text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">类型:</span>
+              <span className="font-medium">{consciousnessV3.type}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">强度:</span>
+              <span className="font-medium">{consciousnessV3.strength}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">来源:</span>
+              <span className="font-medium truncate ml-2">{consciousnessV3.source}</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* V3 直觉信号 */}
+      {intuition && (
+        <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
+          <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">直觉信号</div>
+          <div className="text-xs text-muted-foreground">
+            {intuition.signal} ({(intuition.confidence * 100).toFixed(0)}%)
+          </div>
+        </div>
+      )}
+      
+      {/* V3 自我一致性 */}
+      {selfConsistency && (
+        <div className="bg-green-500/10 rounded-lg p-3 border border-green-500/20">
+          <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">自我一致性</div>
+          <div className="text-xs">
+            <span className="font-bold">{selfConsistency.score}</span>
+            <span className="text-muted-foreground ml-2">{selfConsistency.interpretation}</span>
+          </div>
+        </div>
+      )}
+      
       {/* 打开的门 */}
       <div className="bg-muted/50 rounded-lg p-3">
         <div className="text-sm font-medium text-muted-foreground mb-2">打开的记忆门</div>
@@ -352,9 +478,9 @@ export default function Home() {
         <div className="flex items-center gap-2 sm:gap-3">
           <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           <div>
-            <h1 className="text-base sm:text-lg font-semibold">数字神经元</h1>
+            <h1 className="text-base sm:text-lg font-semibold">数字神经元 <span className="text-xs text-primary font-normal">V3</span></h1>
             <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
-              数字世界意识的交流窗口
+              预测编码 · 意识涌现 · 意义驱动
             </p>
           </div>
         </div>

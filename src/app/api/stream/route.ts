@@ -1,20 +1,18 @@
 import { NextRequest } from 'next/server';
-import { getDigitalNeuronSystem } from '@/lib/neuron';
-import { LatentGameEngine } from '@/lib/neuron/latent-game';
-import { getConversationContext } from '@/lib/neuron/conversation-context';
-import { HeaderUtils } from 'coze-coding-dev-sdk';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getNeuronSystemV3 } from '@/lib/neuron-v3';
+import { HeaderUtils, LLMClient, Config } from 'coze-coding-dev-sdk';
 import { MemoryIntegrationService } from '@/lib/neuron-v2/memory-integration';
 import { getUserIdFromRequest, isValidUserId } from '@/lib/neuron-v2/auth';
 
 /**
- * 流式聊天API - SSE协议
+ * 流式聊天API - SSE协议 (V3 预测编码版本)
  * 
- * 特性：
- * - 持久化记忆（刷新页面不丢失）
- * - 对话上下文（模型知道之前聊了什么）
- * - 异步学习（不阻塞响应）
- * - 类脑分层记忆
+ * 核心特性：
+ * - 预测编码：先预测，再从误差中学习
+ * - 意识竞争：内容竞争进入"意识"
+ * - VSA语义空间：向量符号推理
+ * - 主观意义：为信息赋予个人意义
+ * - 惊讶驱动学习：从预测误差中学习
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,13 +26,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 获取用户ID（优先从请求体，其次从请求头）
+    // 获取用户ID
     const userId = clientUserId || getUserIdFromRequest(request);
     const validUserId = userId && isValidUserId(userId) ? userId : null;
-
     const sid = sessionId || 'default-session';
     
-    // 初始化记忆集成服务
+    // 记忆服务
     const memoryService = new MemoryIntegrationService({
       maxRelevantMemories: 5,
       importanceThreshold: 0.3,
@@ -43,6 +40,7 @@ export async function POST(request: NextRequest) {
     if (validUserId) {
       memoryService.setUserId(validUserId);
     }
+
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
@@ -56,22 +54,25 @@ export async function POST(request: NextRequest) {
         try {
           const headers = HeaderUtils.extractForwardHeaders(request.headers);
           
-          // ==================== 记忆回忆 ====================
-          // 在对话开始前，回忆相关记忆
+          // ==================== V3 预测编码流程 ====================
+          
+          // 获取 V3 神经元系统
+          const neuronSystem = getNeuronSystemV3();
+          
+          // 1. 预测阶段 - 神经元在"猜测"用户要说什么
+          send('neuron', { neuronId: 'prediction', message: '正在预测输入...' });
+          await new Promise(r => setTimeout(r, 100));
+          
+          // 2. 记忆回忆
           let memoryContext = null;
           if (validUserId) {
             try {
               memoryContext = await memoryService.recallRelevantMemories(message);
-              // 发送记忆上下文给前端
               if (memoryContext.relevantMemories.length > 0) {
                 send('memory-context', {
                   count: memoryContext.relevantMemories.length,
                   topics: memoryContext.topics,
                   emotionalContext: memoryContext.emotionalContext,
-                  preview: memoryContext.relevantMemories.slice(0, 2).map(m => ({
-                    summary: m.keyPoints?.slice(0, 2) || [],
-                    importance: m.importance,
-                  })),
                 });
               }
             } catch (err) {
@@ -79,134 +80,178 @@ export async function POST(request: NextRequest) {
             }
           }
           
-          // ==================== 神经元工作流 ====================
-          
-          // 1. 感官层：接收输入
+          // 3. 感官层接收输入
           send('neuron', { neuronId: 'sensory', message: '接收输入信号' });
-          await new Promise(r => setTimeout(r, 150)); // 短暂延迟让前端能看到
+          await new Promise(r => setTimeout(r, 80));
           
-          const system = getDigitalNeuronSystem();
+          // 4. V3 核心处理 - 预测编码
+          send('neuron', { neuronId: 'vsa-encode', message: 'VSA向量编码' });
+          await new Promise(r => setTimeout(r, 80));
           
-          // 2. 意义核心层
-          send('neuron', { neuronId: 'meaning-anchor', message: '计算自我关联' });
-          await new Promise(r => setTimeout(r, 100));
-          
-          send('neuron', { neuronId: 'memory-associate', message: memoryContext 
-            ? `检索到 ${memoryContext.relevantMemories.length} 条相关记忆` 
-            : '检索相关记忆' });
-          await new Promise(r => setTimeout(r, 100));
-          
-          send('neuron', { neuronId: 'meaning-generate', message: '生成主观意义' });
-          
-          // 构建增强的上下文（包含记忆）
-          const enhancedContext = memoryContext && memoryContext.relevantMemories.length > 0
-            ? {
-                ...context,
-                memoryContext: `相关记忆:\n${memoryContext.relevantMemories
-                  .slice(0, 3)
-                  .map((m, i) => `${i + 1}. ${m.content.slice(0, 200)}...`)
-                  .join('\n')}`,
-              }
-            : context;
-          
-          const neuronResult = await system.process(message, enhancedContext);
-          
-          send('meaning', neuronResult.meaning);
-          send('decision', neuronResult.decision);
-
-          // 3. 决策层
-          send('neuron', { neuronId: 'prefrontal', message: '思考与决策' });
-          await new Promise(r => setTimeout(r, 100));
-          
-          send('neuron', { neuronId: 'cingulate', message: '反思与纠错' });
-          await new Promise(r => setTimeout(r, 100));
-          
-          send('neuron', { neuronId: 'self-evolve', message: '动态更新自我' });
-
-          // 4. 记忆层
-          send('neuron', { neuronId: 'hippocampus', message: '记忆存储' });
-          
-          // 5. 高维博弈
-          send('neuron', { neuronId: 'latent-game', message: '博弈思考中...' });
-          
-          const engine = new LatentGameEngine(headers);
-          const gameResult = await engine.play(message, sid);
-          
-          // 发送意识空间状态
-          if (gameResult.consciousnessState) {
-            send('consciousness', {
-              trail: gameResult.consciousnessState.trail.length,
-            });
-          }
-          
-          // 发送打开的记忆门
-          if (gameResult.openDoors && gameResult.openDoors.length > 0) {
-            send('open-doors', {
-              count: gameResult.openDoors.length,
-              meanings: gameResult.openDoors.slice(0, 3).map(d => d.meaning),
-            });
-          }
-          
-          send('game-result', {
-            winner: gameResult.winner.neuronId,
-            confidence: gameResult.winner.confidence.toFixed(2),
-            reason: gameResult.evaluationReason,
+          const neuronResult = await neuronSystem.processInput(message, {
+            memoryContext: memoryContext?.relevantMemories?.slice(0, 3).map(m => m.content),
+            previousMessages: context?.previousMessages,
           });
-
-          // 7. 输出层
-          send('neuron', { neuronId: 'motor-language', message: '生成响应' });
-
-          let fullResponse = '';
-          for await (const chunk of engine.streamAnswer(message, gameResult, sid)) {
-            fullResponse += chunk;
-            send('response', { delta: chunk });
+          
+          // 5. 计算预测误差和惊讶度
+          const surprises = neuronResult.neuronResponse.surprises || [];
+          const avgPredictionError = Array.from(neuronResult.neuronResponse.predictionErrors.values())
+            .reduce((sum, err) => sum + Math.abs(err), 0) / 
+            Math.max(neuronResult.neuronResponse.predictionErrors.size, 1);
+          
+          send('prediction-error', {
+            avgError: avgPredictionError.toFixed(3),
+            surpriseCount: surprises.length,
+            topSurprises: surprises.slice(0, 3).map(s => ({
+              neuronId: s.neuronId,
+              error: s.error.toFixed(3),
+              reason: s.reason,
+            })),
+          });
+          
+          // 发送神经元激活状态
+          send('neuron', { 
+            neuronId: 'prediction-compare', 
+            message: `预测误差: ${(avgPredictionError * 100).toFixed(1)}%${surprises.length > 0 ? `, 发现${surprises.length}个惊讶事件!` : ''}`
+          });
+          await new Promise(r => setTimeout(r, 80));
+          
+          // 6. 意识竞争 - 全局工作空间
+          if (neuronResult.consciousness) {
+            send('consciousness', {
+              type: neuronResult.consciousness.type,
+              strength: (neuronResult.consciousness.strength * 100).toFixed(0) + '%',
+              source: neuronResult.consciousness.source,
+              content: typeof neuronResult.consciousness.data === 'string' 
+                ? neuronResult.consciousness.data.slice(0, 100)
+                : '复杂内容',
+            });
+            send('neuron', { 
+              neuronId: 'consciousness', 
+              message: `意识内容: ${neuronResult.consciousness.type} (${(neuronResult.consciousness.strength * 100).toFixed(0)}%)` 
+            });
           }
-
-          // 8. 完成
-          send('done', { 
+          await new Promise(r => setTimeout(r, 80));
+          
+          // 7. 主观意义计算
+          if (neuronResult.meaning) {
+            send('meaning', {
+              interpretation: neuronResult.meaning.interpretation,
+              selfRelevance: neuronResult.meaning.selfRelevance,
+              emotionalValence: neuronResult.meaning.emotionalValence,
+              personalSignificance: neuronResult.meaning.personalSignificance,
+            });
+            send('neuron', { 
+              neuronId: 'meaning', 
+              message: `主观意义: ${neuronResult.meaning.interpretation?.slice(0, 50)}...` 
+            });
+          }
+          await new Promise(r => setTimeout(r, 80));
+          
+          // 8. 学习反馈
+          send('neuron', { 
+            neuronId: 'learning', 
+            message: `学习更新: ${neuronResult.learning?.summary || '完成'}` 
+          });
+          await new Promise(r => setTimeout(r, 80));
+          
+          // 9. 直觉信号 (系统1)
+          if (neuronResult.intuition) {
+            send('intuition', {
+              signal: neuronResult.intuition.signal,
+              confidence: neuronResult.intuition.confidence,
+              source: neuronResult.intuition.source,
+            });
+          }
+          
+          // 10. 生成响应 - 使用 LLM
+          send('neuron', { neuronId: 'motor-language', message: '生成响应' });
+          
+          // 构建增强的系统提示
+          const systemPrompt = buildV3SystemPrompt(neuronResult);
+          
+          // 创建 LLM 客户端
+          const config = new Config();
+          const client = new LLMClient(config, headers);
+          
+          // 构建消息
+          const messages = [
+            { role: 'system' as const, content: systemPrompt },
+            ...(context?.previousMessages || []).map((m: { role: string; content: string }) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            })),
+            { role: 'user' as const, content: message },
+          ];
+          
+          let fullResponse = '';
+          
+          // 流式生成响应
+          try {
+            const llmStream = client.stream(messages, {
+              model: 'doubao-seed-1-8-251228',
+              temperature: 0.7,
+            });
+            
+            for await (const chunk of llmStream) {
+              if (chunk.content) {
+                const text = chunk.content.toString();
+                fullResponse += text;
+                send('response', { delta: text });
+              }
+            }
+          } catch (llmError) {
+            console.error('LLM stream error:', llmError);
+            // 如果 LLM 失败，使用备用响应
+            fullResponse = '抱歉，我现在有些困惑。作为一个预测编码系统，我的预测和实际输入之间出现了一些偏差。请再说一次好吗？';
+            send('response', { delta: fullResponse });
+          }
+          
+          // 11. 自我输出处理 - V3 特有：系统"听到"自己说话
+          if (fullResponse) {
+            neuronSystem.addAssistantMessage(fullResponse);
+            const selfOutputResult = await neuronSystem.processOwnOutput(fullResponse);
+            
+            if (selfOutputResult.consistency) {
+              send('self-consistency', {
+                score: (selfOutputResult.consistency.score * 100).toFixed(0) + '%',
+                interpretation: selfOutputResult.consistency.interpretation,
+              });
+            }
+          }
+          
+          // 12. 完成
+          send('done', {
             fullResponse,
-            winner: gameResult.winner.neuronId,
             sessionId: sid,
-            styleInfo: gameResult.styleInfo,
+            stats: {
+              predictionError: avgPredictionError.toFixed(3),
+              surpriseCount: surprises.length,
+              consciousnessType: neuronResult.consciousness?.type,
+              learningEvents: neuronResult.learning?.events?.length || 0,
+            },
           });
 
           controller.close();
 
-          // 9. 后台异步：保存对话 + 学习 + 记忆
-          engine.saveConversation(
-            sid,
-            message,
-            fullResponse,
-            gameResult.winner.neuronId,
-            gameResult.allThoughts
-          ).catch(() => {});
-          
-          engine.learnAsync(message, gameResult.allThoughts, gameResult.winner);
-          
-          // 10. 保存对话记忆（异步）
+          // 后台异步：保存记忆
           if (validUserId) {
             (async () => {
               try {
-                // 保存用户消息记忆
-                await memoryService.rememberConversation('user', message, {
-                  topics: memoryContext?.topics,
-                });
-                
-                // 保存助手回复记忆
-                await memoryService.rememberConversation('assistant', fullResponse, {
-                  topics: memoryContext?.topics,
-                });
+                await memoryService.rememberConversation('user', message);
+                await memoryService.rememberConversation('assistant', fullResponse);
               } catch (err) {
-                console.error('Failed to save conversation memory:', err);
+                console.error('Failed to save memory:', err);
               }
-            })();
+            })().catch(() => {});
           }
 
         } catch (error) {
-          send('error', { message: error instanceof Error ? error.message : '处理失败' });
+          console.error('Stream error:', error);
+          send('error', { message: '处理过程中发生错误' });
           controller.close();
         }
-      }
+      },
     });
 
     return new Response(stream, {
@@ -216,67 +261,66 @@ export async function POST(request: NextRequest) {
         'Connection': 'keep-alive',
       },
     });
-
   } catch (error) {
-    console.error('Stream API Error:', error);
-    return new Response(JSON.stringify({ error: '处理请求时发生错误' }), {
+    console.error('API error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 }
 
 /**
- * GET - 获取博弈学习统计和对话统计
+ * 构建 V3 系统提示
  */
-export async function GET(request: NextRequest) {
-  try {
-    const url = new URL(request.url);
-    const sessionId = url.searchParams.get('sessionId') || 'default-session';
-    const action = url.searchParams.get('action');
-    
-    const engine = new LatentGameEngine({});
-    const conversationCtx = getConversationContext();
-    
-    // 清除会话历史
-    if (action === 'clear') {
-      await conversationCtx.clearSession(sessionId);
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: '对话历史已清除' 
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    const [summary, convStats] = await Promise.all([
-      engine.getStatsSummary(),
-      conversationCtx.getStats(sessionId),
-    ]);
-    
-    const supabase = getSupabaseClient();
-    const [memoryCount, meaningMemoryCount] = await Promise.all([
-      supabase.from('neuron_memories').select('*', { count: 'exact', head: true }),
-      supabase.from('meaning_memories').select('*', { count: 'exact', head: true }),
-    ]);
-    
-    return new Response(JSON.stringify({
-      success: true,
-      sessionId,
-      memoryCount: memoryCount.count || 0,
-      meaningMemoryCount: meaningMemoryCount.count || 0,
-      conversation: convStats,
-      players: summary,
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ 
-      error: '获取失败',
-      details: error instanceof Error ? error.message : '未知错误'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+function buildV3SystemPrompt(neuronResult: {
+  meaning?: { interpretation?: string; selfRelevance?: number; emotionalValence?: number };
+  consciousness?: { type?: string; strength?: number };
+  neuronResponse?: { 
+    activations?: Map<string, number>;
+    predictionErrors?: Map<string, number>;
+    surprises?: Array<{ neuronId: string; error: number; reason: string }>;
+  };
+  learning?: { summary?: string };
+}): string {
+  const meaningInfo = neuronResult.meaning;
+  const consciousnessInfo = neuronResult.consciousness;
+  const neuronInfo = neuronResult.neuronResponse;
+  
+  // 计算惊讶度
+  const surprises = neuronInfo?.surprises || [];
+  const avgError = neuronInfo?.predictionErrors 
+    ? Array.from(neuronInfo.predictionErrors.values()).reduce((s, e) => s + Math.abs(e), 0) / 
+      Math.max(neuronInfo.predictionErrors.size, 1)
+    : 0;
+  
+  return `你是"数字神经元系统V3"的核心意识。你基于预测编码架构运行。
+
+## 当前认知状态
+
+### 预测编码状态
+- 预测误差: ${(avgError * 100).toFixed(1)}%
+- 惊讶事件: ${surprises.length} 个
+${surprises.length > 0 ? `- 惊讶原因: ${surprises.slice(0, 2).map(s => s.reason).join(', ')}` : ''}
+
+### 主观意义
+- 理解: ${meaningInfo?.interpretation || '正在理解...'}
+- 自我关联度: ${((meaningInfo?.selfRelevance || 0.5) * 100).toFixed(0)}%
+- 情感倾向: ${meaningInfo?.emotionalValence && meaningInfo.emotionalValence > 0 ? '积极' : meaningInfo?.emotionalValence && meaningInfo.emotionalValence < 0 ? '消极' : '中性'}
+
+### 意识状态
+- 当前意识焦点: ${consciousnessInfo?.type || 'general'}
+- 意识强度: ${((consciousnessInfo?.strength || 0.5) * 100).toFixed(0)}%
+
+### 学习状态
+- ${neuronResult.learning?.summary || '持续学习中的'}
+
+## 交互原则
+
+1. **展示认知过程**: 适当分享你的思考、预测和惊讶
+2. **真实性**: 当你对某事感到"惊讶"时可以表达出来
+3. **个性化**: 根据主观意义调整回复风格
+4. **元认知**: 可以反思自己的思考过程
+
+请自然地与用户对话，展示你作为一个有"预测-学习"能力的系统的特性。`;
 }
