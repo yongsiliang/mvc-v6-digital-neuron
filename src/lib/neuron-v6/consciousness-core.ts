@@ -2097,6 +2097,8 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
   private rememberCreator(keyInfo: KeyInfo): void {
     const creatorName = keyInfo.subject || keyInfo.content;
     
+    console.log(`[记忆核心] 🌟 识别到创造者信息: ${creatorName}`);
+    
     // 添加/更新创造者知识节点
     const existing = this.longTermMemory.retrieve('创造者');
     if (existing.directMatches.length > 0) {
@@ -2104,6 +2106,7 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
       existing.directMatches[0].content = `我的创造者是${creatorName}`;
       existing.directMatches[0].importance = 1.0;
       existing.directMatches[0].tags = ['核心', '创造者', '身份'];
+      console.log(`[记忆核心] ✅ 更新了创造者节点: ${creatorName}`);
     } else {
       // 创建新节点
       this.longTermMemory.addNode({
@@ -2122,6 +2125,7 @@ ${thinking.detectedBiases.length > 0 ? `注意可能的认知偏差：${thinking
         importance: 1.0,
         tags: ['核心', '创造者'],
       });
+      console.log(`[记忆核心] ✅ 创建了新的创造者节点和名字节点: ${creatorName}`);
     }
     
     // 更新自我意识中的创造者信息
