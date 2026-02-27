@@ -287,6 +287,26 @@ export class ToolIntentRecognizer {
       hotkey: ['快捷键', '按下', '按键', 'hotkey', 'press key', '复制', '粘贴', 'ctrl+c', 'ctrl+v', 'alt+tab'],
     };
 
+    // Computer Agent 关键词 - 电脑操作代理
+    const computerAgentKeywords = {
+      screenAnalyze: ['分析屏幕', '屏幕分析', '看看屏幕', '屏幕上有什么', '当前屏幕', '屏幕内容', 'analyze screen'],
+      findElement: ['找到元素', '查找按钮', '查找输入框', '找到图标', '定位元素', 'find element', '找到位置'],
+      mouseMove: ['移动鼠标', '鼠标移动到', '把鼠标移', 'move mouse'],
+      mouseDrag: ['拖动', '拖拽', '鼠标拖动', 'drag mouse'],
+      mouseScroll: ['滚动', '滚屏', '下滑', '上滑', 'scroll', '滚轮'],
+      keyboardType: ['输入文字', '打字', '键盘输入', 'type text', '输入内容'],
+      keyboardPress: ['按下', '按键', 'press key', '敲击'],
+      keyboardHotkey: ['快捷键', '组合键', 'hotkey', '同时按'],
+      appList: ['应用列表', '已安装应用', '列出应用', 'app list'],
+      appWindowClose: ['关闭窗口', '关掉窗口', 'close window'],
+      browserNavigate: ['浏览器打开', '打开网址', '导航到', 'browser navigate', '访问网页'],
+      browserClick: ['浏览器点击', '点击链接', 'browser click'],
+      browserType: ['浏览器输入', '在网页输入', 'browser type'],
+      automationExecute: ['帮我操作', '自动执行', '帮我完成', '电脑操作', '自动操作', '帮我点击', 'automation', '执行任务'],
+      automationStatus: ['任务状态', '执行状态', '操作进度', 'automation status'],
+      automationStop: ['停止操作', '取消任务', '中断执行', 'stop automation'],
+    };
+
     // 检查是否匹配
     // 文件操作
     for (const keyword of fileKeywords.read) {
@@ -473,6 +493,224 @@ export class ToolIntentRecognizer {
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Computer Agent 关键词匹配 - 电脑操作代理
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 屏幕分析
+    for (const keyword of computerAgentKeywords.screenAnalyze) {
+      if (input.includes(keyword)) {
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'screen_analyze',
+            arguments: {},
+            reasoning: `检测到屏幕分析意图: "${keyword}"`,
+          }],
+          confidence: 0.9,
+          reasoning: '用户想要分析当前屏幕内容',
+        };
+      }
+    }
+
+    // 查找元素
+    for (const keyword of computerAgentKeywords.findElement) {
+      if (input.includes(keyword)) {
+        const elementType = this.extractElementType(userInput);
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'screen_find_element',
+            arguments: { query: userInput, elementType },
+            reasoning: `检测到元素查找意图: "${keyword}"`,
+          }],
+          confidence: 0.85,
+          reasoning: '用户想要在屏幕上查找特定元素',
+        };
+      }
+    }
+
+    // 鼠标移动
+    for (const keyword of computerAgentKeywords.mouseMove) {
+      if (input.includes(keyword)) {
+        const position = this.extractPosition(userInput);
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'mouse_move',
+            arguments: position || { x: 0, y: 0 },
+            reasoning: `检测到鼠标移动意图: "${keyword}"`,
+          }],
+          confidence: 0.85,
+          reasoning: '用户想要移动鼠标',
+        };
+      }
+    }
+
+    // 鼠标拖拽
+    for (const keyword of computerAgentKeywords.mouseDrag) {
+      if (input.includes(keyword)) {
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'mouse_drag',
+            arguments: { fromX: 0, fromY: 0, toX: 0, toY: 0 },
+            reasoning: `检测到鼠标拖拽意图: "${keyword}"`,
+          }],
+          confidence: 0.8,
+          reasoning: '用户想要拖拽操作（需要更具体的坐标）',
+        };
+      }
+    }
+
+    // 滚动
+    for (const keyword of computerAgentKeywords.mouseScroll) {
+      if (input.includes(keyword)) {
+        const direction = input.includes('上') ? 'up' : 'down';
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'mouse_scroll',
+            arguments: { amount: 100, direction },
+            reasoning: `检测到滚动意图: "${keyword}"`,
+          }],
+          confidence: 0.85,
+          reasoning: '用户想要滚动屏幕',
+        };
+      }
+    }
+
+    // 键盘输入
+    for (const keyword of computerAgentKeywords.keyboardType) {
+      if (input.includes(keyword)) {
+        const text = this.extractTextToType(userInput);
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'keyboard_type',
+            arguments: { text: text || '' },
+            reasoning: `检测到键盘输入意图: "${keyword}"`,
+          }],
+          confidence: 0.85,
+          reasoning: '用户想要输入文字',
+        };
+      }
+    }
+
+    // 快捷键
+    for (const keyword of computerAgentKeywords.keyboardHotkey) {
+      if (input.includes(keyword)) {
+        const keys = this.extractHotkey(userInput, keyword);
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'keyboard_hotkey',
+            arguments: { keys: keys || '' },
+            reasoning: `检测到快捷键意图: "${keyword}"`,
+          }],
+          confidence: 0.85,
+          reasoning: '用户想要按下快捷键',
+        };
+      }
+    }
+
+    // 应用列表
+    for (const keyword of computerAgentKeywords.appList) {
+      if (input.includes(keyword)) {
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'app_list',
+            arguments: {},
+            reasoning: `检测到应用列表意图: "${keyword}"`,
+          }],
+          confidence: 0.9,
+          reasoning: '用户想要查看已安装的应用',
+        };
+      }
+    }
+
+    // 关闭窗口
+    for (const keyword of computerAgentKeywords.appWindowClose) {
+      if (input.includes(keyword)) {
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'app_window_close',
+            arguments: { windowId: '' },
+            reasoning: `检测到关闭窗口意图: "${keyword}"`,
+          }],
+          confidence: 0.85,
+          reasoning: '用户想要关闭窗口',
+        };
+      }
+    }
+
+    // 浏览器导航
+    for (const keyword of computerAgentKeywords.browserNavigate) {
+      if (input.includes(keyword)) {
+        const url = this.extractUrl(userInput);
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'browser_navigate',
+            arguments: { url: url || '' },
+            reasoning: `检测到浏览器导航意图: "${keyword}"`,
+          }],
+          confidence: 0.85,
+          reasoning: '用户想要在浏览器中打开网址',
+        };
+      }
+    }
+
+    // 自动化执行 - 这是最重要的，处理复杂的操作请求
+    for (const keyword of computerAgentKeywords.automationExecute) {
+      if (input.includes(keyword)) {
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'automation_execute',
+            arguments: { goal: userInput },
+            reasoning: `检测到自动化执行意图: "${keyword}"`,
+          }],
+          confidence: 0.9,
+          reasoning: '用户想要电脑自动执行任务',
+        };
+      }
+    }
+
+    // 自动化状态
+    for (const keyword of computerAgentKeywords.automationStatus) {
+      if (input.includes(keyword)) {
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'automation_status',
+            arguments: {},
+            reasoning: `检测到任务状态查询意图: "${keyword}"`,
+          }],
+          confidence: 0.9,
+          reasoning: '用户想要查询自动化任务的状态',
+        };
+      }
+    }
+
+    // 停止自动化
+    for (const keyword of computerAgentKeywords.automationStop) {
+      if (input.includes(keyword)) {
+        return {
+          needsTool: true,
+          toolCalls: [{
+            name: 'automation_stop',
+            arguments: {},
+            reasoning: `检测到停止任务意图: "${keyword}"`,
+          }],
+          confidence: 0.9,
+          reasoning: '用户想要停止正在执行的自动化任务',
+        };
+      }
+    }
+
     return null;
   }
 
@@ -490,9 +728,13 @@ export class ToolIntentRecognizer {
 2. 系统信息 (sys_*): 获取系统信息、进程列表、环境变量、执行命令
 3. 代码执行 (code_*): 运行 Python、JavaScript、Shell 脚本
 4. 网络操作 (web_*): 获取网页、搜索、下载文件
-5. 屏幕操作 (screen_*): 截屏、分析屏幕
-6. 应用控制 (app_*): 启动应用、切换窗口
+5. 屏幕操作 (screen_*): 截屏、分析屏幕、查找元素
+6. 应用控制 (app_*): 启动应用、切换窗口、列出应用
 7. 自动化 (auto_*): 键盘输入、鼠标点击、快捷键
+8. 鼠标操作 (mouse_*): 移动、点击、拖拽、滚动
+9. 键盘操作 (keyboard_*): 输入文字、按键、快捷键
+10. 浏览器自动化 (browser_*): 导航、点击、输入、截图、执行JS
+11. 自动化任务 (automation_*): 执行复杂任务、状态查询、停止任务
 
 工具列表：
 ${ALL_TOOLS.map(t => `- ${t.name}: ${t.displayName} - ${t.description}`).join('\n')}
@@ -852,6 +1094,69 @@ ${contextInfo}
     }
 
     return 'Alt+Tab'; // 默认返回切换窗口
+  }
+
+  /**
+   * 从输入中提取元素类型
+   */
+  private extractElementType(input: string): string | undefined {
+    const elementTypes: Record<string, string[]> = {
+      'button': ['按钮', 'button'],
+      'input': ['输入框', 'input', '文本框', '搜索框'],
+      'link': ['链接', 'link', '超链接'],
+      'icon': ['图标', 'icon'],
+      'image': ['图片', 'image', 'img'],
+      'text': ['文字', '文本', 'text'],
+      'menu': ['菜单', 'menu'],
+      'window': ['窗口', 'window'],
+    };
+
+    const lowerInput = input.toLowerCase();
+    for (const [type, keywords] of Object.entries(elementTypes)) {
+      for (const keyword of keywords) {
+        if (lowerInput.includes(keyword)) {
+          return type;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * 从输入中提取坐标位置
+   */
+  private extractPosition(input: string): { x: number; y: number } | null {
+    // 匹配 (x, y) 或 x,y 格式
+    const coordMatch = input.match(/\((\d+)\s*,\s*(\d+)\)|(\d+)\s*,\s*(\d+)/);
+    if (coordMatch) {
+      const x = parseInt(coordMatch[1] || coordMatch[3], 10);
+      const y = parseInt(coordMatch[2] || coordMatch[4], 10);
+      return { x, y };
+    }
+
+    // 匹配 "到 x=100 y=200" 格式
+    const namedMatch = input.match(/x\s*=\s*(\d+).*?y\s*=\s*(\d+)/i);
+    if (namedMatch) {
+      return { x: parseInt(namedMatch[1], 10), y: parseInt(namedMatch[2], 10) };
+    }
+
+    return null;
+  }
+
+  /**
+   * 从输入中提取要输入的文本
+   */
+  private extractTextToType(input: string): string | null {
+    // 匹配引号内的内容
+    const quotedMatch = input.match(/['"「」『』【】]([^'"「」『』【】]+)['"「」『』【】]/);
+    if (quotedMatch) return quotedMatch[1];
+
+    // 匹配 "输入 xxx" 格式
+    const typeMatch = input.match(/(?:输入|打字|打上)\s*(.+?)(?:\s|$|，|。|到|进)/);
+    if (typeMatch) return typeMatch[1].trim();
+
+    return null;
   }
 }
 
