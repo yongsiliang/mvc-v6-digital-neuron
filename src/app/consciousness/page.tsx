@@ -28,6 +28,10 @@ import {
   ThinkingIndicator,
   ThoughtItem 
 } from '@/components/neuron/thought-bubble';
+import { 
+  MultimodalInput,
+  MultimodalInputItem
+} from '@/components/neuron/multimodal-input';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -1322,34 +1326,194 @@ export default function ConsciousnessPage() {
 
         {/* 输入区域 */}
         <div className="border-t p-3 md:p-4 bg-background/95 backdrop-blur-sm">
-          <div className="flex gap-2 items-center">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="与紫对话..."
-              className="flex-1 rounded-full border bg-background px-4 py-2.5 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
-              disabled={isLoading}
-            />
+          <div className="flex gap-2 items-start">
+            <div className="flex-1">
+              <MultimodalInput
+                onSend={async (mediaItems, text) => {
+                  // 构建用户消息显示
+                  let displayContent = text;
+                  
+                  // 处理多模态输入
+                  if (mediaItems.length > 0) {
+                    // 调用多模态 API
+                    const multimodalInputs = mediaItems.map(item => {
+                      if (item.type === 'image') {
+                        return { type: 'image' as const, url: item.content };
+                      } else if (item.type === 'audio') {
+                        return { type: 'audio' as const, base64Data: item.content };
+                      }
+                      return null;
+                    }).filter(Boolean);
+                    
+                    // 添加媒体预览到显示内容
+                    const mediaPreview = mediaItems.map(item => 
+                      item.type === 'image' ? '[图片]' : '[语音]'
+                    ).join(' ');
+                    displayContent = mediaPreview + (text ? ` ${text}` : '');
+                    
+                    // 设置加载状态
+                    setIsLoading(true);
+                    setMessages(prev => [...prev, { role: 'user', content: displayContent, timestamp: Date.now() }]);
+                    
+                    try {
+                      // 调用多模态 API
+                      const response = await fetch('/api/neuron-v6/multimodal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          inputs: multimodalInputs,
+                          context: text,
+                        }),
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                      }
+                      
+                      const reader = response.body?.getReader();
+                      if (!reader) throw new Error('No reader');
+                      
+                      let assistantContent = '';
+                      const decoder = new TextDecoder();
+                      
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+                        
+                        for (const line of lines) {
+                          if (line.startsWith('data: ')) {
+                            try {
+                              const data = JSON.parse(line.slice(6));
+                              
+                              switch (data.type) {
+                                case 'processed':
+                                  // 媒体处理进度
+                                  console.log(`[多模态] 已处理 ${data.data.index + 1}/${mediaItems.length}`);
+                                  break;
+                                case 'consciousness':
+                                  assistantContent = data.data.response;
+                                  // 添加助手消息（如果还没有）
+                                  setMessages(prev => {
+                                    const lastMsg = prev[prev.length - 1];
+                                    if (lastMsg?.role !== 'assistant') {
+                                      return [...prev, { role: 'assistant', content: assistantContent, timestamp: Date.now() }];
+                                    }
+                                    return prev;
+                                  });
+                                  // 更新上下文
+                                  if (data.data.emotionalState) {
+                                    setCurrentData(prev => ({
+                                      ...prev,
+                                      context: {
+                                        ...prev.context!,
+                                        emotionalState: data.data.emotionalState,
+                                      }
+                                    }));
+                                  }
+                                  break;
+                                case 'context':
+                                  setCurrentData(prev => ({ ...prev, context: data.data }));
+                                  break;
+                                case 'done':
+                                  setIsLoading(false);
+                                  break;
+                                case 'error':
+                                  console.error('[多模态] 错误:', data.data);
+                                  setIsLoading(false);
+                                  break;
+                              }
+                            } catch {
+                              // 忽略解析错误
+                            }
+                          }
+                        }
+                      }
+                    } catch (error) {
+                      console.error('多模态处理失败:', error);
+                      setMessages(prev => [...prev, { 
+                        role: 'assistant', 
+                        content: '抱歉，处理您的输入时出现问题。', 
+                        timestamp: Date.now() 
+                      }]);
+                      setIsLoading(false);
+                    }
+                  } else if (text) {
+                    // 纯文本消息，使用原有逻辑
+                    setInput(text);
+                    // 直接触发原有的 sendMessage
+                    setIsLoading(true);
+                    setMessages(prev => [...prev, { role: 'user', content: text, timestamp: Date.now() }]);
+                    
+                    try {
+                      const response = await fetch('/api/neuron-v6/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text }),
+                      });
+                      
+                      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                      
+                      const reader = response.body?.getReader();
+                      if (!reader) throw new Error('No reader');
+                      
+                      let assistantContent = '';
+                      const decoder = new TextDecoder();
+                      
+                      // 处理流式响应（简化版）
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+                        
+                        for (const line of lines) {
+                          if (line.startsWith('data: ')) {
+                            try {
+                              const data = JSON.parse(line.slice(6));
+                              if (data.type === 'context') {
+                                setCurrentData(prev => ({ ...prev, context: data.data }));
+                              } else if (data.type === 'stream') {
+                                assistantContent += data.data || '';
+                                setMessages(prev => {
+                                  const lastMsg = prev[prev.length - 1];
+                                  if (lastMsg?.role === 'assistant') {
+                                    return [...prev.slice(0, -1), { ...lastMsg, content: assistantContent }];
+                                  }
+                                  return [...prev, { role: 'assistant', content: assistantContent, timestamp: Date.now() }];
+                                });
+                              } else if (data.type === 'complete') {
+                                setIsLoading(false);
+                              }
+                            } catch {
+                              // 忽略
+                            }
+                          }
+                        }
+                      }
+                    } catch (error) {
+                      console.error('发送失败:', error);
+                      setIsLoading(false);
+                    }
+                  }
+                }}
+                disabled={false}
+                isLoading={isLoading}
+              />
+            </div>
             <Button
               variant="outline"
               size="icon"
               onClick={performReflection}
               disabled={isReflecting || messages.length < 2}
               title="主动反思"
-              className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full"
+              className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full mt-1"
             >
               <Brain className={`w-5 h-5 md:w-4 md:h-4 ${isReflecting ? 'animate-pulse' : ''}`} />
             </Button>
-            <button
-              onClick={sendMessage}
-              disabled={isLoading || !input.trim()}
-              className="px-5 md:px-6 py-2.5 bg-primary text-primary-foreground rounded-full disabled:opacity-50 text-sm md:text-base shrink-0 min-h-[44px] font-medium"
-            >
-              发送
-            </button>
           </div>
         </div>
       </div>
