@@ -33,6 +33,17 @@ function getGlobalStore(): GlobalStore {
 }
 
 /**
+ * 重置共享核心实例（用于热更新后强制重新初始化）
+ */
+export function resetSharedCore(): void {
+  const store = getGlobalStore();
+  store.sharedCore = null;
+  store.isInitialized = false;
+  store.initializationPromise = null;
+  console.log('[SharedCore] 实例已重置');
+}
+
+/**
  * 获取共享的意识核心实例
  */
 export async function getSharedCore(headers: Record<string, string>): Promise<ConsciousnessCore> {
@@ -89,16 +100,4 @@ export function getCurrentCore(): ConsciousnessCore | null {
  */
 export function isCoreInitialized(): boolean {
   return getGlobalStore().isInitialized;
-}
-
-/**
- * 重置共享核心实例
- * 用于开发环境中的热更新或手动重置
- */
-export function resetSharedCore(): void {
-  const store = getGlobalStore();
-  store.sharedCore = null;
-  store.isInitialized = false;
-  store.initializationPromise = null;
-  console.log('[SharedCore] 核心实例已重置');
 }

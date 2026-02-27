@@ -2687,6 +2687,67 @@ ${thinkingSection}
   getHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
     return [...this.conversationHistory];
   }
+  
+  /**
+   * 获取对话历史（别名）
+   */
+  getConversationHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
+    return [...this.conversationHistory];
+  }
+  
+  /**
+   * 在对话历史前面添加旧对话（用于融合历史数据）
+   */
+  prependConversationHistory(history: Array<{ role: 'user' | 'assistant'; content: string }>): void {
+    // 过滤掉空内容
+    const validHistory = history.filter(h => h.content && h.content.trim());
+    
+    // 合并到历史前面
+    this.conversationHistory = [...validHistory, ...this.conversationHistory];
+    
+    // 限制总长度
+    if (this.conversationHistory.length > 200) {
+      this.conversationHistory = this.conversationHistory.slice(-200);
+    }
+    
+    console.log(`[意识核心] 已添加 ${validHistory.length} 条历史对话，当前总数: ${this.conversationHistory.length}`);
+  }
+  
+  /**
+   * 添加情景记忆（用于融合历史数据）
+   */
+  addEpisodicMemory(content: string, options?: {
+    importance?: number;
+    tags?: string[];
+    sourceType?: string;
+  }): void {
+    this.layeredMemory.addEpisodicMemory(content, {
+      importance: options?.importance || 0.5,
+      tags: options?.tags || [],
+    });
+    
+    console.log(`[意识核心] 已添加情景记忆: ${content.slice(0, 50)}...`);
+  }
+  
+  /**
+   * 获取分层记忆统计
+   */
+  getLayeredMemoryStats() {
+    return this.layeredMemory.getStats();
+  }
+  
+  /**
+   * 获取核心统计信息（用于融合 API）
+   */
+  getStats() {
+    const networkState = this.network.getNetworkState();
+    return {
+      conversationHistoryLength: this.conversationHistory.length,
+      memoryStats: this.layeredMemory.getStats(),
+      networkNeuronCount: networkState.stats.totalNeurons,
+      networkSynapseCount: networkState.stats.totalSynapses,
+    };
+  }
 
   /**
    * 执行记忆维护
