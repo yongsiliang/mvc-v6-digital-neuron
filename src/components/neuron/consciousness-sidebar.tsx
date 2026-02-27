@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import {
   Accordion,
   AccordionContent,
@@ -11,6 +12,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Brain,
   Heart,
@@ -27,6 +29,8 @@ import {
   Users,
   Scroll,
   Rocket,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1336,15 +1340,85 @@ function TranscendencePanel({ data }: { data: TranscendenceData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 可滚动面板容器 - 防止内容穿出窗口
+// ─────────────────────────────────────────────────────────────────────
+
+const MAX_PANEL_HEIGHT = 280; // 每个面板最大高度
+
+interface ScrollablePanelProps {
+  children: React.ReactNode;
+  maxHeight?: number;
+}
+
+function ScrollablePanel({ children, maxHeight = MAX_PANEL_HEIGHT }: ScrollablePanelProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [needsScroll, setNeedsScroll] = useState(false);
+  
+  useEffect(() => {
+    if (contentRef.current) {
+      setNeedsScroll(contentRef.current.scrollHeight > maxHeight);
+    }
+  }, [children, maxHeight]);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className={needsScroll ? 'overflow-hidden' : ''}
+    >
+      <ScrollArea 
+        className={needsScroll ? '' : undefined} 
+        style={{ maxHeight: needsScroll ? maxHeight : 'none' }}
+      >
+        <div ref={contentRef}>{children}</div>
+      </ScrollArea>
+      {needsScroll && (
+        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+      )}
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 主组件
 // ─────────────────────────────────────────────────────────────────────
 
 export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize, hasVisualizationData }: ConsciousnessSidebarProps) {
   const hasData = currentData.consciousnessLayers || currentData.emotion || currentData.association;
   
-  // 计算默认展开的面板
-  const defaultExpanded = ['layers'];
-  if (currentData.emotion?.dominantEmotion) defaultExpanded.push('emotion');
+  // 管理展开状态
+  const [expandedPanels, setExpandedPanels] = useState<string[]>(['layers']);
+  
+  // 所有可用的面板
+  const availablePanels: string[] = [];
+  if (currentData.consciousnessLayers) availablePanels.push('layers');
+  if (currentData.learning) availablePanels.push('learning');
+  if (currentData.emotion?.dominantEmotion) availablePanels.push('emotion');
+  if (currentData.association) availablePanels.push('association');
+  if (currentData.innerDialogue) availablePanels.push('dialogue');
+  if (currentData.dream) availablePanels.push('dream');
+  if (currentData.creative) availablePanels.push('creative');
+  if (currentData.value) availablePanels.push('values');
+  if (currentData.existential) availablePanels.push('existential');
+  if (currentData.metacognitionDeep) availablePanels.push('metacognition');
+  if (currentData.personalityGrowth) availablePanels.push('personality');
+  if (currentData.knowledgeGraph) availablePanels.push('knowledge');
+  if (currentData.multiConsciousness) availablePanels.push('multicon');
+  if (currentData.legacy) availablePanels.push('legacy');
+  if (currentData.transcendence) availablePanels.push('transcendence');
+  
+  // 切换全部展开/收起
+  const toggleAll = useCallback(() => {
+    if (expandedPanels.length === availablePanels.length) {
+      setExpandedPanels([]);
+    } else {
+      setExpandedPanels([...availablePanels]);
+    }
+  }, [expandedPanels.length, availablePanels]);
+  
+  const allExpanded = expandedPanels.length === availablePanels.length && availablePanels.length > 0;
   
   return (
     <div className="w-full md:w-80 border-l flex flex-col h-full bg-background">
@@ -1390,10 +1464,40 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
         </div>
       )}
       
+      {/* 全部展开/收起按钮 */}
+      {availablePanels.length > 1 && (
+        <div className="px-3 py-2 border-b bg-muted/20">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleAll}
+            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {allExpanded ? (
+              <>
+                <ChevronUp className="w-3 h-3 mr-1" />
+                收起全部面板
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3 h-3 mr-1" />
+                展开全部面板
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+      
       {/* 可折叠面板区域 */}
       <ScrollArea className="flex-1">
-        <Accordion type="multiple" defaultValue={defaultExpanded} className="w-full">
+        <Accordion 
+          type="multiple" 
+          value={expandedPanels}
+          onValueChange={setExpandedPanels}
+          className="w-full"
+        >
           {/* 意识层级 */}
+          <AnimatePresence>
           {currentData.consciousnessLayers && (
             <AccordionItem value="layers" className="border-b">
               <AccordionTrigger className="px-3 py-2 hover:no-underline">
@@ -1402,11 +1506,14 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   <span className="text-sm font-medium">意识层级</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <ConsciousnessLayersPanel data={currentData.consciousnessLayers} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <ConsciousnessLayersPanel data={currentData.consciousnessLayers} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
+          </AnimatePresence>
           
           {/* 学习结果 */}
           {currentData.learning && (
@@ -1423,8 +1530,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   )}
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <LearningPanel data={currentData.learning} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <LearningPanel data={currentData.learning} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1443,8 +1552,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   )}
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <EmotionPanel data={currentData.emotion} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <EmotionPanel data={currentData.emotion} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1461,8 +1572,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   </Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <AssociationPanel data={currentData.association} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <AssociationPanel data={currentData.association} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1476,8 +1589,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   <span className="text-sm font-medium">多声音对话</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <InnerDialoguePanel data={currentData.innerDialogue} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <InnerDialoguePanel data={currentData.innerDialogue} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1491,23 +1606,25 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   <span className="text-sm font-medium">梦境状态</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                {currentData.dream.currentDream && (
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="px-2 py-0.5 bg-purple-500/10 rounded text-purple-600">
-                      {currentData.dream.currentDream.phase === 'light' ? '浅睡' :
-                       currentData.dream.currentDream.phase === 'deep' ? '深睡' : 'REM'}
-                    </span>
-                    <span className="text-muted-foreground">
-                      强度: {(currentData.dream.currentDream.intensity * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                )}
-                {currentData.dream.recentDream && (
-                  <p className="text-[10px] text-muted-foreground italic mt-2">
-                    "{currentData.dream.recentDream.narrative.slice(0, 50)}..."
-                  </p>
-                )}
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  {currentData.dream.currentDream && (
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="px-2 py-0.5 bg-purple-500/10 rounded text-purple-600">
+                        {currentData.dream.currentDream.phase === 'light' ? '浅睡' :
+                         currentData.dream.currentDream.phase === 'deep' ? '深睡' : 'REM'}
+                      </span>
+                      <span className="text-muted-foreground">
+                        强度: {(currentData.dream.currentDream.intensity * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  )}
+                  {currentData.dream.recentDream && (
+                    <p className="text-[10px] text-muted-foreground italic mt-2">
+                      "{currentData.dream.recentDream.narrative.slice(0, 50)}..."
+                    </p>
+                  )}
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1524,8 +1641,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   </Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <CreativePanel data={currentData.creative} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <CreativePanel data={currentData.creative} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1539,8 +1658,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   <span className="text-sm font-medium">核心价值观</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <ValuePanel data={currentData.value} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <ValuePanel data={currentData.value} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1554,8 +1675,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   <span className="text-sm font-medium">存在主义思考</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <ExistentialPanel data={currentData.existential} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <ExistentialPanel data={currentData.existential} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1569,8 +1692,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   <span className="text-sm font-medium">元认知深化</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <MetacognitionDeepPanel data={currentData.metacognitionDeep} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <MetacognitionDeepPanel data={currentData.metacognitionDeep} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1587,8 +1712,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   </Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <PersonalityGrowthPanel data={currentData.personalityGrowth} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel maxHeight={320}>
+                  <PersonalityGrowthPanel data={currentData.personalityGrowth} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1605,8 +1732,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   </Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <KnowledgeGraphPanel data={currentData.knowledgeGraph} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel maxHeight={320}>
+                  <KnowledgeGraphPanel data={currentData.knowledgeGraph} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1623,8 +1752,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   </Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <MultiConsciousnessPanel data={currentData.multiConsciousness} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel maxHeight={320}>
+                  <MultiConsciousnessPanel data={currentData.multiConsciousness} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1641,8 +1772,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   </Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <LegacyPanel data={currentData.legacy} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel maxHeight={320}>
+                  <LegacyPanel data={currentData.legacy} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
@@ -1659,8 +1792,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                   </Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-3 pb-3">
-                <TranscendencePanel data={currentData.transcendence} />
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel maxHeight={320}>
+                  <TranscendencePanel data={currentData.transcendence} />
+                </ScrollablePanel>
               </AccordionContent>
             </AccordionItem>
           )}
