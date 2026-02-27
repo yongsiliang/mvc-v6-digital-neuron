@@ -17,7 +17,7 @@ import type { NextRequest } from 'next/server';
 /**
  * 多模态输入类型
  */
-export type ModalityType = 'text' | 'image' | 'audio' | 'video';
+export type ModalityType = 'text' | 'image' | 'audio' | 'video' | 'file';
 
 /**
  * 图像输入
@@ -67,9 +67,26 @@ export interface TextInput {
 }
 
 /**
+ * 文件输入
+ */
+export interface FileInput {
+  type: 'file';
+  /** Base64 编码的文件数据 */
+  base64Data: string;
+  /** 文件名 */
+  fileName?: string;
+  /** MIME 类型 */
+  mimeType?: string;
+  /** 文件大小 */
+  fileSize?: number;
+  /** 用户提供的描述 */
+  description?: string;
+}
+
+/**
  * 多模态输入联合类型
  */
-export type MultimodalInput = TextInput | ImageInput | AudioInput | VideoInput;
+export type MultimodalInput = TextInput | ImageInput | AudioInput | VideoInput | FileInput;
 
 /**
  * 处理后的输入结果
@@ -185,6 +202,9 @@ export class MultimodalInputProcessor {
           break;
         case 'video':
           result = await this.processVideo(input);
+          break;
+        case 'file':
+          result = await this.processFile(input);
           break;
         default:
           throw new Error(`不支持的输入类型: ${(input as { type: string }).type}`);
@@ -395,6 +415,97 @@ export class MultimodalInputProcessor {
       };
     } catch (error) {
       throw new Error(`视频分析失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+
+  /**
+   * 处理文件输入
+   */
+  private async processFile(input: FileInput): Promise<ProcessedInput> {
+    const startTime = Date.now();
+
+    if (this.config.verbose) {
+      console.log(`[文件处理] 开始处理文件: ${input.fileName || '未知'}`);
+    }
+
+    try {
+      // 提取文件内容
+      let fileContent = '';
+      const mimeType = input.mimeType || 'application/octet-stream';
+      const fileName = input.fileName || '未知文件';
+      
+      // 对于文本类文件，尝试提取文本内容
+      if (mimeType.startsWith('text/') || 
+          mimeType === 'application/json' ||
+          mimeType === 'application/xml' ||
+          mimeType.includes('javascript') ||
+          mimeType.includes('typescript') ||
+          mimeType.includes('python') ||
+          mimeType.includes('java') ||
+          mimeType.includes('css') ||
+          mimeType === 'application/pdf' ||
+          mimeType.includes('word') ||
+          mimeType.includes('excel') ||
+          mimeType.includes('powerpoint') ||
+          mimeType.includes('spreadsheet') ||
+          mimeType.includes('presentation')) {
+        
+        // 从 Base64 提取内容
+        const base64Data = input.base64Data.split(',')[1] || input.base64Data;
+        try {
+          // 尝试解码文本内容
+          fileContent = atob(base64Data);
+          
+          // 如果是二进制文件（PDF等），可能解码出来是乱码，需要通过 LLM 处理
+          if (mimeType === 'application/pdf' || 
+              mimeType.includes('word') || 
+              mimeType.includes('excel') ||
+              mimeType.includes('powerpoint')) {
+            // 对于文档类文件，使用 LLM 提取关键信息
+            const prompt = `用户上传了一个文件：
+- 文件名: ${fileName}
+- 文件类型: ${mimeType}
+- 文件大小: ${input.fileSize ? `${Math.round(input.fileSize / 1024)}KB` : '未知'}
+
+请根据文件类型和内容（如有），简要描述这个文件可能包含什么内容，以及用户可能想了解什么。如果无法确定具体内容，请给出合理的猜测和建议。`;
+
+            const response = await this.llmClient.invoke([
+              { role: 'user' as const, content: prompt }
+            ], { temperature: 0.3 });
+            
+            fileContent = response.content;
+          }
+        } catch {
+          // 如果解码失败，说明是二进制文件
+          fileContent = `[二进制文件内容，大小: ${input.fileSize ? Math.round(input.fileSize / 1024) + 'KB' : '未知'}]`;
+        }
+      } else {
+        // 其他类型的文件
+        fileContent = `[文件类型: ${mimeType}, 大小: ${input.fileSize ? Math.round(input.fileSize / 1024) + 'KB' : '未知'}]`;
+      }
+
+      // 构建最终输出
+      const outputText = input.description
+        ? `[文件: ${fileName}] ${input.description}\n\n文件内容摘要:\n${fileContent.slice(0, 2000)}${fileContent.length > 2000 ? '...' : ''}`
+        : `[文件: ${fileName}]\n${fileContent.slice(0, 2000)}${fileContent.length > 2000 ? '...' : ''}`;
+
+      if (this.config.verbose) {
+        console.log(`[文件处理] 处理完成，耗时 ${Date.now() - startTime}ms`);
+      }
+
+      return {
+        originalType: 'file',
+        textContent: outputText,
+        rawData: {
+          description: input.description,
+        },
+        metadata: {
+          processedAt: new Date().toISOString(),
+          processingTimeMs: Date.now() - startTime,
+        },
+      };
+    } catch (error) {
+      throw new Error(`文件处理失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
 

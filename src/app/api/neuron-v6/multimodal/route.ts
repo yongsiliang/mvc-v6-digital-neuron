@@ -253,11 +253,16 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return new Response(
     JSON.stringify({
-      supportedTypes: ['text', 'image', 'audio', 'video'],
+      supportedTypes: ['text', 'image', 'audio', 'video', 'file'],
       imageFormats: ['JPEG', 'PNG', 'GIF', 'WebP'],
       audioFormats: ['MP3', 'WAV', 'OGG OPUS', 'M4A'],
       videoFormats: ['MP4', 'WebM', 'AVI', 'MOV'],
-      maxFileSize: '100MB',
+      fileFormats: {
+        documents: ['PDF', 'Word (DOC/DOCX)', 'Excel (XLS/XLSX)', 'PowerPoint (PPT/PPTX)'],
+        text: ['TXT', 'Markdown', 'JSON', 'CSV', 'HTML', 'XML'],
+        code: ['JavaScript', 'TypeScript', 'Python', 'Java', 'CSS'],
+      },
+      maxFileSize: '10MB',
       maxAudioDuration: '2 hours',
       visionModels: ['doubao-seed-1-6-vision-250815'],
       voices: [

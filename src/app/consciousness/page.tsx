@@ -1341,13 +1341,23 @@ export default function ConsciousnessPage() {
                         return { type: 'image' as const, url: item.content };
                       } else if (item.type === 'audio') {
                         return { type: 'audio' as const, base64Data: item.content };
+                      } else if (item.type === 'file') {
+                        return { 
+                          type: 'file' as const, 
+                          base64Data: item.content,
+                          fileName: item.fileName,
+                          mimeType: item.mimeType,
+                          fileSize: item.fileSize,
+                        };
                       }
                       return null;
                     }).filter(Boolean);
                     
                     // 添加媒体预览到显示内容
                     const mediaPreview = mediaItems.map(item => 
-                      item.type === 'image' ? '[图片]' : '[语音]'
+                      item.type === 'image' ? '[图片]' : 
+                      item.type === 'audio' ? '[语音]' : 
+                      item.type === 'file' ? `[文件: ${item.fileName || ''}]` : '[媒体]'
                     ).join(' ');
                     displayContent = mediaPreview + (text ? ` ${text}` : '');
                     
