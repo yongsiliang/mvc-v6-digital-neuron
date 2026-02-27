@@ -21,6 +21,7 @@ import {
   LearningResult,
 } from '@/lib/neuron-v6/consciousness-core';
 import { getSharedCore, resetSharedCore, getCurrentCore } from '@/lib/neuron-v6/shared-core';
+import { scheduleAutoSave } from '@/lib/neuron-v6/auto-save';
 
 export async function POST(request: NextRequest) {
   try {
@@ -339,10 +340,8 @@ export async function POST(request: NextRequest) {
           const maintenance = core.performMaintenance();
           console.log('[V6] 记忆维护完成:', maintenance.decay);
           
-          // 获取并保存状态
-          const state = core.getPersistedState();
-          await PersistenceManagerV6.save(state);
-          console.log('[V6] 状态已保存');
+          // 调度自动保存（防抖，不阻塞响应）
+          scheduleAutoSave(core, '对话完成');
           
           // 发送完成信号
           send('complete', {
