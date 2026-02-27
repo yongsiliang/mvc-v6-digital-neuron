@@ -42,10 +42,28 @@ export async function POST(request: NextRequest) {
     
     const stream = new ReadableStream({
       async start(controller) {
+        let isClosed = false;
         const send = (type: string, data: unknown) => {
-          controller.enqueue(encoder.encode(
-            `data: ${JSON.stringify({ type, data, timestamp: Date.now() })}\n\n`
-          ));
+          if (isClosed) return; // 防止在关闭后发送
+          try {
+            controller.enqueue(encoder.encode(
+              `data: ${JSON.stringify({ type, data, timestamp: Date.now() })}\n\n`
+            ));
+          } catch {
+            // 控制器已关闭，忽略错误
+            isClosed = true;
+          }
+        };
+        
+        const closeStream = () => {
+          if (!isClosed) {
+            isClosed = true;
+            try {
+              controller.close();
+            } catch {
+              // 已关闭，忽略
+            }
+          }
         };
         
         try {
@@ -312,14 +330,14 @@ export async function POST(request: NextRequest) {
           });
           
           // 关闭流
-          controller.close();
+          closeStream();
           
         } catch (error) {
           console.error('[V6] 处理错误:', error);
           send('error', {
             message: error instanceof Error ? error.message : 'Unknown error',
           });
-          controller.close();
+          closeStream();
         }
       },
     });
