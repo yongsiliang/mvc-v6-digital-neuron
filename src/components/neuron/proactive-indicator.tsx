@@ -218,7 +218,120 @@ export function VolitionProgress({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 主动消息气泡组件
+// 顶部泡泡容器 - 自动消失的主动消息
+// ─────────────────────────────────────────────────────────────────────
+
+interface TopBubbleProps {
+  message: ProactiveMessage;
+  onDismiss: (id: string) => void;
+  autoHideDuration?: number; // 自动消失时间（毫秒）
+}
+
+function TopBubble({ message, onDismiss, autoHideDuration = 5000 }: TopBubbleProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  
+  useEffect(() => {
+    // 进入动画
+    const enterTimer = setTimeout(() => setIsVisible(true), 50);
+    
+    // 自动消失
+    const exitTimer = setTimeout(() => {
+      setIsExiting(true);
+      setTimeout(() => onDismiss(message.id), 300);
+    }, autoHideDuration);
+    
+    return () => {
+      clearTimeout(enterTimer);
+      clearTimeout(exitTimer);
+    };
+  }, [message.id, autoHideDuration, onDismiss]);
+  
+  const handleClick = () => {
+    setIsExiting(true);
+    setTimeout(() => onDismiss(message.id), 300);
+  };
+  
+  return (
+    <div
+      onClick={handleClick}
+      className={`
+        relative cursor-pointer
+        transition-all duration-300 ease-out
+        ${isVisible && !isExiting 
+          ? 'opacity-100 -translate-y-0 scale-100' 
+          : 'opacity-0 -translate-y-4 scale-95'}
+      `}
+    >
+      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/80 dark:to-pink-900/80 border border-purple-200/50 dark:border-purple-700/50 shadow-lg backdrop-blur-sm max-w-md">
+        {/* 头像 */}
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold shadow-md">
+          紫
+        </div>
+        
+        {/* 内容 */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Sparkles className="w-3 h-3 text-purple-500" />
+            <span className="text-xs font-medium text-purple-600 dark:text-purple-300">
+              想和你分享
+            </span>
+          </div>
+          <p className="text-sm text-foreground/90 line-clamp-2 leading-relaxed">
+            {message.content}
+          </p>
+        </div>
+        
+        {/* 关闭提示 */}
+        <div className="flex-shrink-0 w-5 h-5 rounded-full bg-white/50 dark:bg-black/20 flex items-center justify-center">
+          <span className="text-[10px] text-muted-foreground">×</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 泡泡容器
+interface ProactiveBubbleContainerProps {
+  messages: ProactiveMessage[];
+  onDismiss: (id: string) => void;
+  maxVisible?: number;
+  autoHideDuration?: number;
+}
+
+export function ProactiveBubbleContainer({ 
+  messages, 
+  onDismiss, 
+  maxVisible = 3,
+  autoHideDuration = 5000 
+}: ProactiveBubbleContainerProps) {
+  const visibleMessages = messages.slice(-maxVisible);
+  
+  if (visibleMessages.length === 0) return null;
+  
+  return (
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none">
+      {visibleMessages.map((msg, index) => (
+        <div 
+          key={msg.id} 
+          className="pointer-events-auto animate-bounce-gentle"
+          style={{ 
+            animationDelay: `${index * 100}ms`,
+          }}
+        >
+          <TopBubble 
+            message={msg} 
+            onDismiss={onDismiss}
+            autoHideDuration={autoHideDuration}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 主动消息气泡组件 (旧版，保留兼容性)
 // ─────────────────────────────────────────────────────────────────────
 
 interface ProactiveMessageBubbleProps {

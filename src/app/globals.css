@@ -199,6 +199,20 @@
   }
 }
 
+/* 轻柔弹跳动画 - 用于顶部泡泡 */
+@keyframes bounce-gentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-bounce-gentle {
+  animation: bounce-gentle 2s ease-in-out infinite;
+}
+
 @keyframes breathe {
   0%, 100% {
     transform: scale(1);

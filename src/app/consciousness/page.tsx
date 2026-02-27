@@ -18,7 +18,8 @@ import { DanmakuContainer, DanmakuMessage } from '@/components/neuron/danmaku';
 import { DraggablePanel } from '@/components/neuron/draggable-panel';
 import { 
   VolitionProgress, 
-  ProactiveMessageBubble, 
+  ProactiveMessageBubble,
+  ProactiveBubbleContainer,
   useProactiveBehavior,
   ProactiveMessage as ProactiveMsgType
 } from '@/components/neuron/proactive-indicator';
@@ -626,24 +627,7 @@ export default function ConsciousnessPage() {
   } = useProactiveBehavior({
     pollInterval: 15000, // 15秒轮询
     enabled: true,
-    onNewMessage: (msg: ProactiveMsgType) => {
-      // 收到新主动消息时，添加到消息列表
-      // 注意：使用函数式更新确保追加而非覆盖
-      setMessages(prev => {
-        // 检查是否已存在相同ID或内容的消息，避免重复
-        const exists = prev.some(m => 
-          m.isProactive && m.content === msg.content
-        );
-        if (exists) return prev;
-        
-        return [...prev, {
-          role: 'assistant',
-          content: msg.content,
-          timestamp: msg.timestamp,
-          isProactive: true,
-        }];
-      });
-    },
+    // 不再将主动消息添加到对话列表，改为顶部泡泡显示
   });
   
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1201,6 +1185,14 @@ export default function ConsciousnessPage() {
 
   return (
     <div className="h-screen flex flex-col md:flex-row bg-background">
+      {/* 顶部主动分享泡泡 */}
+      <ProactiveBubbleContainer
+        messages={proactiveMessages}
+        onDismiss={removeMessage}
+        maxVisible={2}
+        autoHideDuration={6000}
+      />
+      
       {/* 弹幕区域 */}
       <DanmakuContainer
         messages={danmakuMessages}
