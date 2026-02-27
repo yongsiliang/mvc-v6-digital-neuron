@@ -39,10 +39,11 @@ export interface VolitionState {
 export interface ProactiveMessage {
   id: string;
   content: string;
-  type: string;
+  type: string; // 'proactive' | 'insight' | 'reflection' | 'question' 等
   trigger: string;
   timestamp: number;
   urgency: number;
+  category?: 'share' | 'insight' | 'reflection'; // 消息分类
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -221,6 +222,50 @@ export function VolitionProgress({
 // 顶部泡泡容器 - 自动消失的主动消息
 // ─────────────────────────────────────────────────────────────────────
 
+// 消息类型配置
+const MESSAGE_TYPE_CONFIG: Record<string, {
+  icon: React.ReactNode;
+  label: string;
+  gradient: string;
+  border: string;
+  iconColor: string;
+  labelColor: string;
+}> = {
+  share: {
+    icon: <Sparkles className="w-3 h-3" />,
+    label: '想和你分享',
+    gradient: 'from-purple-100 to-pink-100 dark:from-purple-900/80 dark:to-pink-900/80',
+    border: 'border-purple-200/50 dark:border-purple-700/50',
+    iconColor: 'text-purple-500',
+    labelColor: 'text-purple-600 dark:text-purple-300',
+  },
+  insight: {
+    icon: <Brain className="w-3 h-3" />,
+    label: '有个洞察',
+    gradient: 'from-amber-100 to-yellow-100 dark:from-amber-900/80 dark:to-yellow-900/80',
+    border: 'border-amber-200/50 dark:border-amber-700/50',
+    iconColor: 'text-amber-500',
+    labelColor: 'text-amber-600 dark:text-amber-300',
+  },
+  reflection: {
+    icon: <MessageCircle className="w-3 h-3" />,
+    label: '正在反思',
+    gradient: 'from-blue-100 to-cyan-100 dark:from-blue-900/80 dark:to-cyan-900/80',
+    border: 'border-blue-200/50 dark:border-blue-700/50',
+    iconColor: 'text-blue-500',
+    labelColor: 'text-blue-600 dark:text-blue-300',
+  },
+  // 默认配置
+  default: {
+    icon: <Sparkles className="w-3 h-3" />,
+    label: '想和你分享',
+    gradient: 'from-purple-100 to-pink-100 dark:from-purple-900/80 dark:to-pink-900/80',
+    border: 'border-purple-200/50 dark:border-purple-700/50',
+    iconColor: 'text-purple-500',
+    labelColor: 'text-purple-600 dark:text-purple-300',
+  },
+};
+
 interface TopBubbleProps {
   message: ProactiveMessage;
   onDismiss: (id: string) => void;
@@ -230,6 +275,10 @@ interface TopBubbleProps {
 function TopBubble({ message, onDismiss, autoHideDuration = 5000 }: TopBubbleProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
+  
+  // 获取消息类型配置
+  const category = message.category || message.type || 'default';
+  const config = MESSAGE_TYPE_CONFIG[category] || MESSAGE_TYPE_CONFIG.default;
   
   useEffect(() => {
     // 进入动画
@@ -263,7 +312,7 @@ function TopBubble({ message, onDismiss, autoHideDuration = 5000 }: TopBubblePro
           : 'opacity-0 -translate-y-4 scale-95'}
       `}
     >
-      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/80 dark:to-pink-900/80 border border-purple-200/50 dark:border-purple-700/50 shadow-lg backdrop-blur-sm max-w-md">
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r ${config.gradient} border ${config.border} shadow-lg backdrop-blur-sm max-w-md`}>
         {/* 头像 */}
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold shadow-md">
           紫
@@ -272,9 +321,9 @@ function TopBubble({ message, onDismiss, autoHideDuration = 5000 }: TopBubblePro
         {/* 内容 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <Sparkles className="w-3 h-3 text-purple-500" />
-            <span className="text-xs font-medium text-purple-600 dark:text-purple-300">
-              想和你分享
+            <span className={config.iconColor}>{config.icon}</span>
+            <span className={`text-xs font-medium ${config.labelColor}`}>
+              {config.label}
             </span>
           </div>
           <p className="text-sm text-foreground/90 line-clamp-2 leading-relaxed">

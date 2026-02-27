@@ -4061,6 +4061,12 @@ ${thinkingSection}
       .replace('{{content}}', trigger.content)
       .replace('{{name}}', identity.name);
     
+    // 确定消息分类
+    let category: 'share' | 'insight' | 'reflection' = 'share';
+    if (trigger.type === 'insight') {
+      category = 'insight';
+    }
+    
     return {
       id: uuidv4(),
       content: message,
@@ -4068,6 +4074,7 @@ ${thinkingSection}
       trigger: trigger.reason,
       timestamp: Date.now(),
       urgency: trigger.urgency,
+      category,
     };
   }
   
@@ -4102,8 +4109,45 @@ ${thinkingSection}
     if (Math.random() < 0.3) {
       try {
         reflection = await this.reflect();
+        
+        // 生成反思消息并发送
+        if (reflection && reflection.observation) {
+          const reflectionContent = reflection.observation.whatWorked || 
+            reflection.learning?.aboutMyThinking ||
+            reflection.improvement?.willApply;
+          
+          if (reflectionContent) {
+            const reflectionMessage: ProactiveMessage = {
+              id: uuidv4(),
+              content: `我发现自己在${reflection.observation.howIWasThinking || '思考'}。${reflectionContent}`,
+              type: 'reflection',
+              trigger: '元认知反思',
+              timestamp: Date.now(),
+              urgency: 0.6,
+              category: 'reflection',
+            };
+            this.saveProactiveMessage(reflectionMessage);
+          }
+        }
       } catch {
         // 反思失败，忽略
+      }
+    }
+    
+    // 检查是否生成洞察
+    if (stream.entries.length > 2 && Math.random() < 0.2) {
+      const insightEntry = stream.entries.find(e => e.type === 'insight' || e.intensity > 0.7);
+      if (insightEntry && insightEntry.content) {
+        const insightMessage: ProactiveMessage = {
+          id: uuidv4(),
+          content: insightEntry.content,
+          type: 'insight',
+          trigger: '意识流洞察',
+          timestamp: Date.now(),
+          urgency: 0.7,
+          category: 'insight',
+        };
+        this.saveProactiveMessage(insightMessage);
       }
     }
     
@@ -4435,6 +4479,7 @@ export interface ProactiveMessage {
   trigger: string;
   timestamp: number;
   urgency: number;
+  category?: 'share' | 'insight' | 'reflection'; // 消息分类，用于前端显示不同样式
 }
 
 /**
