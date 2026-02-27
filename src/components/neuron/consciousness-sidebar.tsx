@@ -1340,28 +1340,51 @@ function TranscendencePanel({ data }: { data: TranscendenceData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 可滚动面板容器 - 防止内容穿出窗口
+// 可滚动面板容器 - 防止内容穿出窗口，自适应高度
 // ─────────────────────────────────────────────────────────────────────
 
-const MAX_PANEL_HEIGHT = 280; // 每个面板最大高度
+const DEFAULT_MAX_HEIGHT = 280; // 默认面板最大高度
+const MAX_VIEWPORT_RATIO = 0.4; // 最大占用视口高度比例
 
 interface ScrollablePanelProps {
   children: React.ReactNode;
   maxHeight?: number;
 }
 
-function ScrollablePanel({ children, maxHeight = MAX_PANEL_HEIGHT }: ScrollablePanelProps) {
+function ScrollablePanel({ children, maxHeight }: ScrollablePanelProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [needsScroll, setNeedsScroll] = useState(false);
+  const [calculatedMaxHeight, setCalculatedMaxHeight] = useState(maxHeight || DEFAULT_MAX_HEIGHT);
   
+  // 动态计算最大高度
   useEffect(() => {
-    if (contentRef.current) {
-      setNeedsScroll(contentRef.current.scrollHeight > maxHeight);
-    }
+    const updateMaxHeight = () => {
+      // 计算可用高度：视口高度的 40%，但不小于 200px，不大于 400px
+      const viewportHeight = window.innerHeight;
+      const dynamicMax = Math.min(
+        Math.max(viewportHeight * MAX_VIEWPORT_RATIO, 200),
+        400
+      );
+      
+      // 如果传入了 maxHeight，使用较小的值
+      const finalMax = maxHeight ? Math.min(maxHeight, dynamicMax) : dynamicMax;
+      setCalculatedMaxHeight(finalMax);
+      
+      // 检查是否需要滚动
+      if (contentRef.current) {
+        setNeedsScroll(contentRef.current.scrollHeight > finalMax);
+      }
+    };
+    
+    updateMaxHeight();
+    window.addEventListener('resize', updateMaxHeight);
+    return () => window.removeEventListener('resize', updateMaxHeight);
   }, [children, maxHeight]);
   
   return (
     <motion.div
+      ref={containerRef}
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
@@ -1369,7 +1392,7 @@ function ScrollablePanel({ children, maxHeight = MAX_PANEL_HEIGHT }: ScrollableP
       className="relative"
     >
       {needsScroll ? (
-        <ScrollArea className="w-full" style={{ maxHeight }}>
+        <ScrollArea className="w-full" style={{ maxHeight: calculatedMaxHeight }}>
           <div ref={contentRef}>{children}</div>
         </ScrollArea>
       ) : (
@@ -1563,8 +1586,14 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
         </div>
       )}
       
-      {/* 可折叠面板区域 */}
-      <ScrollArea className="flex-1">
+      {/* 可折叠面板区域 - 自适应高度，使用 CSS 变量计算 */}
+      <div 
+        className="flex-1 min-h-0 overflow-hidden"
+        style={{
+          height: 'calc(100vh - var(--header-height, 180px) - var(--nav-height, 100px))'
+        }}
+      >
+        <ScrollArea className="h-full w-full">
         <Accordion 
           type="multiple" 
           value={expandedPanels}
@@ -1883,7 +1912,11 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
             <p className="text-sm">开始对话以查看意识状态...</p>
           </div>
         )}
-      </ScrollArea>
+        </ScrollArea>
+      </div>
+      
+      {/* 底部阴影指示器 */}
+      <div className="h-6 bg-gradient-to-t from-background to-transparent pointer-events-none shrink-0" />
     </div>
   );
 }
