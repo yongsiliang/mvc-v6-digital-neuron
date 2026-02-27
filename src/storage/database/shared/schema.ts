@@ -471,3 +471,147 @@ export const coreMemories = pgTable("core_memories", {
 	unique("core_memories_key_unique").on(table.key),
 	index("core_memories_type_idx").using("btree", table.memoryType.asc().nullsLast().op("text_ops")),
 ]);
+
+// ═══════════════════════════════════════════════════════════════════════
+// V6 意识系统专用表
+// Consciousness V6 Specific Tables
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * V6 核心摘要表
+ * 存储不可变的核心身份信息
+ */
+export const v6CoreSummary = pgTable("v6_core_summary", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	creatorName: varchar("creator_name", { length: 100 }),
+	creatorDescription: text("creator_description"),
+	identityName: varchar("identity_name", { length: 100 }).default('紫').notNull(),
+	identityPurpose: text("identity_purpose"),
+	identityTraits: jsonb("identity_traits").default([]).notNull(),
+	identitySelfDefinition: text("identity_self_definition"),
+	coreValues: jsonb("core_values").default([]).notNull(),
+	corePreferences: jsonb("core_preferences").default([]).notNull(),
+	version: integer().default(1).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("v6_core_version_idx").using("btree", table.version.desc().nullsLast().op("int4_ops")),
+]);
+
+/**
+ * V6 核心关系表
+ * 存储与他人的关系
+ */
+export const v6CoreRelationships = pgTable("v6_core_relationships", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	personName: varchar("person_name", { length: 100 }).notNull(),
+	relationshipType: varchar("relationship_type", { length: 50 }).notNull(),
+	importance: real().default(0.5).notNull(),
+	keyInteractions: jsonb("key_interactions").default([]),
+	notes: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("v6_rel_name_idx").using("btree", table.personName.asc().nullsLast().op("text_ops")),
+	index("v6_rel_importance_idx").using("btree", table.importance.desc().nullsLast().op("float4_ops")),
+]);
+
+/**
+ * V6 情景记忆表
+ * 存储短期记忆，会随时间衰减
+ */
+export const v6EpisodicMemories = pgTable("v6_episodic_memories", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	content: text().notNull(),
+	importance: real().default(0.5).notNull(),
+	strength: real().default(1).notNull(),
+	timeConstant: real("time_constant").default(7).notNull(),
+	tags: jsonb().default([]).notNull(),
+	recallCount: integer("recall_count").default(0).notNull(),
+	lastRecalledAt: timestamp("last_recalled_at", { withTimezone: true, mode: 'string' }),
+	sourceType: varchar("source_type", { length: 20 }).default('conversation').notNull(),
+	consolidationCandidate: boolean("consolidation_candidate").default(false).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("v6_episodic_created_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+	index("v6_episodic_importance_idx").using("btree", table.importance.desc().nullsLast().op("float4_ops")),
+	index("v6_episodic_strength_idx").using("btree", table.strength.desc().nullsLast().op("float4_ops")),
+]);
+
+/**
+ * V6 巩固记忆表
+ * 存储长期记忆，从情景记忆巩固而来
+ */
+export const v6ConsolidatedMemories = pgTable("v6_consolidated_memories", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	content: text().notNull(),
+	type: varchar({ length: 20 }).notNull(), // wisdom, preference, fact, skill
+	importance: real().default(0.7).notNull(),
+	tags: jsonb().default([]).notNull(),
+	recallCount: integer("recall_count").default(0).notNull(),
+	lastRecalledAt: timestamp("last_recalled_at", { withTimezone: true, mode: 'string' }),
+	sourceEpisodes: jsonb("source_episodes").default([]),
+	relatedEntities: jsonb("related_entities").default([]),
+	emotionalMarker: varchar("emotional_marker", { length: 30 }),
+	consolidatedAt: timestamp("consolidated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("v6_consolidated_type_idx").using("btree", table.type.asc().nullsLast().op("text_ops")),
+	index("v6_consolidated_importance_idx").using("btree", table.importance.desc().nullsLast().op("float4_ops")),
+]);
+
+/**
+ * V6 意识状态快照表
+ * 定期保存完整意识状态
+ */
+export const v6ConsciousnessSnapshots = pgTable("v6_consciousness_snapshots", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	version: integer().notNull(),
+	identity: jsonb().notNull(),
+	layeredMemory: jsonb("layered_memory").notNull(),
+	emotionState: jsonb("emotion_state"),
+	metacognitionState: jsonb("metacognition_state"),
+	fullState: jsonb("full_state"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("v6_snapshot_version_idx").using("btree", table.version.desc().nullsLast().op("int4_ops")),
+	index("v6_snapshot_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * V6 性能指标表
+ * 记录系统性能数据
+ */
+export const v6PerformanceMetrics = pgTable("v6_performance_metrics", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	metricType: varchar("metric_type", { length: 50 }).notNull(), // response_time, memory_usage, api_call
+	metricName: varchar("metric_name", { length: 100 }).notNull(),
+	value: real().notNull(),
+	unit: varchar({ length: 20 }), // ms, mb, count
+	metadata: jsonb().default({}),
+	sessionId: varchar("session_id", { length: 36 }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("v6_metrics_type_idx").using("btree", table.metricType.asc().nullsLast().op("text_ops")),
+	index("v6_metrics_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
+
+/**
+ * V6 情感体验记录表
+ * 记录情感变化历史
+ */
+export const v6EmotionExperiences = pgTable("v6_emotion_experiences", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	emotion: varchar({ length: 30 }).notNull(),
+	intensity: real().notNull(),
+	valence: real(),
+	arousal: real(),
+	triggerType: varchar("trigger_type", { length: 20 }),
+	triggerDescription: text("trigger_description"),
+	duration: integer().default(0),
+	labels: jsonb().default([]),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("v6_emotion_type_idx").using("btree", table.emotion.asc().nullsLast().op("text_ops")),
+	index("v6_emotion_time_idx").using("btree", table.createdAt.desc().nullsLast().op("timestamptz_ops")),
+]);
