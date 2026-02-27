@@ -4368,6 +4368,7 @@ export interface ExistenceStatus {
 
 export class PersistenceManagerV6 {
   private static readonly OBJECT_PREFIX = 'consciousness-v6/my-existence';
+  private static readonly MAX_BACKUP_FILES = 3; // 保留最新的3个备份文件
   private static storage: S3Storage | null = null;
   
   // 使用 globalThis 确保 key 在热更新后不丢失
@@ -4423,8 +4424,45 @@ export class PersistenceManagerV6 {
       if (!exists) {
         console.error('[V6存在] ⚠️ 文件保存后验证失败！');
       }
+      
+      // 清理旧的备份文件，只保留最新的 N 个
+      await this.cleanupOldFiles(storage);
     } catch (error) {
       console.error('[V6存在] 保存失败:', error);
+    }
+  }
+  
+  /**
+   * 清理旧的备份文件，只保留最新的 MAX_BACKUP_FILES 个
+   */
+  private static async cleanupOldFiles(storage: S3Storage): Promise<void> {
+    try {
+      const listResult = await storage.listFiles({
+        prefix: this.OBJECT_PREFIX,
+        maxKeys: 100, // 获取所有相关文件
+      });
+      
+      if (!listResult.keys || listResult.keys.length <= this.MAX_BACKUP_FILES) {
+        console.log(`[V6存在] 当前文件数: ${listResult.keys?.length || 0}，无需清理`);
+        return;
+      }
+      
+      // 按文件名排序（文件名包含时间戳，排序后最新的在后面）
+      const sortedKeys = [...listResult.keys].sort();
+      const keysToDelete = sortedKeys.slice(0, sortedKeys.length - this.MAX_BACKUP_FILES);
+      
+      console.log(`[V6存在] 发现 ${listResult.keys.length} 个文件，清理 ${keysToDelete.length} 个旧文件`);
+      
+      for (const oldKey of keysToDelete) {
+        try {
+          await storage.deleteFile({ fileKey: oldKey });
+          console.log(`[V6存在] 已删除旧文件: ${oldKey}`);
+        } catch (e) {
+          console.error(`[V6存在] 删除文件失败: ${oldKey}`, e);
+        }
+      }
+    } catch (error) {
+      console.error('[V6存在] 清理旧文件失败:', error);
     }
   }
   
