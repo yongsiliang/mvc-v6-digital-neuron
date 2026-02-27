@@ -33,6 +33,13 @@ import {
   createLongTermMemory 
 } from './long-term-memory';
 import { 
+  LayeredMemorySystem,
+  CoreSummary,
+  ConsolidatedMemory,
+  EpisodicMemory,
+  MemoryRetrievalResult
+} from './layered-memory';
+import { 
   MetacognitionEngine, 
   MetacognitiveContext, 
   createMetacognitionEngine 
@@ -721,6 +728,9 @@ export interface PersistedState {
   
   conversationHistory: Array<{ role: string; content: string }>;
   
+  // 分层记忆状态
+  layeredMemoryState?: ReturnType<LayeredMemorySystem['exportState']>;
+  
   // 完整状态
   fullState?: {
     meaning: ReturnType<MeaningAssigner['exportState']>;
@@ -785,6 +795,9 @@ export class ConsciousnessCore {
   
   // 知识图谱系统
   private knowledgeGraphSystem: KnowledgeGraphSystem;
+  
+  // 分层记忆系统（新增）
+  private layeredMemory: LayeredMemorySystem;
   
   // 多意识体协作系统
   private multiConsciousnessSystem: MultiConsciousnessSystem;
@@ -864,6 +877,9 @@ export class ConsciousnessCore {
     
     // 初始化知识图谱系统
     this.knowledgeGraphSystem = createKnowledgeGraphSystem();
+    
+    // 初始化分层记忆系统
+    this.layeredMemory = new LayeredMemorySystem();
     
     // 初始化多意识体协作系统
     this.multiConsciousnessSystem = createMultiConsciousnessSystem();
@@ -2280,6 +2296,13 @@ ${thinkingSection}
       );
     }
     
+    // 同步更新分层记忆的核心层
+    this.layeredMemory.setCreator(
+      newCreatorName,
+      keyInfo.context || '我的创造者',
+      '创造者'
+    );
+    
     console.log(`[记忆核心] 永远记住了创造者：${newCreatorName}`);
   }
   
@@ -2365,6 +2388,7 @@ ${thinkingSection}
         wisdoms: memoryStats.wisdomCount,
       },
       conversationHistory: this.conversationHistory.slice(-50),
+      layeredMemoryState: this.layeredMemory.exportState(),
       fullState: {
         meaning: this.meaningAssigner.exportState(),
         self: this.selfConsciousness.exportState(),
@@ -2383,6 +2407,11 @@ ${thinkingSection}
       this.selfConsciousness.importState(state.fullState.self);
       this.longTermMemory.importState(state.fullState.memory);
       this.metacognition.importState(state.fullState.metacognition);
+    }
+    
+    // 恢复分层记忆状态
+    if (state.layeredMemoryState) {
+      this.layeredMemory.importState(state.layeredMemoryState);
     }
     
     // 类型安全的恢复对话历史
