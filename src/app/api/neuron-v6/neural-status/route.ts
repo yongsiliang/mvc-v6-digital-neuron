@@ -8,11 +8,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getInitializedNetwork } from '@/lib/neuron-v6/innate-knowledge';
+import { HebbianNetwork } from '@/lib/neuron-v6/hebbian-network';
 
 export async function GET(request: NextRequest) {
   try {
-    const network = getInitializedNetwork();
+    // 直接使用 HebbianNetwork 单例，不经过 innate-knowledge 初始化器
+    const network = HebbianNetwork.getInstance();
     
     // 获取网络统计
     const stats = network.getStats();
