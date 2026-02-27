@@ -1275,12 +1275,12 @@ export default function ConsciousnessPage() {
                 }`}
               >
                 <div
-                  className={`max-w-[85%] md:max-w-[80%] rounded-lg p-2 md:p-3 text-sm md:text-base ${
+                  className={`rounded-lg p-2 md:p-3 text-sm md:text-base ${
                     message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
+                      ? 'bg-primary text-primary-foreground max-w-[70%]'
                       : message.isProactive
-                        ? 'bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-800'
-                        : 'bg-muted'
+                        ? 'bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-800 max-w-[65%]'
+                        : 'bg-muted max-w-[80%]'
                   }`}
                 >
                   {message.isProactive && (
@@ -1289,7 +1289,7 @@ export default function ConsciousnessPage() {
                       <span>紫主动分享</span>
                     </div>
                   )}
-                  {message.content}
+                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
                 </div>
               </div>
             ))}
@@ -1339,7 +1339,7 @@ export default function ConsciousnessPage() {
       </div>
 
       {/* 右侧：意识状态面板 - 桌面端显示 */}
-      <div className="hidden md:block">
+      <div className="hidden md:block w-72 lg:w-80 shrink-0 h-screen overflow-hidden">
         <ConsciousnessSidebar 
           currentData={currentData}
           existenceStatus={existenceStatus}

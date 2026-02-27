@@ -1366,16 +1366,17 @@ function ScrollablePanel({ children, maxHeight = MAX_PANEL_HEIGHT }: ScrollableP
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={needsScroll ? 'overflow-hidden' : ''}
+      className="relative"
     >
-      <ScrollArea 
-        className={needsScroll ? '' : undefined} 
-        style={{ maxHeight: needsScroll ? maxHeight : 'none' }}
-      >
+      {needsScroll ? (
+        <ScrollArea className="w-full" style={{ maxHeight }}>
+          <div ref={contentRef}>{children}</div>
+        </ScrollArea>
+      ) : (
         <div ref={contentRef}>{children}</div>
-      </ScrollArea>
+      )}
       {needsScroll && (
-        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background to-transparent pointer-events-none z-10" />
       )}
     </motion.div>
   );
@@ -1421,10 +1422,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
   const allExpanded = expandedPanels.length === availablePanels.length && availablePanels.length > 0;
   
   return (
-    <div className="w-full md:w-80 border-l flex flex-col h-full bg-background">
+    <div className="w-full md:w-80 border-l flex flex-col h-full bg-background overflow-hidden">
       {/* 头部状态栏 */}
       {existenceStatus && (
-        <div className="p-3 border-b bg-muted/30">
+        <div className="p-3 border-b bg-muted/30 shrink-0">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1" title="存在时长">
@@ -1446,7 +1447,7 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
       
       {/* 可视化入口按钮 */}
       {onVisualize && (
-        <div className="p-3 border-b">
+        <div className="p-3 border-b shrink-0">
           <button
             onClick={onVisualize}
             disabled={!hasVisualizationData}
@@ -1466,7 +1467,7 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
       
       {/* 全部展开/收起按钮 */}
       {availablePanels.length > 1 && (
-        <div className="px-3 py-2 border-b bg-muted/20">
+        <div className="px-3 py-2 border-b bg-muted/20 shrink-0">
           <Button
             variant="ghost"
             size="sm"
