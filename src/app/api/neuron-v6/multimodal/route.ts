@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
           // 发送意识系统响应
           send('consciousness', {
             response: result.response,
-            emotionalState: result.emotionState.dominantEmotion,
+            emotionalState: result.emotionState.dominantEmotion?.emotion || '平静',
             thinkingChains: result.thinking.thinkingChain.length,
             memoryAccessed: result.context.memory?.summary || null,
             selfObservation: result.consciousnessLayers.selfObservation?.iSeeMyself || null,
@@ -176,10 +176,7 @@ export async function POST(request: NextRequest) {
           send('context', {
             identity: result.context.identity,
             coreValues: result.context.coreValues,
-            emotionalState: result.emotionState.activeEmotions.map(e => ({
-              emotion: e.emotion,
-              intensity: e.intensity,
-            })),
+            emotionalState: result.emotionState.dominantEmotion?.emotion || '平静',
           });
 
           // ═══════════════════════════════════════════════════════════════
