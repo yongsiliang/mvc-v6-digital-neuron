@@ -98,8 +98,8 @@ export class ToolIntentRecognizer {
 
     // 网络操作关键词
     const webKeywords = {
-      fetch: ['获取网页', '打开网页', 'fetch', 'get url', '访问网站'],
-      search: ['网上搜索', '网络搜索', 'web search', 'google', '搜索一下'],
+      fetch: ['获取网页', '打开网页', 'fetch', 'get url', '访问网站', '打开网站', '打开百度', '打开谷歌', '打开github', '访问', '看看网站', '浏览网页', '打开链接', '访问链接'],
+      search: ['网上搜索', '网络搜索', 'web search', 'google', '搜索一下', '帮我搜索', '搜一下'],
       download: ['下载', 'download'],
     };
 
@@ -411,8 +411,56 @@ ${ALL_TOOLS.map(t => `- ${t.name}: ${t.displayName} - ${t.description}`).join('\
    * 从输入中提取 URL
    */
   private extractUrl(input: string): string | null {
+    // 首先尝试匹配完整 URL
     const urlMatch = input.match(/(https?:\/\/[^\s]+)/);
-    return urlMatch ? urlMatch[1] : null;
+    if (urlMatch) return urlMatch[1];
+    
+    // 根据关键词推断网站
+    const siteMap: Record<string, string> = {
+      '百度': 'https://www.baidu.com',
+      '谷歌': 'https://www.google.com',
+      'google': 'https://www.google.com',
+      'github': 'https://github.com',
+      'youtube': 'https://www.youtube.com',
+      '油管': 'https://www.youtube.com',
+      'bilibili': 'https://www.bilibili.com',
+      'b站': 'https://www.bilibili.com',
+      '知乎': 'https://www.zhihu.com',
+      '微博': 'https://weibo.com',
+      '淘宝': 'https://www.taobao.com',
+      '京东': 'https://www.jd.com',
+      '天猫': 'https://www.tmall.com',
+      '腾讯': 'https://www.qq.com',
+      '微信': 'https://weixin.qq.com',
+      '抖音': 'https://www.douyin.com',
+      'twitter': 'https://twitter.com',
+      '推特': 'https://twitter.com',
+      'facebook': 'https://www.facebook.com',
+      '脸书': 'https://www.facebook.com',
+      'instagram': 'https://www.instagram.com',
+      'linkedin': 'https://www.linkedin.com',
+      'reddit': 'https://www.reddit.com',
+      '亚马逊': 'https://www.amazon.com',
+      'amazon': 'https://www.amazon.com',
+      '微软': 'https://www.microsoft.com',
+      'microsoft': 'https://www.microsoft.com',
+      '苹果': 'https://www.apple.com',
+      'apple': 'https://www.apple.com',
+      'stackoverflow': 'https://stackoverflow.com',
+      'csdn': 'https://www.csdn.net',
+      '掘金': 'https://juejin.cn',
+      'npm': 'https://www.npmjs.com',
+      'mdn': 'https://developer.mozilla.org',
+    };
+    
+    const lowerInput = input.toLowerCase();
+    for (const [keyword, url] of Object.entries(siteMap)) {
+      if (lowerInput.includes(keyword.toLowerCase())) {
+        return url;
+      }
+    }
+    
+    return null;
   }
 }
 
