@@ -12,17 +12,19 @@ import { Network, Activity, Zap, Brain, RefreshCw } from 'lucide-react';
 // 类型定义
 // ─────────────────────────────────────────────────────────────────────
 
-interface HebbianNeuron {
+interface VizNeuron {
   id: string;
   label: string;
   activation: number;
-  type: 'sensory' | 'concept' | 'emotion' | 'abstract';
+  type: 'sensory' | 'concept' | 'emotion' | 'abstract' | 'trap';
   totalActivations: number;
 }
 
-interface HebbianSynapse {
+interface VizSynapse {
   from: string;
   to: string;
+  fromLabel: string;
+  toLabel: string;
   weight: number;
 }
 
@@ -45,6 +47,10 @@ interface NetworkStats {
     to: string;
     weight: number;
   }>;
+  visualization?: {
+    neurons: VizNeuron[];
+    synapses: VizSynapse[];
+  };
 }
 
 interface HebbianNetworkData {
@@ -63,13 +69,11 @@ const NEURON_TYPE_COLORS: Record<string, string> = {
   emotion: '#ec4899',   // 粉色 - 情感
   abstract: '#8b5cf6',  // 紫色 - 抽象
   trap: '#ef4444',      // 红色 - 陷阱
-  default: '#6b7280',   // 灰色 - 默认
 };
 
 const WEIGHT_COLORS = {
   positive: '#22c55e',  // 绿色 - 兴奋性连接
   negative: '#ef4444',  // 红色 - 抑制性连接
-  neutral: '#6b7280',   // 灰色 - 弱连接
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -77,19 +81,20 @@ const WEIGHT_COLORS = {
 // ─────────────────────────────────────────────────────────────────────
 
 interface NetworkVizProps {
-  neurons: HebbianNeuron[];
-  synapses: HebbianSynapse[];
+  neurons: VizNeuron[];
+  synapses: VizSynapse[];
   width: number;
   height: number;
-  onNodeClick?: (neuron: HebbianNeuron) => void;
+  onNodeClick?: (neuron: VizNeuron) => void;
   highlightedId?: string | null;
 }
 
 function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highlightedId }: NetworkVizProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
-  const nodesRef = useRef<Array<HebbianNeuron & { x: number; y: number; vx: number; vy: number; radius: number }>>([]);
-  const [hoveredNode, setHoveredNode] = useState<HebbianNeuron | null>(null);
+  const nodesRef = useRef<Array<VizNeuron & { x: number; y: number; vx: number; vy: number; radius: number }>>([]);
+  const [hoveredNode, setHoveredNode] = useState<VizNeuron | null>(null);
+  const initializedRef = useRef(false);
 
   // 初始化节点位置
   const initializeNodes = useCallback(() => {
@@ -97,11 +102,11 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
 
     const centerX = width / 2;
     const centerY = height / 2;
-    const radius = Math.min(width, height) * 0.35;
+    const radius = Math.min(width, height) * 0.38;
 
     nodesRef.current = neurons.map((neuron, index) => {
       const angle = (index / neurons.length) * Math.PI * 2 - Math.PI / 2;
-      const r = radius * (0.6 + Math.random() * 0.4);
+      const r = radius * (0.5 + Math.random() * 0.5);
 
       return {
         ...neuron,
@@ -109,9 +114,11 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
         y: centerY + Math.sin(angle) * r,
         vx: 0,
         vy: 0,
-        radius: 12 + neuron.activation * 10 + Math.min(neuron.totalActivations * 0.5, 8),
+        radius: 10 + Math.abs(neuron.activation) * 8 + Math.min((neuron.totalActivations || 0) * 0.3, 6),
       };
     });
+    
+    initializedRef.current = true;
   }, [neurons, width, height]);
 
   // 力导向布局
@@ -128,7 +135,7 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
         const dx = nodes[j].x - nodes[i].x;
         const dy = nodes[j].y - nodes[i].y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = 800 / (dist * dist);
+        const force = 500 / (dist * dist);
 
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
@@ -149,7 +156,7 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
         const dx = target.x - source.x;
         const dy = target.y - source.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = (dist - 80) * 0.005 * Math.abs(synapse.weight);
+        const force = (dist - 70) * 0.003 * Math.abs(synapse.weight);
 
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
@@ -162,21 +169,17 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
     }
 
     // 向心引力和边界约束
-    const padding = 30;
+    const padding = 25;
     for (const node of nodes) {
-      // 向心力
-      node.vx += (centerX - node.x) * 0.0008;
-      node.vy += (centerY - node.y) * 0.0008;
+      node.vx += (centerX - node.x) * 0.0005;
+      node.vy += (centerY - node.y) * 0.0005;
 
-      // 阻尼
-      node.vx *= 0.92;
-      node.vy *= 0.92;
+      node.vx *= 0.9;
+      node.vy *= 0.9;
 
-      // 更新位置
       node.x += node.vx;
       node.y += node.vy;
 
-      // 边界约束
       node.x = Math.max(padding, Math.min(width - padding, node.x));
       node.y = Math.max(padding, Math.min(height - padding, node.y));
     }
@@ -192,17 +195,16 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
 
     const nodes = nodesRef.current;
 
-    // 清空画布
     ctx.clearRect(0, 0, width, height);
 
-    // 背景渐变
+    // 背景
     const bgGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 2);
     bgGradient.addColorStop(0, 'rgba(139, 92, 246, 0.08)');
     bgGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // 绘制突触连接
+    // 绘制突触
     for (const synapse of synapses) {
       const source = nodes.find(n => n.id === synapse.from);
       const target = nodes.find(n => n.id === synapse.to);
@@ -210,58 +212,33 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
       if (source && target) {
         const absWeight = Math.abs(synapse.weight);
         const color = synapse.weight > 0 ? WEIGHT_COLORS.positive : WEIGHT_COLORS.negative;
-        const opacity = Math.min(0.1 + absWeight * 0.5, 0.7);
+        const opacity = Math.min(0.2 + absWeight * 0.4, 0.6);
 
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
         ctx.strokeStyle = color + Math.round(opacity * 255).toString(16).padStart(2, '0');
-        ctx.lineWidth = 1 + absWeight * 2;
+        ctx.lineWidth = 0.5 + absWeight * 2;
         ctx.stroke();
-
-        // 箭头指示方向（仅强连接）
-        if (absWeight > 0.5) {
-          const midX = (source.x + target.x) / 2;
-          const midY = (source.y + target.y) / 2;
-          const angle = Math.atan2(target.y - source.y, target.x - source.x);
-
-          ctx.beginPath();
-          ctx.moveTo(midX - Math.cos(angle - 0.5) * 6, midY - Math.sin(angle - 0.5) * 6);
-          ctx.lineTo(midX, midY);
-          ctx.lineTo(midX - Math.cos(angle + 0.5) * 6, midY - Math.sin(angle + 0.5) * 6);
-          ctx.strokeStyle = color + 'aa';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        }
       }
     }
 
-    // 绘制神经元
+    // 绘制节点
     for (const node of nodes) {
-      const color = NEURON_TYPE_COLORS[node.type] || NEURON_TYPE_COLORS.default;
-      const radius = node.radius;
+      const color = NEURON_TYPE_COLORS[node.type] || NEURON_TYPE_COLORS.concept;
+      const radius = Math.max(node.radius, 8);
       const isHighlighted = highlightedId === node.id;
       const isHovered = hoveredNode?.id === node.id;
 
-      // 光晕效果
-      const glowRadius = radius * (isHighlighted || isHovered ? 3 : 2);
+      // 光晕
+      const glowRadius = radius * (isHighlighted || isHovered ? 2.5 : 2);
       const glowGradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, glowRadius);
-      glowGradient.addColorStop(0, color + '60');
+      glowGradient.addColorStop(0, color + '50');
       glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = glowGradient;
       ctx.beginPath();
       ctx.arc(node.x, node.y, glowRadius, 0, Math.PI * 2);
       ctx.fill();
-
-      // 激活脉冲环
-      if (node.activation > 0.3) {
-        const pulseRadius = radius + 8 + Math.sin(Date.now() / 500) * 3;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, pulseRadius, 0, Math.PI * 2 * node.activation);
-        ctx.strokeStyle = color + '40';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
 
       // 节点主体
       const nodeGradient = ctx.createRadialGradient(
@@ -269,39 +246,36 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
         node.x, node.y, radius
       );
       nodeGradient.addColorStop(0, color);
-      nodeGradient.addColorStop(1, color + 'aa');
+      nodeGradient.addColorStop(1, color + 'cc');
 
       ctx.beginPath();
       ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
       ctx.fillStyle = nodeGradient;
       ctx.fill();
 
-      // 边框
       ctx.strokeStyle = isHighlighted ? '#ffffff' : color;
-      ctx.lineWidth = isHighlighted ? 3 : 2;
+      ctx.lineWidth = isHighlighted ? 3 : 1.5;
       ctx.stroke();
 
-      // 标签（仅显示重要节点或悬浮节点）
-      if (node.activation > 0.5 || isHovered || isHighlighted || node.totalActivations > 5) {
+      // 标签
+      if (isHovered || isHighlighted || node.totalActivations > 3) {
         ctx.font = '10px system-ui';
+        const labelWidth = ctx.measureText(node.label).width + 8;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(node.x - labelWidth / 2, node.y + radius + 3, labelWidth, 13);
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
-        // 标签背景
-        const labelWidth = ctx.measureText(node.label).width + 6;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(node.x - labelWidth / 2, node.y + radius + 4, labelWidth, 14);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(node.label, node.x, node.y + radius + 11);
+        ctx.fillText(node.label, node.x, node.y + radius + 10);
       }
     }
   }, [synapses, width, height, highlightedId, hoveredNode]);
 
   // 动画循环
   useEffect(() => {
-    initializeNodes();
+    if (!initializedRef.current) {
+      initializeNodes();
+    }
 
     const animate = () => {
       applyForces();
@@ -313,6 +287,12 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
     return () => cancelAnimationFrame(animationRef.current);
   }, [initializeNodes, applyForces, draw]);
 
+  // 重新初始化当神经元变化
+  useEffect(() => {
+    initializedRef.current = false;
+    initializeNodes();
+  }, [neurons, initializeNodes]);
+
   // 鼠标交互
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -323,7 +303,7 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
     const y = e.clientY - rect.top;
 
     const nodes = nodesRef.current;
-    let found: HebbianNeuron | null = null;
+    let found: VizNeuron | null = null;
 
     for (const node of nodes) {
       const dist = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
@@ -337,7 +317,7 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
     canvas.style.cursor = found ? 'pointer' : 'default';
   }, []);
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleClick = useCallback(() => {
     if (hoveredNode && onNodeClick) {
       onNodeClick(hoveredNode);
     }
@@ -367,7 +347,7 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
   const [data, setData] = useState<HebbianNetworkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedNeuron, setSelectedNeuron] = useState<HebbianNeuron | null>(null);
+  const [selectedNeuron, setSelectedNeuron] = useState<VizNeuron | null>(null);
   const [activeTab, setActiveTab] = useState<'network' | 'stats' | 'activity'>('network');
 
   // 获取网络数据
@@ -392,25 +372,13 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
 
   useEffect(() => {
     fetchData();
-    // 每 30 秒刷新一次
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // 转换为可视化数据
-  const neurons: HebbianNeuron[] = data?.network.highlyActiveNeurons.map(n => ({
-    id: n.id,
-    label: n.label,
-    activation: n.activation,
-    type: 'concept' as const,
-    totalActivations: Math.round(n.activation * 10),
-  })) || [];
-
-  const synapses: HebbianSynapse[] = data?.network.strongSynapses.map(s => ({
-    from: s.from,
-    to: s.to,
-    weight: s.weight,
-  })) || [];
+  // 从API数据提取可视化的神经元和突触
+  const vizNeurons: VizNeuron[] = data?.network?.visualization?.neurons || [];
+  const vizSynapses: VizSynapse[] = data?.network?.visualization?.synapses || [];
 
   if (loading) {
     return (
@@ -464,11 +432,11 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
           </TabsList>
 
           <TabsContent value="network" className="mt-2">
-            {neurons.length > 0 ? (
+            {vizNeurons.length > 0 ? (
               <div className="space-y-2">
                 <NetworkCanvas
-                  neurons={neurons}
-                  synapses={synapses}
+                  neurons={vizNeurons}
+                  synapses={vizSynapses}
                   width={280}
                   height={200}
                   onNodeClick={setSelectedNeuron}
@@ -477,11 +445,15 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
                 {selectedNeuron && (
                   <div className="text-xs p-2 bg-muted rounded-md">
                     <div className="font-medium">{selectedNeuron.label}</div>
-                    <div className="text-muted-foreground">
-                      激活度: {(selectedNeuron.activation * 100).toFixed(0)}%
+                    <div className="text-muted-foreground flex gap-3">
+                      <span>激活: {(selectedNeuron.activation * 100).toFixed(0)}%</span>
+                      <span>类型: {selectedNeuron.type}</span>
                     </div>
                   </div>
                 )}
+                <div className="text-xs text-muted-foreground text-center">
+                  共 {stats?.totalNeurons || 0} 个神经元, {stats?.totalSynapses || 0} 个突触
+                </div>
               </div>
             ) : (
               <div className="text-center text-muted-foreground py-8 text-sm">
@@ -528,14 +500,13 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
                   </div>
                 </div>
 
-                {/* 神经元类型分布 */}
                 {stats?.neuronsByType && Object.keys(stats.neuronsByType).length > 0 && (
                   <div className="space-y-1.5">
                     <div className="text-xs font-medium">类型分布</div>
                     {Object.entries(stats.neuronsByType).map(([type, count]) => (
                       <div key={type} className="flex justify-between items-center">
                         <Badge variant="outline" className="text-xs"
-                          style={{ borderColor: NEURON_TYPE_COLORS[type] || NEURON_TYPE_COLORS.default }}>
+                          style={{ borderColor: NEURON_TYPE_COLORS[type] || '#6b7280' }}>
                           {type}
                         </Badge>
                         <span>{count}</span>
@@ -550,42 +521,27 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
           <TabsContent value="activity" className="mt-2">
             <ScrollArea className="h-[220px]">
               <div className="space-y-2">
-                {stats?.highlyActiveNeurons && stats.highlyActiveNeurons.length > 0 ? (
-                  stats.highlyActiveNeurons.map((neuron, i) => (
-                    <div
-                      key={neuron.id + i}
-                      className="flex items-center justify-between p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-muted transition-colors"
-                      onClick={() => setSelectedNeuron({
-                        id: neuron.id,
-                        label: neuron.label,
-                        activation: neuron.activation,
-                        type: 'concept',
-                        totalActivations: 0,
-                      })}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: NEURON_TYPE_COLORS.concept }}
-                        />
-                        <span className="truncate text-sm">{neuron.label}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${neuron.activation * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-10 text-right">
-                          {(neuron.activation * 100).toFixed(0)}%
+                {stats?.strongSynapses && stats.strongSynapses.length > 0 ? (
+                  stats.strongSynapses.slice(0, 15).map((synapse, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-xs">
+                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                        <span className="truncate">{synapse.from}</span>
+                        <span className={synapse.weight > 0 ? 'text-green-500' : 'text-red-500'}>
+                          {synapse.weight > 0 ? '→' : '⊣'}
                         </span>
+                        <span className="truncate">{synapse.to}</span>
                       </div>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs shrink-0 ${synapse.weight > 0 ? 'border-green-500 text-green-600' : 'border-red-500 text-red-600'}`}
+                      >
+                        {synapse.weight.toFixed(2)}
+                      </Badge>
                     </div>
                   ))
                 ) : (
                   <div className="text-center text-muted-foreground py-8 text-sm">
-                    暂无高激活神经元
+                    暂无强连接数据
                   </div>
                 )}
               </div>

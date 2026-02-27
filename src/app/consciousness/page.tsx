@@ -13,7 +13,7 @@ import {
   ConsciousnessDashboard, 
   ConsciousnessVisualizationData 
 } from '@/components/visualization/consciousness-dashboard';
-import { VisualizationPanel } from '@/components/visualization/visualization-panel';
+import { DraggableVisualizationPanel } from '@/components/visualization/visualization-panel';
 import { ConsciousnessSidebar } from '@/components/neuron/consciousness-sidebar';
 import { DanmakuContainer, DanmakuMessage } from '@/components/neuron/danmaku';
 import { DraggablePanel } from '@/components/neuron/draggable-panel';
@@ -1675,16 +1675,12 @@ export default function ConsciousnessPage() {
       
       {/* 神经网络和记忆图谱可视化悬浮窗口 */}
       {showNeuralViz && (
-        <DraggablePanel
-          title="神经网络与记忆"
-          icon={<span className="text-lg">🔮</span>}
+        <DraggableVisualizationPanel
           onClose={() => setShowNeuralViz(false)}
           defaultPosition={{ x: 50, y: 100 }}
           defaultSize={{ width: 360, height: 450 }}
           className="md:!right-4 md:!top-20 md:!w-[380px] md:!h-[520px]"
-        >
-          <VisualizationPanel onClose={() => setShowNeuralViz(false)} />
-        </DraggablePanel>
+        />
       )}
     </div>
   );

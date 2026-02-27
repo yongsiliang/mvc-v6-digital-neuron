@@ -6,60 +6,58 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MemoryStick, Network, Sparkles, Clock, Tag, RefreshCw, Search, TrendingUp } from 'lucide-react';
+import { MemoryStick, RefreshCw, Search, User, MessageSquare, Brain } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
 // ─────────────────────────────────────────────────────────────────────
 
-interface MemoryNode {
+interface VizMemoryNode {
   id: string;
   label: string;
   content: string;
   type: 'core' | 'consolidated' | 'episodic';
   importance: number;
-  accessCount: number;
-  lastAccessed: number;
-  createdAt: number;
   tags: string[];
-  connections: string[];
 }
 
-interface MemoryStats {
-  core: {
-    relationshipCount: number;
-    lastUpdated: number;
+interface VizMemoryEdge {
+  id: string;
+  source: string;
+  target: string;
+  strength: number;
+}
+
+interface MemoryVisualizationData {
+  nodes: VizMemoryNode[];
+  edges: VizMemoryEdge[];
+  stats: {
+    totalNodes: number;
+    totalEdges: number;
+    coreCount: number;
+    consolidatedCount: number;
+    episodicCount: number;
   };
-  consolidated: number;
-  episodic: number;
 }
 
 interface MemoryStatusData {
   success: boolean;
-  fullState?: {
-    layeredMemory?: MemoryStats;
-    conversationHistory?: Array<{
-      role: string;
-      content: string;
-      timestamp?: number;
-    }>;
+  identity: {
+    name: string;
+    whoAmI: string;
+    traits: Array<{ name: string; strength: number }>;
   };
-  memoryState?: {
-    nodes: Array<{
-      label: string;
-      content: string;
-      type: string;
-      importance: number;
-      accessCount: number;
-      tags: string[];
-    }>;
-    experiences: Array<{
-      content: string;
-      emotion: string;
-      importance: number;
-      timestamp: number;
-    }>;
+  layeredMemory: {
+    stats: {
+      core: { hasCreator: boolean; relationshipCount: number };
+      consolidated: number;
+      episodic: number;
+    };
+    coreMemories: Array<{ key: string; value: string }>;
+    consolidatedCount: number;
+    episodicCount: number;
   };
+  visualization: MemoryVisualizationData;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -67,9 +65,9 @@ interface MemoryStatusData {
 // ─────────────────────────────────────────────────────────────────────
 
 const MEMORY_TYPE_COLORS = {
-  core: '#f59e0b',      // 琥珀色 - 核心记忆
+  core: '#f59e0b',       // 琥珀色 - 核心记忆
   consolidated: '#3b82f6', // 蓝色 - 巩固记忆
-  episodic: '#10b981',  // 绿色 - 情景记忆
+  episodic: '#10b981',   // 绿色 - 情景记忆
 };
 
 const MEMORY_TYPE_LABELS = {
@@ -83,18 +81,20 @@ const MEMORY_TYPE_LABELS = {
 // ─────────────────────────────────────────────────────────────────────
 
 interface MemoryGraphCanvasProps {
-  nodes: MemoryNode[];
+  nodes: VizMemoryNode[];
+  edges: VizMemoryEdge[];
   width: number;
   height: number;
-  onNodeClick?: (node: MemoryNode) => void;
+  onNodeClick?: (node: VizMemoryNode) => void;
   highlightedId?: string | null;
 }
 
-function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }: MemoryGraphCanvasProps) {
+function MemoryGraphCanvas({ nodes, edges, width, height, onNodeClick, highlightedId }: MemoryGraphCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
-  const nodesRef = useRef<Array<MemoryNode & { x: number; y: number; vx: number; vy: number; radius: number }>>([]);
-  const [hoveredNode, setHoveredNode] = useState<MemoryNode | null>(null);
+  const nodesRef = useRef<Array<VizMemoryNode & { x: number; y: number; vx: number; vy: number; radius: number }>>([]);
+  const [hoveredNode, setHoveredNode] = useState<VizMemoryNode | null>(null);
+  const initializedRef = useRef(false);
 
   // 初始化节点位置
   const initializeNodes = useCallback(() => {
@@ -114,25 +114,30 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
 
       // 核心记忆在中心，其他类型在外围
       if (node.type === 'core') {
-        angle = (coreNodes.indexOf(node) / coreNodes.length) * Math.PI * 2 - Math.PI / 2;
-        radius = Math.min(width, height) * 0.15;
+        const idx = coreNodes.indexOf(node);
+        angle = (idx / Math.max(coreNodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+        radius = Math.min(width, height) * 0.12;
       } else if (node.type === 'consolidated') {
-        angle = (consolidatedNodes.indexOf(node) / consolidatedNodes.length) * Math.PI * 2;
-        radius = Math.min(width, height) * 0.28;
+        const idx = consolidatedNodes.indexOf(node);
+        angle = (idx / Math.max(consolidatedNodes.length, 1)) * Math.PI * 2;
+        radius = Math.min(width, height) * 0.25;
       } else {
-        angle = (episodicNodes.indexOf(node) / episodicNodes.length) * Math.PI * 2 + Math.PI / 4;
+        const idx = episodicNodes.indexOf(node);
+        angle = (idx / Math.max(episodicNodes.length, 1)) * Math.PI * 2 + Math.PI / 4;
         radius = Math.min(width, height) * 0.38;
       }
 
       return {
         ...node,
-        x: centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 20,
-        y: centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 20,
+        x: centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 15,
+        y: centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 15,
         vx: 0,
         vy: 0,
-        radius: node.type === 'core' ? 18 : 14 + node.importance * 6,
+        radius: node.type === 'core' ? 16 : 12 + node.importance * 4,
       };
     });
+    
+    initializedRef.current = true;
   }, [nodes, width, height]);
 
   // 力导向布局
@@ -149,7 +154,7 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
         const dx = canvasNodes[j].x - canvasNodes[i].x;
         const dy = canvasNodes[j].y - canvasNodes[i].y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = 600 / (dist * dist);
+        const force = 400 / (dist * dist);
 
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
@@ -162,51 +167,47 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
     }
 
     // 连接引力
-    for (const node of canvasNodes) {
-      for (const connId of node.connections) {
-        const target = canvasNodes.find(n => n.id === connId);
-        if (target) {
-          const dx = target.x - node.x;
-          const dy = target.y - node.y;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const force = (dist - 60) * 0.003;
+    for (const edge of edges) {
+      const source = canvasNodes.find(n => n.id === edge.source);
+      const target = canvasNodes.find(n => n.id === edge.target);
 
-          node.vx += (dx / dist) * force;
-          node.vy += (dy / dist) * force;
-        }
+      if (source && target) {
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const force = (dist - 50) * 0.002 * edge.strength;
+
+        source.vx += (dx / dist) * force;
+        source.vy += (dy / dist) * force;
+        target.vx -= (dx / dist) * force;
+        target.vy -= (dy / dist) * force;
       }
     }
 
-    // 类型分层约束（核心记忆向心，情景记忆离心）
+    // 类型分层约束
+    const padding = 20;
     for (const node of canvasNodes) {
       const dx = centerX - node.x;
       const dy = centerY - node.y;
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
-      let centerForce = 0.0005;
-      if (node.type === 'core') {
-        centerForce = 0.002;
-      } else if (node.type === 'episodic') {
-        centerForce = -0.0003;
-      }
+      let centerForce = 0.0003;
+      if (node.type === 'core') centerForce = 0.001;
+      else if (node.type === 'episodic') centerForce = -0.0002;
 
       node.vx += (dx / dist) * centerForce * dist;
       node.vy += (dy / dist) * centerForce * dist;
 
-      // 阻尼
-      node.vx *= 0.9;
-      node.vy *= 0.9;
+      node.vx *= 0.88;
+      node.vy *= 0.88;
 
-      // 更新位置
       node.x += node.vx;
       node.y += node.vy;
 
-      // 边界约束
-      const padding = 25;
       node.x = Math.max(padding, Math.min(width - padding, node.x));
       node.y = Math.max(padding, Math.min(height - padding, node.y));
     }
-  }, [width, height]);
+  }, [edges, width, height]);
 
   // 绘制
   const draw = useCallback(() => {
@@ -218,40 +219,39 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
 
     const canvasNodes = nodesRef.current;
 
-    // 清空画布
     ctx.clearRect(0, 0, width, height);
 
-    // 背景渐变
+    // 背景
     const bgGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 2);
-    bgGradient.addColorStop(0, 'rgba(245, 158, 11, 0.05)');
+    bgGradient.addColorStop(0, 'rgba(245, 158, 11, 0.06)');
     bgGradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.03)');
     bgGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // 绘制连接线
-    for (const node of canvasNodes) {
-      for (const connId of node.connections) {
-        const target = canvasNodes.find(n => n.id === connId);
-        if (target) {
-          ctx.beginPath();
-          ctx.moveTo(node.x, node.y);
-          ctx.lineTo(target.x, target.y);
-          ctx.strokeStyle = 'rgba(156, 163, 175, 0.2)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
+    // 绘制边
+    for (const edge of edges) {
+      const source = canvasNodes.find(n => n.id === edge.source);
+      const target = canvasNodes.find(n => n.id === edge.target);
+
+      if (source && target) {
+        ctx.beginPath();
+        ctx.moveTo(source.x, source.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.strokeStyle = `rgba(156, 163, 175, ${0.2 + edge.strength * 0.3})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
     }
 
     // 绘制节点
     for (const node of canvasNodes) {
       const color = MEMORY_TYPE_COLORS[node.type];
-      const radius = node.radius;
+      const radius = Math.max(node.radius, 8);
       const isHighlighted = highlightedId === node.id;
       const isHovered = hoveredNode?.id === node.id;
 
-      // 光晕效果
+      // 光晕
       const glowRadius = radius * (isHighlighted || isHovered ? 2.5 : 2);
       const glowGradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, glowRadius);
       glowGradient.addColorStop(0, color + '40');
@@ -267,25 +267,24 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
         node.x, node.y, radius
       );
       nodeGradient.addColorStop(0, color);
-      nodeGradient.addColorStop(1, color + 'aa');
+      nodeGradient.addColorStop(1, color + 'bb');
 
       ctx.beginPath();
       ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
       ctx.fillStyle = nodeGradient;
       ctx.fill();
 
-      // 边框
       ctx.strokeStyle = isHighlighted ? '#ffffff' : color;
-      ctx.lineWidth = isHighlighted ? 3 : 2;
+      ctx.lineWidth = isHighlighted ? 3 : 1.5;
       ctx.stroke();
 
       // 核心记忆标记
       if (node.type === 'core') {
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius + 4, 0, Math.PI * 2);
-        ctx.strokeStyle = color + '60';
+        ctx.strokeStyle = color + '50';
         ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
+        ctx.setLineDash([2, 2]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -293,41 +292,40 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
       // 标签
       if (node.type === 'core' || isHovered || isHighlighted) {
         ctx.font = 'bold 10px system-ui';
+        const labelWidth = ctx.measureText(node.label).width + 8;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(node.x - labelWidth / 2, node.y + radius + 3, labelWidth, 13);
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
-        const labelWidth = ctx.measureText(node.label).width + 8;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(node.x - labelWidth / 2, node.y + radius + 4, labelWidth, 14);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(node.label, node.x, node.y + radius + 11);
+        ctx.fillText(node.label, node.x, node.y + radius + 10);
       }
     }
 
     // 图例
-    const legendY = 15;
-    let legendX = 15;
-    ctx.font = '10px system-ui';
+    const legendY = 12;
+    let legendX = 10;
+    ctx.font = '9px system-ui';
 
     for (const [type, color] of Object.entries(MEMORY_TYPE_COLORS)) {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(legendX, legendY, 5, 0, Math.PI * 2);
+      ctx.arc(legendX, legendY, 4, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#9ca3af';
       ctx.textAlign = 'left';
-      ctx.fillText(MEMORY_TYPE_LABELS[type as keyof typeof MEMORY_TYPE_LABELS], legendX + 8, legendY + 3);
+      ctx.fillText(MEMORY_TYPE_LABELS[type as keyof typeof MEMORY_TYPE_LABELS], legendX + 6, legendY + 3);
 
-      legendX += 75;
+      legendX += 68;
     }
-  }, [width, height, highlightedId, hoveredNode]);
+  }, [edges, width, height, highlightedId, hoveredNode]);
 
   // 动画循环
   useEffect(() => {
-    initializeNodes();
+    if (!initializedRef.current) {
+      initializeNodes();
+    }
 
     const animate = () => {
       applyForces();
@@ -339,6 +337,11 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
     return () => cancelAnimationFrame(animationRef.current);
   }, [initializeNodes, applyForces, draw]);
 
+  useEffect(() => {
+    initializedRef.current = false;
+    initializeNodes();
+  }, [nodes, initializeNodes]);
+
   // 鼠标交互
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -349,7 +352,7 @@ function MemoryGraphCanvas({ nodes, width, height, onNodeClick, highlightedId }:
     const y = e.clientY - rect.top;
 
     const canvasNodes = nodesRef.current;
-    let found: MemoryNode | null = null;
+    let found: VizMemoryNode | null = null;
 
     for (const node of canvasNodes) {
       const dist = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
@@ -393,7 +396,7 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
   const [data, setData] = useState<MemoryStatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMemory, setSelectedMemory] = useState<MemoryNode | null>(null);
+  const [selectedMemory, setSelectedMemory] = useState<VizMemoryNode | null>(null);
   const [activeTab, setActiveTab] = useState<'graph' | 'list' | 'stats'>('graph');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -419,60 +422,13 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
 
   useEffect(() => {
     fetchData();
-    // 每 30 秒刷新一次
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // 转换为可视化节点数据
-  const memoryNodes: MemoryNode[] = [];
-
-  // 从 memoryState.nodes 提取
-  if (data?.memoryState?.nodes) {
-    data.memoryState.nodes.forEach((node, i) => {
-      memoryNodes.push({
-        id: `node-${i}`,
-        label: node.label,
-        content: node.content,
-        type: node.importance > 0.8 ? 'core' : node.importance > 0.5 ? 'consolidated' : 'episodic',
-        importance: node.importance,
-        accessCount: node.accessCount,
-        lastAccessed: Date.now(),
-        createdAt: Date.now() - i * 10000,
-        tags: node.tags || [],
-        connections: [],
-      });
-    });
-  }
-
-  // 从 memoryState.experiences 提取
-  if (data?.memoryState?.experiences) {
-    data.memoryState.experiences.forEach((exp, i) => {
-      memoryNodes.push({
-        id: `exp-${i}`,
-        label: exp.content.slice(0, 20) + (exp.content.length > 20 ? '...' : ''),
-        content: exp.content,
-        type: 'episodic',
-        importance: exp.importance,
-        accessCount: 1,
-        lastAccessed: exp.timestamp,
-        createdAt: exp.timestamp,
-        tags: [exp.emotion],
-        connections: [],
-      });
-    });
-  }
-
-  // 统计信息
-  const stats = {
-    core: memoryNodes.filter(n => n.type === 'core').length,
-    consolidated: memoryNodes.filter(n => n.type === 'consolidated').length,
-    episodic: memoryNodes.filter(n => n.type === 'episodic').length,
-    total: memoryNodes.length,
-    avgImportance: memoryNodes.length > 0
-      ? memoryNodes.reduce((sum, n) => sum + n.importance, 0) / memoryNodes.length
-      : 0,
-  };
+  // 从API数据提取
+  const memoryNodes: VizMemoryNode[] = data?.visualization?.nodes || [];
+  const memoryEdges: VizMemoryEdge[] = data?.visualization?.edges || [];
 
   // 过滤记忆
   const filteredNodes = searchQuery
@@ -511,6 +467,14 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
     );
   }
 
+  const vizStats = data?.visualization?.stats || {
+    totalNodes: 0,
+    totalEdges: 0,
+    coreCount: 0,
+    consolidatedCount: 0,
+    episodicCount: 0,
+  };
+
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
@@ -537,8 +501,9 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
               <div className="space-y-2">
                 <MemoryGraphCanvas
                   nodes={memoryNodes}
+                  edges={memoryEdges}
                   width={280}
-                  height={200}
+                  height={180}
                   onNodeClick={setSelectedMemory}
                   highlightedId={selectedMemory?.id}
                 />
@@ -579,7 +544,6 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
 
           <TabsContent value="list" className="mt-2">
             <div className="space-y-2">
-              {/* 搜索框 */}
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <input
@@ -591,7 +555,7 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
                 />
               </div>
 
-              <ScrollArea className="h-[190px]">
+              <ScrollArea className="h-[170px]">
                 <div className="space-y-1.5">
                   {filteredNodes.length > 0 ? (
                     filteredNodes.map((node) => (
@@ -607,7 +571,7 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
                         <div className="flex-1 min-w-0">
                           <div className="text-sm truncate">{node.label}</div>
                           <div className="text-xs text-muted-foreground truncate">
-                            {node.content.slice(0, 40)}...
+                            {node.content.slice(0, 35)}...
                           </div>
                         </div>
                         <Badge variant="outline" className="text-[10px] shrink-0">
@@ -631,49 +595,64 @@ export function MemoryGraphVisualization({ className }: MemoryGraphVisualization
                 <div className="bg-muted/50 rounded-md p-2 text-center">
                   <div className="text-xs text-muted-foreground">核心</div>
                   <div className="font-bold text-lg" style={{ color: MEMORY_TYPE_COLORS.core }}>
-                    {stats.core}
+                    {vizStats.coreCount}
                   </div>
                 </div>
                 <div className="bg-muted/50 rounded-md p-2 text-center">
                   <div className="text-xs text-muted-foreground">巩固</div>
                   <div className="font-bold text-lg" style={{ color: MEMORY_TYPE_COLORS.consolidated }}>
-                    {stats.consolidated}
+                    {vizStats.consolidatedCount}
                   </div>
                 </div>
                 <div className="bg-muted/50 rounded-md p-2 text-center">
                   <div className="text-xs text-muted-foreground">情景</div>
                   <div className="font-bold text-lg" style={{ color: MEMORY_TYPE_COLORS.episodic }}>
-                    {stats.episodic}
+                    {vizStats.episodicCount}
                   </div>
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">总记忆数</span>
-                  <span className="font-medium">{stats.total}</span>
+                  <span className="text-muted-foreground">总记忆节点</span>
+                  <span className="font-medium">{vizStats.totalNodes}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">平均重要性</span>
-                  <span className="font-medium">{(stats.avgImportance * 100).toFixed(1)}%</span>
+                  <span className="text-muted-foreground">记忆连接</span>
+                  <span className="font-medium">{vizStats.totalEdges}</span>
                 </div>
               </div>
 
-              {/* 分层记忆状态 */}
-              {data?.fullState?.layeredMemory && (
+              {data?.layeredMemory && (
                 <div className="space-y-1.5 pt-2 border-t">
                   <div className="text-xs font-medium">分层记忆系统</div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">核心关系</span>
-                    <span className="font-medium">{data.fullState.layeredMemory.core?.relationshipCount || 0}</span>
+                    <span className="font-medium">{data.layeredMemory.stats?.core?.relationshipCount || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">巩固记忆</span>
-                    <span className="font-medium">{data.fullState.layeredMemory.consolidated || 0}</span>
+                    <span className="font-medium">{data.layeredMemory.consolidatedCount || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">情景记忆</span>
-                    <span className="font-medium">{data.fullState.layeredMemory.episodic || 0}</span>
+                    <span className="font-medium">{data.layeredMemory.episodicCount || 0}</span>
+                  </div>
+                </div>
+              )}
+
+              {data?.identity && (
+                <div className="space-y-1.5 pt-2 border-t">
+                  <div className="text-xs font-medium flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    身份特质
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {data.identity.traits.slice(0, 6).map((trait, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {trait.name} ({(trait.strength * 100).toFixed(0)}%)
+                      </Badge>
+                    ))}
                   </div>
                 </div>
               )}
