@@ -734,7 +734,13 @@ export class SelfConsciousness {
     metacognitiveState?: MetacognitiveState;
   }): void {
     if (state.identity) {
-      this.identity = state.identity;
+      this.identity = {
+        ...state.identity,
+        // 确保 createdAt 是 Date 对象
+        createdAt: state.identity.createdAt instanceof Date 
+          ? state.identity.createdAt 
+          : new Date(state.identity.createdAt || Date.now()),
+      };
     }
     if (state.reflections) {
       this.reflections = state.reflections;

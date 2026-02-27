@@ -9,33 +9,8 @@
  */
 
 import { NextRequest } from 'next/server';
-import { HeaderUtils, Config } from 'coze-coding-dev-sdk';
-import { 
-  ConsciousnessCore,
-  createConsciousnessCore,
-  PersistenceManagerV6,
-} from '@/lib/neuron-v6/consciousness-core';
-
-// 单例引用
-let consciousnessCore: ConsciousnessCore | null = null;
-
-async function getCore(headers: Record<string, string>): Promise<ConsciousnessCore> {
-  if (!consciousnessCore) {
-    const { LLMClient } = await import('coze-coding-dev-sdk');
-    const config = new Config();
-    const llmClient = new LLMClient(config, headers);
-    consciousnessCore = createConsciousnessCore(llmClient);
-    
-    const hasState = await PersistenceManagerV6.exists();
-    if (hasState) {
-      const state = await PersistenceManagerV6.load();
-      if (state) {
-        await consciousnessCore.restoreFromState(state);
-      }
-    }
-  }
-  return consciousnessCore;
-}
+import { HeaderUtils } from 'coze-coding-dev-sdk';
+import { getSharedCore } from '@/lib/neuron-v6/shared-core';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +18,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action } = body;
     
-    const core = await getCore(headers);
+    const core = await getSharedCore(headers);
     
     if (action === 'check') {
       // 检查是否有主动消息
@@ -81,7 +56,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const headers = HeaderUtils.extractForwardHeaders(request.headers);
-    const core = await getCore(headers);
+    const core = await getSharedCore(headers);
     
     // GET请求默认检查主动消息
     const message = await core.checkProactiveMessage();
