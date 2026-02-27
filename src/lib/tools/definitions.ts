@@ -251,6 +251,22 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     ],
     examples: ['运行 git status', '执行 npm install'],
   },
+  {
+    name: 'sys_notify',
+    displayName: '系统通知',
+    description: '发送系统桌面通知。',
+    category: 'system',
+    dangerLevel: 'safe',
+    requiresConfirmation: false,
+    timeout: 5000,
+    icon: '🔔',
+    parameters: [
+      { name: 'title', type: 'string', description: '通知标题', required: true },
+      { name: 'message', type: 'string', description: '通知内容', required: true },
+      { name: 'sound', type: 'boolean', description: '是否播放声音', required: false, default: true },
+    ],
+    examples: ['发送提醒通知', '任务完成通知'],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────
@@ -310,6 +326,21 @@ export const CODE_TOOLS: ToolDefinition[] = [
 // ─────────────────────────────────────────────────────────────────────
 
 export const WEB_TOOLS: ToolDefinition[] = [
+  {
+    name: 'web_open',
+    displayName: '打开网页',
+    description: '在默认浏览器中打开指定网页。',
+    category: 'web',
+    dangerLevel: 'safe',
+    requiresConfirmation: false,
+    timeout: 10000,
+    icon: '🌐',
+    parameters: [
+      { name: 'url', type: 'url', description: '网页URL', required: true },
+      { name: 'browser', type: 'string', description: '指定浏览器（可选）', required: false },
+    ],
+    examples: ['打开百度', '打开GitHub'],
+  },
   {
     name: 'web_fetch',
     displayName: '获取网页',

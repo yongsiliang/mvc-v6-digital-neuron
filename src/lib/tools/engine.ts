@@ -25,6 +25,7 @@ import { createFilesystemExecutor } from './executors/filesystem';
 import { createSystemExecutor } from './executors/system';
 import { createCodeExecutor } from './executors/code';
 import { createWebExecutor } from './executors/web';
+import { createLocalExecutor } from './executors/local';
 
 // ─────────────────────────────────────────────────────────────────────
 // 默认安全策略
@@ -133,6 +134,12 @@ export class ToolEngine {
     const webExecutor = createWebExecutor();
     WEB_TOOL_NAMES.forEach(name => {
       this.executors.set(name, webExecutor);
+    });
+
+    // 本地操作执行器（浏览器、应用、自动化、屏幕等）
+    const localExecutor = createLocalExecutor();
+    LOCAL_TOOL_NAMES.forEach(name => {
+      this.executors.set(name, localExecutor);
     });
 
     this.logger(`已注册 ${this.executors.size} 个工具执行器`, 'info');
@@ -527,6 +534,19 @@ const CODE_TOOL_NAMES = [
 
 const WEB_TOOL_NAMES = [
   'web_fetch', 'web_search', 'web_download',
+];
+
+const LOCAL_TOOL_NAMES = [
+  // 浏览器控制
+  'web_open',
+  // 应用控制
+  'app_launch', 'app_list', 'app_window_list', 'app_window_focus',
+  // 自动化
+  'auto_type', 'auto_hotkey', 'auto_click', 'auto_script',
+  // 屏幕操作
+  'screen_capture',
+  // 系统通知
+  'sys_notify',
 ];
 
 // ─────────────────────────────────────────────────────────────────────
