@@ -365,6 +365,58 @@ interface ProactiveMessage {
   urgency: number;
 }
 
+// 可折叠的消息面板组件
+function CollapsibleMessage({ 
+  message, 
+  isProactive 
+}: { 
+  message: Message; 
+  isProactive: boolean;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const content = message.content;
+  const shouldCollapse = isProactive && content.length > 80;
+  const previewContent = shouldCollapse ? content.slice(0, 80) + '...' : content;
+  
+  return (
+    <div
+      className={`rounded-lg p-2 md:p-3 text-sm md:text-base ${
+        message.role === 'user'
+          ? 'bg-primary text-primary-foreground max-w-[70%]'
+          : isProactive
+            ? 'bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-800 max-w-[65%]'
+            : 'bg-muted max-w-[80%]'
+      }`}
+    >
+      {isProactive && (
+        <button 
+          onClick={() => shouldCollapse && setIsExpanded(!isExpanded)}
+          className={`flex items-center gap-1 mb-1 text-xs text-purple-600 dark:text-purple-400 ${shouldCollapse ? 'cursor-pointer hover:text-purple-700 dark:hover:text-purple-300' : ''}`}
+        >
+          <Sparkles className="w-3 h-3" />
+          <span>紫主动分享</span>
+          {shouldCollapse && (
+            <span className="ml-1 text-purple-400">
+              {isExpanded ? '▼' : '▶'}
+            </span>
+          )}
+        </button>
+      )}
+      <div className="whitespace-pre-wrap break-words">
+        {shouldCollapse && !isExpanded ? previewContent : content}
+      </div>
+      {shouldCollapse && !isExpanded && (
+        <button 
+          onClick={() => setIsExpanded(true)}
+          className="mt-1 text-xs text-purple-500 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-300"
+        >
+          点击展开查看完整内容
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 组件
 // ─────────────────────────────────────────────────────────────────────
@@ -1274,23 +1326,7 @@ export default function ConsciousnessPage() {
                       : 'justify-start'
                 }`}
               >
-                <div
-                  className={`rounded-lg p-2 md:p-3 text-sm md:text-base ${
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground max-w-[70%]'
-                      : message.isProactive
-                        ? 'bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-800 max-w-[65%]'
-                        : 'bg-muted max-w-[80%]'
-                  }`}
-                >
-                  {message.isProactive && (
-                    <div className="flex items-center gap-1 mb-1 text-xs text-purple-600 dark:text-purple-400">
-                      <Sparkles className="w-3 h-3" />
-                      <span>紫主动分享</span>
-                    </div>
-                  )}
-                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                </div>
+                <CollapsibleMessage message={message} isProactive={!!message.isProactive} />
               </div>
             ))}
             
