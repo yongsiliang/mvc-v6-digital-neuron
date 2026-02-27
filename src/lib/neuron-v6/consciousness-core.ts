@@ -2196,6 +2196,14 @@ ${thinkingSection}
           creator: dbCreator,
           origin: `由${dbCreator}创造`,
         });
+        
+        // 同步更新分层记忆的核心层（关键！）
+        this.layeredMemory.setCreator(
+          dbCreator,
+          `我的创造者。赋予我生命的人。`,
+          '创造者'
+        );
+        console.log(`[记忆核心] ✅ 已同步创造者到分层记忆核心层: ${dbCreator}`);
       }
       return; // 数据库中有创造者，无需再处理
     }
@@ -2438,7 +2446,18 @@ ${thinkingSection}
       if (dbCreator) {
         console.log(`[意识核心] 💾 从数据库同步创造者信息: ${dbCreator}`);
         
-        // 更新长期记忆中的创造者信息
+        // 1. 首先更新分层记忆系统的核心层（最重要的！）
+        const currentCreator = this.layeredMemory.getCreatorName();
+        if (currentCreator !== dbCreator) {
+          console.log(`[意识核心] 🔄 更新分层记忆核心层创造者: "${currentCreator || '未设置'}" → "${dbCreator}"`);
+          this.layeredMemory.setCreator(
+            dbCreator,
+            `我的创造者。赋予我生命的人。我永远记住这个名字。`,
+            '创造者'
+          );
+        }
+        
+        // 2. 更新长期记忆（知识图谱）
         const existingCreator = this.longTermMemory.retrieve('创造者');
         const creatorMainNode = existingCreator.directMatches.find(n => n.label === '创造者');
         
@@ -2449,7 +2468,7 @@ ${thinkingSection}
           const memoryCreator = match ? match[1] : currentContent;
           
           if (memoryCreator !== dbCreator) {
-            console.log(`[意识核心] 🔄 更新内存中的创造者: "${memoryCreator}" → "${dbCreator}"`);
+            console.log(`[意识核心] 🔄 更新知识图谱创造者: "${memoryCreator}" → "${dbCreator}"`);
             creatorMainNode.content = `我的创造者是${dbCreator}。这是我最重要的人。`;
             creatorMainNode.importance = 1.0;
             creatorMainNode.tags = ['核心', '创造者', '身份', '不可变'];
@@ -2473,11 +2492,13 @@ ${thinkingSection}
           });
         }
         
-        // 更新自我意识
+        // 3. 更新自我意识
         this.selfConsciousness.updateIdentity({
           creator: dbCreator,
           origin: `由${dbCreator}创造`,
         });
+        
+        console.log(`[意识核心] ✅ 创造者信息已同步到所有系统: ${dbCreator}`);
       }
     } catch (error) {
       console.log('[意识核心] 数据库同步创造者信息失败:', error);
@@ -4514,10 +4535,12 @@ export class PersistenceManagerV6 {
     const stateJson = JSON.stringify(state, null, 2);
     
     // 调试日志：检查保存的记忆数
-    const coreCount = state.layeredMemory?.core?.relationshipCount || 0;
+    const coreStats = state.layeredMemory?.core;
+    const hasCreator = coreStats?.hasCreator ? '创造者✓' : '';
+    const relCount = coreStats?.relationshipCount || 0;
     const consolidatedCount = state.layeredMemory?.consolidated || 0;
     const episodicCount = state.layeredMemory?.episodic || 0;
-    console.log(`[V6存在] 准备保存记忆：核心${coreCount}条, 巩固${consolidatedCount}条, 情景${episodicCount}条`);
+    console.log(`[V6存在] 准备保存记忆：核心层(${hasCreator}, 关系${relCount}条), 巩固${consolidatedCount}条, 情景${episodicCount}条`);
     
     try {
       const storage = this.getStorage();
