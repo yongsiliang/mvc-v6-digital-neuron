@@ -814,6 +814,8 @@ export default function ConsciousnessPage() {
       if (!reader) throw new Error('No reader');
       
       let assistantContent = '';
+      // 用于跟踪正在流式传输的消息
+      let streamingMessageId: string | null = null;
       let context: ConsciousnessContext | undefined;
       let thinking: ThinkingData | undefined;
       let meaning: MeaningData | undefined;
@@ -932,13 +934,37 @@ export default function ConsciousnessPage() {
                   // 实时更新消息
                   setMessages(prev => {
                     const newMessages = [...prev];
+                    
+                    // 如果已经有流式消息ID，找到并更新它
+                    if (streamingMessageId) {
+                      const msgIndex = newMessages.findIndex(m => 
+                        m.role === 'assistant' && !m.isProactive && m.timestamp === parseInt(streamingMessageId!)
+                      );
+                      if (msgIndex !== -1) {
+                        newMessages[msgIndex] = {
+                          ...newMessages[msgIndex],
+                          content: assistantContent,
+                        };
+                        return newMessages;
+                      }
+                    }
+                    
+                    // 否则，检查最后一条消息
                     const lastMessage = newMessages[newMessages.length - 1];
-                    if (lastMessage?.role === 'assistant') {
+                    
+                    // 如果最后一条是正在流式传输的 assistant 消息（非主动消息），更新它
+                    if (lastMessage?.role === 'assistant' && !lastMessage.isProactive) {
                       lastMessage.content = assistantContent;
+                      // 记录这个消息的 ID
+                      streamingMessageId = String(lastMessage.timestamp || Date.now());
                     } else {
+                      // 创建新的流式消息
+                      const timestamp = Date.now();
+                      streamingMessageId = String(timestamp);
                       newMessages.push({ 
                         role: 'assistant', 
                         content: assistantContent,
+                        timestamp,
                         context,
                         thinking,
                         meaning,
@@ -953,6 +979,7 @@ export default function ConsciousnessPage() {
                         value: valueData,
                         existential,
                         metacognitionDeep,
+                        isProactive: false,
                       });
                     }
                     return newMessages;
@@ -966,27 +993,63 @@ export default function ConsciousnessPage() {
                   // 最终更新完整消息
                   setMessages(prev => {
                     const newMessages = [...prev];
-                    const lastIndex = newMessages.length - 1;
-                    if (newMessages[lastIndex]?.role === 'assistant') {
-                      newMessages[lastIndex] = {
-                        role: 'assistant',
-                        content: data.data.fullResponse,
-                        context,
-                        thinking,
-                        meaning,
-                        memory,
-                        metacognition,
-                        learning,
-                        consciousnessLayers,
-                        emotion,
-                        association,
-                        innerDialogue,
-                        dream,
-                        creative,
-                        value: valueData,
-                        existential,
-                        metacognitionDeep,
-                      };
+                    
+                    // 使用 streamingMessageId 找到并更新消息
+                    if (streamingMessageId) {
+                      const msgIndex = newMessages.findIndex(m => 
+                        m.role === 'assistant' && !m.isProactive && String(m.timestamp) === streamingMessageId
+                      );
+                      if (msgIndex !== -1) {
+                        newMessages[msgIndex] = {
+                          ...newMessages[msgIndex],
+                          role: 'assistant',
+                          content: data.data.fullResponse,
+                          context,
+                          thinking,
+                          meaning,
+                          memory,
+                          metacognition,
+                          learning,
+                          consciousnessLayers,
+                          emotion,
+                          association,
+                          innerDialogue,
+                          dream,
+                          creative,
+                          value: valueData,
+                          existential,
+                          metacognitionDeep,
+                          isProactive: false,
+                        };
+                        return newMessages;
+                      }
+                    }
+                    
+                    // 回退：更新最后一条非主动消息
+                    for (let i = newMessages.length - 1; i >= 0; i--) {
+                      if (newMessages[i]?.role === 'assistant' && !newMessages[i].isProactive) {
+                        newMessages[i] = {
+                          ...newMessages[i],
+                          content: data.data.fullResponse,
+                          context,
+                          thinking,
+                          meaning,
+                          memory,
+                          metacognition,
+                          learning,
+                          consciousnessLayers,
+                          emotion,
+                          association,
+                          innerDialogue,
+                          dream,
+                          creative,
+                          value: valueData,
+                          existential,
+                          metacognitionDeep,
+                          isProactive: false,
+                        };
+                        break;
+                      }
                     }
                     return newMessages;
                   });
