@@ -238,6 +238,11 @@ export interface MemoryRetrieval {
  * 长期记忆管理器
  */
 export class LongTermMemory {
+  // 节点数量上限
+  private static readonly MAX_NODES = 300;
+  // 核心节点标签（不会被清理）
+  private static readonly PROTECTED_TAGS = ['核心', '创造者', '不可变', '身份'];
+  
   private nodes: Map<string, KnowledgeNode> = new Map();
   private links: Map<string, KnowledgeLink> = new Map();
   private experiences: Experience[] = [];
@@ -310,7 +315,111 @@ export class LongTermMemory {
     // 更新索引
     this.indexNode(fullNode);
     
+    // 检查是否需要清理低重要性节点
+    this.maintainNodeLimit();
+    
     return fullNode;
+  }
+  
+  /**
+   * 维护节点数量上限
+   * 清理低重要性、长时间未访问的非保护节点
+   */
+  private maintainNodeLimit(): void {
+    if (this.nodes.size <= LongTermMemory.MAX_NODES) {
+      return;
+    }
+    
+    const excessCount = this.nodes.size - LongTermMemory.MAX_NODES;
+    
+    // 筛选可清理的节点（排除受保护的核心节点）
+    const cleanableNodes = Array.from(this.nodes.values())
+      .filter(node => !this.isProtectedNode(node));
+    
+    if (cleanableNodes.length === 0) {
+      console.log(`[长期记忆] 节点数 ${this.nodes.size} 超限，但无可用清理节点`);
+      return;
+    }
+    
+    // 按重要性 + 访问新鲜度排序，优先清理低价值的
+    const now = Date.now();
+    const scoredNodes = cleanableNodes.map(node => ({
+      node,
+      score: this.calculateNodeValue(node, now),
+    }));
+    
+    scoredNodes.sort((a, b) => a.score - b.score);
+    
+    // 清理最低价值的节点
+    const toRemove = scoredNodes.slice(0, excessCount);
+    
+    console.log(`[长期记忆] 节点数 ${this.nodes.size} 超限，清理 ${toRemove.length} 个低价值节点`);
+    
+    for (const { node } of toRemove) {
+      this.removeNode(node.id);
+    }
+  }
+  
+  /**
+   * 检查节点是否受保护
+   */
+  private isProtectedNode(node: KnowledgeNode): boolean {
+    return node.tags.some(tag => LongTermMemory.PROTECTED_TAGS.includes(tag));
+  }
+  
+  /**
+   * 计算节点价值分数（用于决定清理优先级）
+   * 分数越低越应该清理
+   */
+  private calculateNodeValue(node: KnowledgeNode, now: number): number {
+    // 重要性权重
+    const importanceScore = node.importance;
+    
+    // 访问频率权重
+    const accessScore = Math.min(node.accessCount / 10, 1);
+    
+    // 新鲜度权重（最近访问过的更值钱）
+    const daysSinceAccess = (now - node.lastAccessedAt) / (1000 * 60 * 60 * 24);
+    const freshnessScore = Math.max(0, 1 - daysSinceAccess / 30); // 30天衰减
+    
+    // 综合分数
+    return importanceScore * 0.5 + accessScore * 0.3 + freshnessScore * 0.2;
+  }
+  
+  /**
+   * 移除节点
+   */
+  private removeNode(nodeId: string): void {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+    
+    // 从索引中移除
+    const labelKey = node.label.toLowerCase();
+    const labelIds = this.labelIndex.get(labelKey);
+    if (labelIds) {
+      const idx = labelIds.indexOf(nodeId);
+      if (idx !== -1) labelIds.splice(idx, 1);
+      if (labelIds.length === 0) this.labelIndex.delete(labelKey);
+    }
+    
+    for (const tag of node.tags) {
+      const tagIds = this.tagIndex.get(tag);
+      if (tagIds) {
+        const idx = tagIds.indexOf(nodeId);
+        if (idx !== -1) tagIds.splice(idx, 1);
+        if (tagIds.length === 0) this.tagIndex.delete(tag);
+      }
+    }
+    
+    // 移除相关的连接
+    for (const [linkId, link] of this.links.entries()) {
+      if (link.from === nodeId || link.to === nodeId) {
+        this.links.delete(linkId);
+      }
+    }
+    
+    // 移除节点
+    this.nodes.delete(nodeId);
   }
   
   /**

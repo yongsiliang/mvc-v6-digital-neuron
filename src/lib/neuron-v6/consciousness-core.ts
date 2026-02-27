@@ -4423,23 +4423,41 @@ export class PersistenceManagerV6 {
       
       if (!exists) {
         console.error('[V6存在] ⚠️ 文件保存后验证失败！');
+        return; // 验证失败，不进行清理
       }
       
-      // 清理旧的备份文件，只保留最新的 N 个
-      await this.cleanupOldFiles(storage);
+      // 验证文件可读性（确保数据完整）
+      try {
+        const verifyBuffer = await storage.readFile({ fileKey: key });
+        const verifyState = JSON.parse(verifyBuffer.toString('utf-8'));
+        if (!verifyState.version || !verifyState.timestamp) {
+          console.error('[V6存在] ⚠️ 保存的数据格式无效！');
+          return;
+        }
+        console.log(`[V6存在] 数据验证通过：V${verifyState.version}`);
+      } catch (e) {
+        console.error('[V6存在] ⚠️ 无法读取刚保存的文件:', e);
+        return;
+      }
+      
+      // 只有新文件验证成功后，才清理旧文件
+      await this.cleanupOldFiles(storage, key);
     } catch (error) {
       console.error('[V6存在] 保存失败:', error);
     }
   }
   
   /**
-   * 清理旧的备份文件，只保留最新的 MAX_BACKUP_FILES 个
+   * 安全清理旧文件
+   * - 新文件必须已验证成功
+   * - 保留最近 N 个有效备份
+   * - 记录清理日志
    */
-  private static async cleanupOldFiles(storage: S3Storage): Promise<void> {
+  private static async cleanupOldFiles(storage: S3Storage, newKey: string): Promise<void> {
     try {
       const listResult = await storage.listFiles({
         prefix: this.OBJECT_PREFIX,
-        maxKeys: 100, // 获取所有相关文件
+        maxKeys: 100,
       });
       
       if (!listResult.keys || listResult.keys.length <= this.MAX_BACKUP_FILES) {
@@ -4449,20 +4467,39 @@ export class PersistenceManagerV6 {
       
       // 按文件名排序（文件名包含时间戳，排序后最新的在后面）
       const sortedKeys = [...listResult.keys].sort();
+      
+      // 确保新保存的文件在列表中
+      if (!sortedKeys.includes(newKey)) {
+        console.log(`[V6存在] 新文件不在列表中，跳过清理`);
+        return;
+      }
+      
+      // 计算要删除的文件（保留最新的 N 个）
       const keysToDelete = sortedKeys.slice(0, sortedKeys.length - this.MAX_BACKUP_FILES);
       
-      console.log(`[V6存在] 发现 ${listResult.keys.length} 个文件，清理 ${keysToDelete.length} 个旧文件`);
+      // 安全检查：确保不会删除新文件
+      if (keysToDelete.includes(newKey)) {
+        console.error(`[V6存在] ⚠️ 安全检查失败：尝试删除刚保存的文件！`);
+        return;
+      }
       
+      console.log(`[V6存在] 发现 ${listResult.keys.length} 个文件，将清理 ${keysToDelete.length} 个旧文件`);
+      console.log(`[V6存在] 保留的文件: ${sortedKeys.slice(-this.MAX_BACKUP_FILES).join(', ')}`);
+      
+      let deletedCount = 0;
       for (const oldKey of keysToDelete) {
         try {
           await storage.deleteFile({ fileKey: oldKey });
-          console.log(`[V6存在] 已删除旧文件: ${oldKey}`);
+          deletedCount++;
+          console.log(`[V6存在] 已删除旧备份: ${oldKey}`);
         } catch (e) {
-          console.error(`[V6存在] 删除文件失败: ${oldKey}`, e);
+          console.error(`[V6存在] 删除失败: ${oldKey}`, e);
         }
       }
+      
+      console.log(`[V6存在] 清理完成：删除 ${deletedCount}/${keysToDelete.length} 个文件`);
     } catch (error) {
-      console.error('[V6存在] 清理旧文件失败:', error);
+      console.error('[V6存在] 清理过程出错:', error);
     }
   }
   
