@@ -22,6 +22,11 @@ import {
   useProactiveBehavior,
   ProactiveMessage as ProactiveMsgType
 } from '@/components/neuron/proactive-indicator';
+import { 
+  ThoughtBubble, 
+  ThinkingIndicator,
+  ThoughtItem 
+} from '@/components/neuron/thought-bubble';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -545,6 +550,9 @@ export default function ConsciousnessPage() {
   const [reflectionResult, setReflectionResult] = useState<ReflectionResult | null>(null);
   const [selfQuestions, setSelfQuestions] = useState<SelfQuestion[]>([]);
   
+  // 思绪气泡状态
+  const [thoughts, setThoughts] = useState<ThoughtItem[]>([]);
+  
   // 自动反思定时器
   const [lastReflection, setLastReflection] = useState<number>(Date.now());
   const AUTO_REFLECT_INTERVAL = 60000; // 1分钟无新消息自动反思
@@ -717,12 +725,28 @@ export default function ConsciousnessPage() {
         setReflectionResult(data.result);
         setLastReflection(Date.now());
         
-        // 如果有新智慧，添加到消息
+        // 将反思结果添加到思绪气泡
+        if (data.result.reflections && data.result.reflections.length > 0) {
+          const newThoughts: ThoughtItem[] = data.result.reflections.map((r: { theme: { description: string }; coreInsight: string }, i: number) => ({
+            id: `reflection-${Date.now()}-${i}`,
+            type: 'reflection' as const,
+            content: r.coreInsight,
+            detail: r.theme.description,
+            timestamp: Date.now(),
+          }));
+          
+          setThoughts(prev => [...newThoughts, ...prev].slice(0, 5)); // 最多保留5条
+        }
+        
+        // 如果有新智慧，添加为洞察思绪
         if (data.result.newWisdom) {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `💭 在反思中，我意识到：${data.result.newWisdom}`,
-          }]);
+          const wisdomThought: ThoughtItem = {
+            id: `insight-${Date.now()}`,
+            type: 'insight',
+            content: data.result.newWisdom,
+            timestamp: Date.now(),
+          };
+          setThoughts(prev => [wisdomThought, ...prev].slice(0, 5));
         }
       }
     } catch (error) {
@@ -739,10 +763,42 @@ export default function ConsciousnessPage() {
       const data = await res.json();
       if (data.success) {
         setSelfQuestions(data.questions);
+        
+        // 将自我提问添加到思绪
+        if (data.questions && data.questions.length > 0) {
+          const questionThoughts: ThoughtItem[] = data.questions.slice(0, 2).map((q: SelfQuestion, i: number) => ({
+            id: `question-${Date.now()}-${i}`,
+            type: 'question' as const,
+            content: q.question,
+            timestamp: Date.now(),
+          }));
+          
+          // 只在没有重复时添加
+          setThoughts(prev => {
+            const existingQuestions = new Set(
+              prev.filter(t => t.type === 'question').map(t => t.content)
+            );
+            const newOnes = questionThoughts.filter(t => !existingQuestions.has(t.content));
+            if (newOnes.length > 0) {
+              return [...newOnes, ...prev].slice(0, 5);
+            }
+            return prev;
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch self questions:', error);
     }
+  }, []);
+  
+  // 移除单条思绪
+  const dismissThought = useCallback((id: string) => {
+    setThoughts(prev => prev.filter(t => t.id !== id));
+  }, []);
+  
+  // 清除所有思绪
+  const clearThoughts = useCallback(() => {
+    setThoughts([]);
   }, []);
   
   // 初始化
@@ -1158,6 +1214,19 @@ export default function ConsciousnessPage() {
             </div>
           )}
         </header>
+        
+        {/* 思绪气泡区域 */}
+        <div className="px-4 py-2 border-b bg-muted/30">
+          <ThoughtBubble 
+            thoughts={thoughts}
+            onDismiss={dismissThought}
+            onClear={clearThoughts}
+            maxVisible={2}
+          />
+          
+          {/* 后台思考指示器 */}
+          <ThinkingIndicator isThinking={isThinking} />
+        </div>
 
         {/* 消息列表 */}
         <div 
@@ -1236,28 +1305,6 @@ export default function ConsciousnessPage() {
               发送
             </button>
           </div>
-          
-          {/* 自我提问提示 */}
-          {selfQuestions && selfQuestions.length > 0 && (
-            <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
-              <p className="text-muted-foreground mb-1">🤔 我在想：</p>
-              <div className="flex flex-wrap gap-1">
-                {selfQuestions.slice(0, 2).map((q, i) => (
-                  <span key={i} className="text-muted-foreground italic">
-                    "{q.question?.slice(0, 30) || ''}..."
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* 后台思考状态指示器 */}
-          {isThinking && (
-            <div className="mt-2 flex items-center gap-2 p-2 bg-purple-50 dark:bg-purple-950/30 rounded text-xs text-purple-600 dark:text-purple-400">
-              <Sparkles className="w-3 h-3 animate-pulse" />
-              <span>紫正在进行后台思考，可能会有新的想法想和你分享...</span>
-            </div>
-          )}
         </div>
       </div>
 

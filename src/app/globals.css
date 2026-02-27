@@ -489,3 +489,80 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   思绪气泡动画
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(10px);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-2px);
+  }
+  70% {
+    transform: scale(0.95) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fade-out-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes thought-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 思绪气泡动画类 */
+.thought-bubble-enter {
+  animation: bounce-in 0.4s ease-out forwards;
+}
+
+.thought-bubble-exit {
+  animation: fade-out-up 0.3s ease-out forwards;
+}
+
+.thought-bubble-pulse {
+  animation: thought-pulse 2s ease-in-out infinite;
+}
+
+.thinking-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.60 0.14 185 / 0.1) 0%,
+    oklch(0.60 0.14 185 / 0.3) 50%,
+    oklch(0.60 0.14 185 / 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
