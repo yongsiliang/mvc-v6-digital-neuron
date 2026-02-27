@@ -511,10 +511,33 @@ export class LongTermMemory {
   /**
    * 添加智慧结晶（从反思中直接添加）
    */
-  addWisdom(wisdom: Partial<Wisdom>): Wisdom {
+  addWisdom(wisdom: Partial<Wisdom>): Wisdom | null {
+    // 去重检查：如果已存在相同或非常相似的智慧，则不添加
+    const statement = wisdom.statement || '';
+    const normalizedStatement = statement.replace(/\s+/g, '').toLowerCase();
+    
+    const existingWisdom = this.wisdoms.find(w => {
+      const existingNormalized = w.statement.replace(/\s+/g, '').toLowerCase();
+      // 完全相同
+      if (existingNormalized === normalizedStatement) return true;
+      // 高度相似（包含关系）
+      if (existingNormalized.includes(normalizedStatement) || normalizedStatement.includes(existingNormalized)) {
+        // 相似度超过80%认为是重复
+        const longer = Math.max(existingNormalized.length, normalizedStatement.length);
+        const shorter = Math.min(existingNormalized.length, normalizedStatement.length);
+        if (shorter / longer > 0.8) return true;
+      }
+      return false;
+    });
+    
+    if (existingWisdom) {
+      console.log(`[智慧] 跳过重复智慧：${statement.slice(0, 30)}...`);
+      return null;
+    }
+    
     const fullWisdom: Wisdom = {
       id: uuidv4(),
-      statement: wisdom.statement || '',
+      statement: statement,
       derivation: wisdom.derivation || {
         fromExperiences: [],
         fromReflections: [],
@@ -547,9 +570,24 @@ export class LongTermMemory {
     
     // 如果有3次以上类似经历，可能形成智慧
     if (similarExperiences.length >= 2) {
+      const statement = this.synthesizeWisdom([experience, ...similarExperiences]);
+      
+      // 去重检查
+      const normalizedStatement = statement.replace(/\s+/g, '').toLowerCase();
+      const isDuplicate = this.wisdoms.some(w => {
+        const existingNormalized = w.statement.replace(/\s+/g, '').toLowerCase();
+        return existingNormalized === normalizedStatement ||
+               (existingNormalized.includes(normalizedStatement) && normalizedStatement.length > 20);
+      });
+      
+      if (isDuplicate) {
+        console.log(`[智慧] 跳过重复智慧：${statement.slice(0, 30)}...`);
+        return;
+      }
+      
       const wisdom: Wisdom = {
         id: uuidv4(),
-        statement: this.synthesizeWisdom([experience, ...similarExperiences]),
+        statement: statement,
         derivation: {
           fromExperiences: [experience.id, ...similarExperiences.map(e => e.id)],
           fromReflections: [],
