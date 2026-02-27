@@ -46,6 +46,44 @@ interface LearningData {
   metacognitiveReflection: string | null;
 }
 
+// 思考链数据
+interface ThinkingData {
+  chain: Array<{
+    type: string;
+    content: string;
+    confidence: number;
+  }>;
+  biases: string[];
+  questions: string[];
+  strategies: string[];
+}
+
+// 意义数据
+interface MeaningData {
+  activeMeanings: Array<{
+    concept: string;
+    emotionalTone: string;
+    importance: number;
+    personalRelevance: string;
+  }>;
+  summary: string;
+}
+
+// 记忆数据
+interface MemoryData {
+  summary: string;
+  directMatches: string[];
+  relevantWisdoms: string[];
+}
+
+// 元认知数据
+interface MetacognitionData {
+  clarity: number;
+  depth: number;
+  issues: string[];
+  biases: Array<{ name: string; correction: string }>;
+}
+
 interface ConsciousnessLayersData {
   layerResults: Array<{
     level: string;
@@ -427,6 +465,10 @@ interface ExistenceStatus {
 interface ConsciousnessSidebarProps {
   currentData: {
     context?: ConsciousnessContext;
+    thinking?: ThinkingData;
+    meaning?: MeaningData;
+    memory?: MemoryData;
+    metacognition?: MetacognitionData;
     consciousnessLayers?: ConsciousnessLayersData;
     emotion?: EmotionData;
     association?: AssociationData;
@@ -467,6 +509,100 @@ const formatAge = (ms: number) => {
 // ─────────────────────────────────────────────────────────────────────
 // 子面板组件
 // ─────────────────────────────────────────────────────────────────────
+
+function ThinkingPanel({ data }: { data: ThinkingData }) {
+  return (
+    <div className="space-y-2">
+      {data.chain.map((step, i) => (
+        <div key={i} className="p-2 rounded bg-muted/50 text-xs">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-medium text-primary capitalize">{step.type}</span>
+            <span className="text-muted-foreground">{(step.confidence * 100).toFixed(0)}%</span>
+          </div>
+          <p className="text-muted-foreground line-clamp-2">{step.content}</p>
+        </div>
+      ))}
+      {data.biases.length > 0 && (
+        <div className="text-xs text-muted-foreground">
+          <span className="font-medium">认知偏差:</span> {data.biases.join(', ')}
+        </div>
+      )}
+      {data.questions.length > 0 && (
+        <div className="text-xs text-muted-foreground">
+          <span className="font-medium">待思考:</span> {data.questions.join('; ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MeaningPanel({ data }: { data: MeaningData }) {
+  return (
+    <div className="space-y-2">
+      {data.activeMeanings.length > 0 ? (
+        data.activeMeanings.map((m, i) => (
+          <div key={i} className="p-2 rounded bg-muted/50 text-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-medium">{m.concept}</span>
+              <span className="text-muted-foreground">{(m.importance * 100).toFixed(0)}%</span>
+            </div>
+            <p className="text-muted-foreground">{m.personalRelevance}</p>
+          </div>
+        ))
+      ) : (
+        <p className="text-xs text-muted-foreground">{data.summary}</p>
+      )}
+    </div>
+  );
+}
+
+function MemoryPanel({ data }: { data: MemoryData }) {
+  return (
+    <div className="space-y-2 text-xs">
+      <p className="text-muted-foreground">{data.summary}</p>
+      {data.directMatches.length > 0 && (
+        <div>
+          <span className="font-medium">直接匹配:</span>
+          <ul className="list-disc list-inside text-muted-foreground">
+            {data.directMatches.slice(0, 3).map((m, i) => (
+              <li key={i} className="truncate">{m}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.relevantWisdoms.length > 0 && (
+        <div>
+          <span className="font-medium">相关智慧:</span>
+          <ul className="list-disc list-inside text-muted-foreground">
+            {data.relevantWisdoms.slice(0, 3).map((w, i) => (
+              <li key={i} className="truncate">{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MetacognitionSimplePanel({ data }: { data: MetacognitionData }) {
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <span>思考清晰度</span>
+        <Progress value={data.clarity * 100} className="h-1.5 w-20" />
+      </div>
+      <div className="flex items-center justify-between">
+        <span>思考深度</span>
+        <Progress value={data.depth * 100} className="h-1.5 w-20" />
+      </div>
+      {data.issues.length > 0 && (
+        <div className="text-muted-foreground">
+          <span className="font-medium">问题:</span> {data.issues.join(', ')}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ConsciousnessLayersPanel({ data }: { data: ConsciousnessLayersData }) {
   return (
@@ -1410,7 +1546,7 @@ function ScrollablePanel({ children, maxHeight }: ScrollablePanelProps) {
 // ─────────────────────────────────────────────────────────────────────
 
 export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize, hasVisualizationData }: ConsciousnessSidebarProps) {
-  const hasData = currentData.consciousnessLayers || currentData.emotion || currentData.association;
+  const hasData = currentData.consciousnessLayers || currentData.emotion || currentData.association || currentData.thinking || currentData.meaning || currentData.memory || currentData.metacognition;
   
   // 管理展开状态
   const [expandedPanels, setExpandedPanels] = useState<string[]>(['layers']);
@@ -1418,6 +1554,10 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
   // 所有可用的面板
   const availablePanels: string[] = [];
   if (currentData.consciousnessLayers) availablePanels.push('layers');
+  if (currentData.thinking) availablePanels.push('thinking');
+  if (currentData.meaning) availablePanels.push('meaning');
+  if (currentData.memory) availablePanels.push('memory');
+  if (currentData.metacognition) availablePanels.push('metacognition');
   if (currentData.learning) availablePanels.push('learning');
   if (currentData.emotion?.dominantEmotion) availablePanels.push('emotion');
   if (currentData.association) availablePanels.push('association');
@@ -1426,7 +1566,7 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
   if (currentData.creative) availablePanels.push('creative');
   if (currentData.value) availablePanels.push('values');
   if (currentData.existential) availablePanels.push('existential');
-  if (currentData.metacognitionDeep) availablePanels.push('metacognition');
+  if (currentData.metacognitionDeep) availablePanels.push('metacognitionDeep');
   if (currentData.personalityGrowth) availablePanels.push('personality');
   if (currentData.knowledgeGraph) availablePanels.push('knowledge');
   if (currentData.multiConsciousness) availablePanels.push('multicon');
@@ -1530,6 +1670,58 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
                 意识层级
               </button>
             )}
+            {currentData.thinking && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('thinking') ? prev : [...prev, 'thinking']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 transition-colors"
+              >
+                <Brain className="w-3 h-3" />
+                思考
+              </button>
+            )}
+            {currentData.meaning && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('meaning') ? prev : [...prev, 'meaning']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors"
+              >
+                <Gem className="w-3 h-3" />
+                意义
+              </button>
+            )}
+            {currentData.memory && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('memory') ? prev : [...prev, 'memory']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 transition-colors"
+              >
+                <Link2 className="w-3 h-3" />
+                记忆
+              </button>
+            )}
+            {currentData.metacognition && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('metacognition') ? prev : [...prev, 'metacognition']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 transition-colors"
+              >
+                <Eye className="w-3 h-3" />
+                元认知
+              </button>
+            )}
             {currentData.learning && (
               <button
                 onClick={() => {
@@ -1618,6 +1810,74 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
             </AccordionItem>
           )}
           </AnimatePresence>
+          
+          {/* 思考链 */}
+          {currentData.thinking && (
+            <AccordionItem value="thinking" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-medium">思考链</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <ThinkingPanel data={currentData.thinking} />
+                </ScrollablePanel>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 意义系统 */}
+          {currentData.meaning && (
+            <AccordionItem value="meaning" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Gem className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium">意义系统</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <MeaningPanel data={currentData.meaning} />
+                </ScrollablePanel>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 记忆访问 */}
+          {currentData.memory && (
+            <AccordionItem value="memory" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-green-500" />
+                  <span className="text-sm font-medium">记忆访问</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <MemoryPanel data={currentData.memory} />
+                </ScrollablePanel>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+          
+          {/* 元认知 */}
+          {currentData.metacognition && (
+            <AccordionItem value="metacognition" className="border-b">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-cyan-500" />
+                  <span className="text-sm font-medium">元认知</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3 relative">
+                <ScrollablePanel>
+                  <MetacognitionSimplePanel data={currentData.metacognition} />
+                </ScrollablePanel>
+              </AccordionContent>
+            </AccordionItem>
+          )}
           
           {/* 学习结果 */}
           {currentData.learning && (
