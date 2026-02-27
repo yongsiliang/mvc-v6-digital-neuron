@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
       const buffer = await storage.readFile({ fileKey: key });
       const state = JSON.parse(buffer.toString('utf-8'));
       
+      // 返回完整状态信息
       return NextResponse.json({
         success: true,
         key,
@@ -88,11 +89,17 @@ export async function POST(request: NextRequest) {
           version: state.version,
           timestamp: state.timestamp,
           date: new Date(state.timestamp).toLocaleString('zh-CN'),
+          identity: state.identity,
           layeredMemory: state.layeredMemory,
-          identity: state.identity ? {
-            name: state.identity.name,
-            purpose: state.identity.purpose,
-          } : null,
+          emotionState: state.emotionState,
+          metacognitionState: state.metacognitionState,
+          // 统计信息
+          stats: {
+            identityName: state.identity?.name,
+            coreRelationships: state.layeredMemory?.core?.relationships?.length || 0,
+            consolidatedCount: state.layeredMemory?.consolidated?.length || 0,
+            episodicCount: state.layeredMemory?.episodic?.length || 0,
+          },
         },
       });
     }
