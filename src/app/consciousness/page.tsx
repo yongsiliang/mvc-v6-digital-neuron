@@ -1169,13 +1169,13 @@ export default function ConsciousnessPage() {
           </div>
           
           {/* 自我提问提示 */}
-          {selfQuestions.length > 0 && (
+          {selfQuestions && selfQuestions.length > 0 && (
             <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
               <p className="text-muted-foreground mb-1">🤔 我在想：</p>
               <div className="flex flex-wrap gap-1">
                 {selfQuestions.slice(0, 2).map((q, i) => (
                   <span key={i} className="text-muted-foreground italic">
-                    "{q.question.slice(0, 30)}..."
+                    "{q.question?.slice(0, 30) || ''}..."
                   </span>
                 ))}
               </div>
