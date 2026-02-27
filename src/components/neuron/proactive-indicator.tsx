@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -280,6 +280,15 @@ export function useProactiveBehavior(options: UseProactiveBehaviorOptions = {}) 
   const [isThinking, setIsThinking] = useState(false);
   const [lastPollTime, setLastPollTime] = useState<number>(0);
   
+  // 使用 ref 存储回调，避免依赖循环
+  const onNewMessageRef = useRef(onNewMessage);
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
+  
+  // 已处理的消息 ID 集合（使用 ref 避免依赖问题）
+  const processedIdsRef = useRef<Set<string>>(new Set());
+  
   // 获取意愿状态
   const fetchVolitionState = useCallback(async () => {
     try {
@@ -300,26 +309,31 @@ export function useProactiveBehavior(options: UseProactiveBehaviorOptions = {}) 
       const res = await fetch('/api/neuron-v6/proactive?action=unread_messages');
       const data = await res.json();
       
-      if (data.success && data.messages.length > 0) {
+      if (data.success && data.messages && data.messages.length > 0) {
         const newMessages = data.messages as ProactiveMessage[];
         
-        // 检查是否有新消息
-        const existingIds = new Set(proactiveMessages.map(m => m.id));
-        const trulyNew = newMessages.filter(m => !existingIds.has(m.id));
+        // 过滤掉已处理的消息
+        const trulyNew = newMessages.filter(m => !processedIdsRef.current.has(m.id));
         
         if (trulyNew.length > 0) {
+          // 标记为已处理
+          trulyNew.forEach(msg => {
+            processedIdsRef.current.add(msg.id);
+          });
+          
+          // 更新本地状态
           setProactiveMessages(prev => [...prev, ...trulyNew]);
           
           // 触发回调
           trulyNew.forEach(msg => {
-            onNewMessage?.(msg);
+            onNewMessageRef.current?.(msg);
           });
         }
       }
     } catch (error) {
       console.error('[Proactive] Failed to fetch unread messages:', error);
     }
-  }, [proactiveMessages, onNewMessage]);
+  }, []); // 移除依赖，使用 ref 代替
   
   // 清除消息（已读）
   const clearMessages = useCallback(async () => {
@@ -331,6 +345,7 @@ export function useProactiveBehavior(options: UseProactiveBehaviorOptions = {}) 
       });
       
       setProactiveMessages([]);
+      processedIdsRef.current.clear();
     } catch (error) {
       console.error('[Proactive] Failed to clear messages:', error);
     }

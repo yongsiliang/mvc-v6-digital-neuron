@@ -568,15 +568,21 @@ export default function ConsciousnessPage() {
     enabled: true,
     onNewMessage: (msg: ProactiveMsgType) => {
       // 收到新主动消息时，添加到消息列表
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: msg.content,
-        timestamp: msg.timestamp,
-        isProactive: true,
-      }]);
-      
-      // 清除该消息（已处理）
-      removeMessage(msg.id);
+      // 注意：使用函数式更新确保追加而非覆盖
+      setMessages(prev => {
+        // 检查是否已存在相同ID或内容的消息，避免重复
+        const exists = prev.some(m => 
+          m.isProactive && m.content === msg.content
+        );
+        if (exists) return prev;
+        
+        return [...prev, {
+          role: 'assistant',
+          content: msg.content,
+          timestamp: msg.timestamp,
+          isProactive: true,
+        }];
+      });
     },
   });
   
