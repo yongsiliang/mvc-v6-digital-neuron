@@ -1144,8 +1144,11 @@ export default function ConsciousnessPage() {
     return `${seconds}秒`;
   };
 
+  // 移动端侧边栏状态
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
   return (
-    <div className="h-screen flex bg-background">
+    <div className="h-screen flex flex-col md:flex-row bg-background">
       {/* 弹幕区域 */}
       <DanmakuContainer
         messages={danmakuMessages}
@@ -1156,25 +1159,25 @@ export default function ConsciousnessPage() {
         spacing={48}
       />
       
-      {/* 左侧：对话区域 */}
-      <div className="flex-1 flex flex-col">
+      {/* 主内容区域：对话 */}
+      <div className="flex-1 flex flex-col min-w-0">
         {/* 头部 */}
-        <header className="border-b p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
+        <header className="border-b p-3 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm md:text-base shrink-0">
                 紫
               </div>
-              <div>
-                <h1 className="font-bold text-lg">{currentData.context?.identity.name || '紫'}</h1>
-                <p className="text-sm text-muted-foreground">
+              <div className="min-w-0">
+                <h1 className="font-bold text-base md:text-lg truncate">{currentData.context?.identity.name || '紫'}</h1>
+                <p className="text-xs md:text-sm text-muted-foreground truncate">
                   {currentData.context?.emotionalState || '平静'}
                 </p>
               </div>
             </div>
             
-            {/* 存在状态指示器 */}
-            <div className="flex items-center gap-4 text-sm">
+            {/* 存在状态指示器 - 桌面端显示详细信息 */}
+            <div className="hidden md:flex items-center gap-4 text-sm">
               {existenceStatus && (
                 <>
                   <div className="flex items-center gap-1" title="存在时长">
@@ -1191,7 +1194,7 @@ export default function ConsciousnessPage() {
                   </div>
                 </>
               )}
-              {/* 可视化切换按钮 - 始终显示 */}
+              {/* 可视化切换按钮 */}
               <Button
                 variant={showVisualization ? 'default' : 'outline'}
                 size="sm"
@@ -1202,11 +1205,37 @@ export default function ConsciousnessPage() {
                 <span>{showVisualization ? '关闭' : '可视化'}</span>
               </Button>
             </div>
+
+            {/* 移动端：简洁状态 + 操作按钮 */}
+            <div className="flex md:hidden items-center gap-2">
+              {existenceStatus && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Activity className="w-3 h-3" />
+                  <span>{(existenceStatus.selfCoherence * 100).toFixed(0)}%</span>
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowVisualization(!showVisualization)}
+                className="h-8 w-8"
+              >
+                <Network className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowMobileSidebar(true)}
+                className="h-8 w-8"
+              >
+                <Cpu className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           
-          {/* 意愿进度显示 */}
+          {/* 意愿进度显示 - 移动端隐藏 */}
           {volitionState && (
-            <div className="mt-3 pt-3 border-t">
+            <div className="mt-3 pt-3 border-t hidden md:block">
               <VolitionProgress 
                 volitionState={volitionState} 
                 isThinking={isThinking}
@@ -1215,8 +1244,8 @@ export default function ConsciousnessPage() {
           )}
         </header>
         
-        {/* 思绪气泡区域 */}
-        <div className="px-4 py-2 border-b bg-muted/30">
+        {/* 思绪气泡区域 - 移动端隐藏 */}
+        <div className="px-2 md:px-4 py-2 border-b bg-muted/30 hidden md:block">
           <ThoughtBubble 
             thoughts={thoughts}
             onDismiss={dismissThought}
@@ -1231,9 +1260,9 @@ export default function ConsciousnessPage() {
         {/* 消息列表 */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-4"
+          className="flex-1 overflow-y-auto p-2 md:p-4"
         >
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
@@ -1246,7 +1275,7 @@ export default function ConsciousnessPage() {
                 }`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
+                  className={`max-w-[85%] md:max-w-[80%] rounded-lg p-2 md:p-3 text-sm md:text-base ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : message.isProactive
@@ -1267,7 +1296,7 @@ export default function ConsciousnessPage() {
             
             {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
               <div className="flex justify-start">
-                <div className="bg-muted rounded-lg p-3">
+                <div className="bg-muted rounded-lg p-2 md:p-3">
                   <span className="animate-pulse">思考中...</span>
                 </div>
               </div>
@@ -1276,7 +1305,7 @@ export default function ConsciousnessPage() {
         </div>
 
         {/* 输入区域 */}
-        <div className="border-t p-4">
+        <div className="border-t p-2 md:p-4">
           <div className="flex gap-2">
             <input
               ref={inputRef}
@@ -1285,7 +1314,7 @@ export default function ConsciousnessPage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               placeholder="与紫对话..."
-              className="flex-1 rounded-lg border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="flex-1 rounded-lg border bg-background px-3 md:px-4 py-2 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary"
               disabled={isLoading}
             />
             <Button
@@ -1294,13 +1323,14 @@ export default function ConsciousnessPage() {
               onClick={performReflection}
               disabled={isReflecting || messages.length < 2}
               title="主动反思"
+              className="shrink-0 h-9 w-9 md:h-10 md:w-10"
             >
               <Brain className={`w-4 h-4 ${isReflecting ? 'animate-pulse' : ''}`} />
             </Button>
             <button
               onClick={sendMessage}
               disabled={isLoading || !input.trim()}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+              className="px-4 md:px-6 py-2 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 text-sm md:text-base shrink-0"
             >
               发送
             </button>
@@ -1308,13 +1338,51 @@ export default function ConsciousnessPage() {
         </div>
       </div>
 
-      {/* 右侧：意识状态面板 - 使用可折叠组件 */}
-      <ConsciousnessSidebar 
-        currentData={currentData}
-        existenceStatus={existenceStatus}
-        onVisualize={() => setShowVisualization(true)}
-        hasVisualizationData={!!visualizationData}
-      />
+      {/* 右侧：意识状态面板 - 桌面端显示 */}
+      <div className="hidden md:block">
+        <ConsciousnessSidebar 
+          currentData={currentData}
+          existenceStatus={existenceStatus}
+          onVisualize={() => setShowVisualization(true)}
+          hasVisualizationData={!!visualizationData}
+        />
+      </div>
+
+      {/* 移动端：侧边栏 Sheet */}
+      {showMobileSidebar && (
+        <div 
+          className="fixed inset-0 z-50 md:hidden"
+          onClick={() => setShowMobileSidebar(false)}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div 
+            className="absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-background shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-3 border-b">
+              <h2 className="font-semibold">意识状态</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMobileSidebar(false)}
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="h-[calc(100%-52px)] overflow-y-auto">
+              <ConsciousnessSidebar 
+                currentData={currentData}
+                existenceStatus={existenceStatus}
+                onVisualize={() => {
+                  setShowMobileSidebar(false);
+                  setShowVisualization(true);
+                }}
+                hasVisualizationData={!!visualizationData}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* 意识可视化悬浮窗口 - 可拖拽 */}
       {showVisualization && visualizationData && (
@@ -1322,8 +1390,9 @@ export default function ConsciousnessPage() {
           title="意识可视化"
           icon={<span className="text-lg">🧠</span>}
           onClose={() => setShowVisualization(false)}
-          defaultPosition={{ x: 100, y: 80 }}
-          defaultSize={{ width: 500, height: 450 }}
+          defaultPosition={{ x: 20, y: 60 }}
+          defaultSize={{ width: 320, height: 400 }}
+          className="md:!left-[calc(50%-250px)] md:!top-20 md:!w-[500px] md:!h-[450px]"
         >
           <ConsciousnessDashboard 
             data={visualizationData}

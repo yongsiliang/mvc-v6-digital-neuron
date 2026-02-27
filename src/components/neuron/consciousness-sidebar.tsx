@@ -1347,7 +1347,7 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
   if (currentData.emotion?.dominantEmotion) defaultExpanded.push('emotion');
   
   return (
-    <div className="w-80 border-l flex flex-col h-full">
+    <div className="w-full md:w-80 border-l flex flex-col h-full bg-background">
       {/* 头部状态栏 */}
       {existenceStatus && (
         <div className="p-3 border-b bg-muted/30">
