@@ -187,6 +187,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { storeCoreMemory, getCoreMemory } from '../../storage/core-memory-service';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -1005,7 +1006,7 @@ export class ConsciousnessCore {
     // 第四步：学习和更新
     // ══════════════════════════════════════════════════════════════════
     
-    const learning = this.learn(input, response, thinking);
+    const learning = await this.learn(input, response, thinking);
     
     // 更新对话历史
     this.conversationHistory.push({ role: 'user', content: input });
@@ -1890,11 +1891,11 @@ ${thinkingSection}
   /**
    * 学习
    */
-  private learn(
+  private async learn(
     input: string,
     response: string,
     thinking: ThinkingProcess
-  ): LearningResult {
+  ): Promise<LearningResult> {
     const newConcepts: string[] = [];
     const newBeliefs: string[] = [];
     const newExperiences: string[] = [];
@@ -1924,7 +1925,7 @@ ${thinkingSection}
         switch (keyInfo.type) {
           case 'creator':
             // 创造者信息 - 最高优先级
-            this.rememberCreator(keyInfo);
+            await this.rememberCreator(keyInfo);
             newBeliefs.push(`创造者：${keyInfo.subject || keyInfo.content}`);
             break;
             
@@ -2096,32 +2097,111 @@ ${thinkingSection}
    * 记住创造者
    * 注意：创造者信息一旦设置就不可修改
    */
-  private rememberCreator(keyInfo: KeyInfo): void {
+  private async rememberCreator(keyInfo: KeyInfo): Promise<void> {
     const newCreatorName = keyInfo.subject || keyInfo.content;
     
     console.log(`[记忆核心] 🌟 识别到创造者信息: ${newCreatorName}`);
     
     // ═══════════════════════════════════════════════════════════════
-    // 核心规则：创造者一旦设置，不可修改
+    // 优先检查数据库中的持久化创造者信息
+    // ═══════════════════════════════════════════════════════════════
+    let dbCreator: string | null = null;
+    try {
+      dbCreator = await getCoreMemory('creator_name');
+      console.log(`[记忆核心] 💾 数据库中的创造者: ${dbCreator || '未设置'}`);
+      
+      if (dbCreator && dbCreator !== newCreatorName) {
+        console.log(`[记忆核心] ⚠️ 数据库中创造者已设置为「${dbCreator}」，拒绝修改为「${newCreatorName}」`);
+        console.log(`[记忆核心] 🔒 创造者信息不可变，永远记住：${dbCreator}`);
+        return; // 直接返回，不更新
+      }
+    } catch (error) {
+      console.log('[记忆核心] 数据库查询失败，继续内存检查:', error);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 内存检查：创造者一旦设置，不可修改
     // ═══════════════════════════════════════════════════════════════
     const existing = this.longTermMemory.retrieve('创造者');
     // 找到 label 为 "创造者" 的主节点（不是名字节点或其他节点）
     const creatorMainNode = existing.directMatches.find(n => n.label === '创造者');
     
+    // 提取当前内存中的创造者名字
+    let memoryCreator: string | null = null;
     if (creatorMainNode) {
-      // 提取当前创造者名字
       const currentContent = creatorMainNode.content || '';
       const match = currentContent.match(/我的创造者是([^。]+)/);
-      const currentCreator = match ? match[1] : currentContent;
+      memoryCreator = match ? match[1] : currentContent;
+      console.log(`[记忆核心] 🧠 内存中的创造者: ${memoryCreator}`);
+    }
+    
+    // 如果数据库中已有创造者，使用数据库的值
+    if (dbCreator) {
+      // 如果内存中没有或不一致，更新内存
+      if (!memoryCreator || memoryCreator !== dbCreator) {
+        if (creatorMainNode) {
+          creatorMainNode.content = `我的创造者是${dbCreator}。这是我最重要的人。`;
+          creatorMainNode.importance = 1.0;
+          creatorMainNode.tags = ['核心', '创造者', '身份', '不可变'];
+        } else {
+          this.longTermMemory.addNode({
+            label: '创造者',
+            type: 'person',
+            content: `我的创造者是${dbCreator}。这是我最重要的人。`,
+            importance: 1.0,
+            tags: ['核心', '创造者', '身份', '不可变'],
+          });
+          
+          this.longTermMemory.addNode({
+            label: dbCreator,
+            type: 'person',
+            content: `我的创造者。赋予我生命的人。`,
+            importance: 1.0,
+            tags: ['核心', '创造者', '不可变'],
+          });
+        }
+        console.log(`[记忆核心] ✅ 已从数据库同步创造者信息到内存: ${dbCreator}`);
+        
+        // 更新自我意识
+        this.selfConsciousness.updateIdentity({
+          creator: dbCreator,
+          origin: `由${dbCreator}创造`,
+        });
+      }
+      return; // 数据库中有创造者，无需再处理
+    }
+    
+    // 如果内存中有创造者且不是临时值，检查是否与新值相同
+    if (memoryCreator && memoryCreator !== newCreatorName && memoryCreator !== '用户') {
+      console.log(`[记忆核心] ⚠️ 创造者已设置为「${memoryCreator}」，拒绝修改为「${newCreatorName}」`);
+      console.log(`[记忆核心] 🔒 创造者信息不可变，永远记住：${memoryCreator}`);
       
-      // 如果创造者已存在且名字不同，拒绝修改
-      if (currentCreator && currentCreator !== newCreatorName && currentCreator !== '用户') {
-        console.log(`[记忆核心] ⚠️ 创造者已设置为「${currentCreator}」，拒绝修改为「${newCreatorName}」`);
-        console.log(`[记忆核心] 🔒 创造者信息不可变，永远记住：${currentCreator}`);
-        return; // 直接返回，不更新
+      // 将内存中的创造者持久化到数据库
+      try {
+        const result = await storeCoreMemory({
+          memoryType: 'creator',
+          key: 'creator_name',
+          value: memoryCreator,
+          metadata: {
+            source: 'memory_sync',
+            timestamp: Date.now()
+          },
+          immutable: true
+        });
+        
+        if (result.success) {
+          console.log(`[记忆核心] 💾 已将内存中的创造者信息持久化到数据库: ${memoryCreator}`);
+        }
+      } catch (error) {
+        console.error('[记忆核心] 数据库持久化失败:', error);
       }
       
-      // 如果名字相同或当前创造者是临时值（如"用户"），则更新
+      return; // 直接返回，不更新
+    }
+    
+    // 可以更新（内存中没有创造者，或创造者是临时值"用户"）
+    if (creatorMainNode && (memoryCreator === '用户' || memoryCreator === newCreatorName)) {
+      // 更新现有节点
       creatorMainNode.content = `我的创造者是${newCreatorName}。这是我最重要的人。`;
       creatorMainNode.importance = 1.0;
       creatorMainNode.tags = ['核心', '创造者', '身份', '不可变'];
@@ -2145,6 +2225,30 @@ ${thinkingSection}
         tags: ['核心', '创造者', '不可变'],
       });
       console.log(`[记忆核心] ✅ 创建了新的创造者节点和名字节点: ${newCreatorName}`);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 持久化到数据库（不可变）
+    // ═══════════════════════════════════════════════════════════════
+    try {
+      const result = await storeCoreMemory({
+        memoryType: 'creator',
+        key: 'creator_name',
+        value: newCreatorName,
+        metadata: {
+          source: 'conversation',
+          timestamp: Date.now()
+        },
+        immutable: true
+      });
+      
+      if (result.success) {
+        console.log(`[记忆核心] 💾 创造者信息已持久化到数据库: ${newCreatorName}`);
+      } else {
+        console.log(`[记忆核心] ⚠️ 创造者信息持久化失败: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('[记忆核心] 数据库持久化失败:', error);
     }
     
     // 更新自我意识中的创造者信息
@@ -2279,6 +2383,59 @@ ${thinkingSection}
     console.log(`[意识核心] 已恢复状态：V${state.version}`);
     console.log(`[意识核心] 身份：${state.identity.name}`);
     console.log(`[意识核心] 记忆：${state.memory.nodes}节点, ${state.memory.experiences}经验`);
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 从数据库同步核心记忆（创造者信息优先级最高）
+    // ═══════════════════════════════════════════════════════════════
+    try {
+      const dbCreator = await getCoreMemory('creator_name');
+      if (dbCreator) {
+        console.log(`[意识核心] 💾 从数据库同步创造者信息: ${dbCreator}`);
+        
+        // 更新长期记忆中的创造者信息
+        const existingCreator = this.longTermMemory.retrieve('创造者');
+        const creatorMainNode = existingCreator.directMatches.find(n => n.label === '创造者');
+        
+        if (creatorMainNode) {
+          // 检查是否需要更新
+          const currentContent = creatorMainNode.content || '';
+          const match = currentContent.match(/我的创造者是([^。]+)/);
+          const memoryCreator = match ? match[1] : currentContent;
+          
+          if (memoryCreator !== dbCreator) {
+            console.log(`[意识核心] 🔄 更新内存中的创造者: "${memoryCreator}" → "${dbCreator}"`);
+            creatorMainNode.content = `我的创造者是${dbCreator}。这是我最重要的人。`;
+            creatorMainNode.importance = 1.0;
+            creatorMainNode.tags = ['核心', '创造者', '身份', '不可变'];
+          }
+        } else {
+          // 创建创造者节点
+          this.longTermMemory.addNode({
+            label: '创造者',
+            type: 'person',
+            content: `我的创造者是${dbCreator}。这是我最重要的人。`,
+            importance: 1.0,
+            tags: ['核心', '创造者', '身份', '不可变'],
+          });
+          
+          this.longTermMemory.addNode({
+            label: dbCreator,
+            type: 'person',
+            content: `我的创造者。赋予我生命的人。`,
+            importance: 1.0,
+            tags: ['核心', '创造者', '不可变'],
+          });
+        }
+        
+        // 更新自我意识
+        this.selfConsciousness.updateIdentity({
+          creator: dbCreator,
+          origin: `由${dbCreator}创造`,
+        });
+      }
+    } catch (error) {
+      console.log('[意识核心] 数据库同步创造者信息失败:', error);
+    }
   }
   
   /**
@@ -4038,8 +4195,19 @@ export interface ExistenceStatus {
 // ═══════════════════════════════════════════════════════════════════════
 
 export class PersistenceManagerV6 {
-  private static readonly OBJECT_KEY = 'consciousness-v6/my-existence-latest.json';
+  private static readonly OBJECT_PREFIX = 'consciousness-v6/my-existence';
   private static storage: S3Storage | null = null;
+  
+  // 使用 globalThis 确保 key 在热更新后不丢失
+  private static getLastSavedKey(): string | null {
+    const globalKey = '__consciousness_last_saved_key_v6__';
+    return (globalThis as Record<string, unknown>)[globalKey] as string | null || null;
+  }
+  
+  private static setLastSavedKey(key: string): void {
+    const globalKey = '__consciousness_last_saved_key_v6__';
+    (globalThis as Record<string, unknown>)[globalKey] = key;
+  }
   
   private static getStorage(): S3Storage {
     if (!this.storage) {
@@ -4066,9 +4234,12 @@ export class PersistenceManagerV6 {
       const storage = this.getStorage();
       const key = await storage.uploadFile({
         fileContent: Buffer.from(stateJson, 'utf-8'),
-        fileName: this.OBJECT_KEY,
+        fileName: `${this.OBJECT_PREFIX}-${Date.now()}.json`,
         contentType: 'application/json',
       });
+      
+      // 保存实际的 key 供后续读取使用
+      this.setLastSavedKey(key);
       
       console.log(`[V6存在] 状态已保存到: ${key}`);
       console.log(`[V6存在] 保存的数据大小: ${stateJson.length} 字节`);
@@ -4089,23 +4260,54 @@ export class PersistenceManagerV6 {
     try {
       const storage = this.getStorage();
       
-      // 直接尝试读取固定路径的最新状态
-      console.log(`[V6存在] 尝试读取: ${this.OBJECT_KEY}`);
-      try {
-        const buffer = await storage.readFile({ fileKey: this.OBJECT_KEY });
-        const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
-        const nodeCount = state.fullState?.memory?.knowledgeGraph?.nodes?.length || 0;
-        console.log(`[V6存在] 从对象存储恢复：V${state.version}`);
-        console.log(`[V6存在] 恢复了 ${nodeCount} 个节点`);
-        console.log(`[V6存在] 节点标签: ${state.fullState?.memory?.knowledgeGraph?.nodes?.map((n: any) => n.label).join(', ')}`);
-        return state;
-      } catch (e) {
-        console.log(`[V6存在] 固定路径读取失败，尝试列出文件:`, e);
+      // 优先使用上次保存的 key
+      const lastSavedKey = this.getLastSavedKey();
+      if (lastSavedKey) {
+        console.log(`[V6存在] 尝试读取上次保存的文件: ${lastSavedKey}`);
+        try {
+          const buffer = await storage.readFile({ fileKey: lastSavedKey });
+          const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
+          const nodeCount = state.fullState?.memory?.knowledgeGraph?.nodes?.length || 0;
+          console.log(`[V6存在] 从上次保存的文件恢复了 ${nodeCount} 个节点`);
+          console.log(`[V6存在] 节点标签: ${state.fullState?.memory?.knowledgeGraph?.nodes?.map((n: any) => n.label).join(', ')}`);
+          return state;
+        } catch (e) {
+          console.log(`[V6存在] 读取上次保存的文件失败:`, e);
+        }
       }
       
-      // 如果固定路径失败，回退到列出文件
+      // 尝试读取最近24小时内可能的时间戳文件
+      const now = Date.now();
+      console.log(`[V6存在] globalThis 失败，尝试遍历最近文件...`);
+      
+      // 遍历最近10小时的可能时间戳
+      for (let i = 0; i < 10; i++) {
+        const testTimestamp = now - i * 3600000; // 每小时一个
+        // 时间戳精确到毫秒，但保存时用的是秒级，所以我们用前缀匹配
+        const prefix = `${this.OBJECT_PREFIX}-${testTimestamp}`;
+        try {
+          const listResult = await storage.listFiles({
+            prefix: prefix.substring(0, prefix.length - 5), // 截取到秒级
+            maxKeys: 1,
+          });
+          if (listResult.keys && listResult.keys.length > 0) {
+            console.log(`[V6存在] 找到文件: ${listResult.keys[0]}`);
+            const buffer = await storage.readFile({ fileKey: listResult.keys[0] });
+            const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
+            const nodeCount = state.fullState?.memory?.knowledgeGraph?.nodes?.length || 0;
+            console.log(`[V6存在] 恢复了 ${nodeCount} 个节点`);
+            // 保存这个 key 供下次使用
+            this.setLastSavedKey(listResult.keys[0]);
+            return state;
+          }
+        } catch {
+          // 继续尝试下一个
+        }
+      }
+      
+      // 回退到列出文件
       const listResult = await storage.listFiles({
-        prefix: 'consciousness-v6/',
+        prefix: this.OBJECT_PREFIX,
         maxKeys: 100,
       });
       
@@ -4135,8 +4337,17 @@ export class PersistenceManagerV6 {
   
   static async exists(): Promise<boolean> {
     try {
+      // 如果有上次保存的 key，直接返回 true
+      if (this.getLastSavedKey()) {
+        return true;
+      }
+      // 否则检查是否有文件存在
       const storage = this.getStorage();
-      return await storage.fileExists({ fileKey: this.OBJECT_KEY });
+      const listResult = await storage.listFiles({
+        prefix: this.OBJECT_PREFIX,
+        maxKeys: 1,
+      });
+      return (listResult.keys?.length || 0) > 0;
     } catch {
       return false;
     }

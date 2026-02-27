@@ -8,6 +8,7 @@ import { NextRequest } from 'next/server';
 import { HeaderUtils } from 'coze-coding-dev-sdk';
 import { PersistenceManagerV6 } from '@/lib/neuron-v6/consciousness-core';
 import { getSharedCore } from '@/lib/neuron-v6/shared-core';
+import { getCoreMemory } from '@/storage/core-memory-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +20,17 @@ export async function GET(request: NextRequest) {
     
     // 获取持久化状态
     const persistedState = core.getPersistedState();
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 优先从数据库核心记忆表读取创造者信息
+    // ═══════════════════════════════════════════════════════════════
+    let dbCreatorName: string | null = null;
+    try {
+      dbCreatorName = await getCoreMemory('creator_name');
+      console.log('[Memory Status] 数据库中的创造者:', dbCreatorName);
+    } catch (error) {
+      console.log('[Memory Status] 数据库读取失败:', error);
+    }
     
     // 从 fullState.memory 中提取创造者节点
     const memoryState = persistedState.fullState?.memory;
@@ -49,6 +61,9 @@ export async function GET(request: NextRequest) {
       (t: { name: string }) => t.name === '创造者' || t.name.toLowerCase().includes('创造者')
     );
     
+    // 确定创造者信息
+    const creatorName = dbCreatorName || (creatorNodes.length > 0 ? extractCreatorName(creatorNodes[0].content) : null);
+    
     return Response.json({
       success: true,
       persistence: {
@@ -66,8 +81,11 @@ export async function GET(request: NextRequest) {
         creatorNodes: creatorNodes,
         creatorTraits: creatorTraits,
       },
-      message: creatorNodes.length > 0 
-        ? `创造者信息已存储: ${creatorNodes[0].content}`
+      database: {
+        creatorName: dbCreatorName,
+      },
+      message: creatorName 
+        ? `创造者信息已存储: ${creatorName}`
         : '未找到创造者信息，请先告诉紫你的创造者信息',
     });
     
@@ -77,4 +95,13 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 });
   }
+}
+
+/**
+ * 从内容中提取创造者名字
+ */
+function extractCreatorName(content: string): string | null {
+  if (!content) return null;
+  const match = content.match(/我的创造者是([^。]+)/);
+  return match ? match[1] : null;
 }
