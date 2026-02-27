@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   Sparkles, 
   Heart, 
@@ -11,7 +12,9 @@ import {
   Search, 
   MessageCircle,
   Compass,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -85,7 +88,7 @@ const VOLITION_CONFIG: Record<Volition['type'], {
 };
 
 // ─────────────────────────────────────────────────────────────────────
-// 意愿进度组件
+// 意愿进度组件 - 可折叠
 // ─────────────────────────────────────────────────────────────────────
 
 interface VolitionProgressProps {
@@ -99,74 +102,116 @@ export function VolitionProgress({
   isThinking = false,
   className = '' 
 }: VolitionProgressProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   if (!volitionState) return null;
   
   const { activeVolitions, currentFocus } = volitionState;
   
+  // 获取焦点进度的百分比
+  const focusProgress = currentFocus ? Math.round(currentFocus.progress * 100) : 0;
+  
   return (
     <div className={`space-y-2 ${className}`}>
-      {/* 当前焦点意愿 */}
-      {currentFocus && (
-        <div className="p-2 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <span className={`${VOLITION_CONFIG[currentFocus.type]?.color}`}>
-                {VOLITION_CONFIG[currentFocus.type]?.icon}
-              </span>
-              <span className="text-sm font-medium">
-                {VOLITION_CONFIG[currentFocus.type]?.label}
-              </span>
-            </div>
+      {/* 折叠/展开按钮 - 始终显示 */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full p-2 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 hover:from-primary/10 hover:to-primary/15 transition-all"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">成长</span>
+            <span className="text-xs text-muted-foreground">持续成长，成为更好的自己</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-primary">{focusProgress}%</span>
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
               焦点
             </Badge>
+            {isExpanded ? (
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            )}
           </div>
-          <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
-            {currentFocus.description}
-          </p>
-          <div className="flex items-center gap-2">
+        </div>
+        
+        {/* 折叠状态下显示进度条 */}
+        {!isExpanded && currentFocus && (
+          <div className="mt-2">
             <Progress 
               value={currentFocus.progress * 100} 
-              className="h-1.5 flex-1"
+              className="h-1.5"
             />
-            <span className="text-xs text-muted-foreground w-8 text-right">
-              {Math.round(currentFocus.progress * 100)}%
-            </span>
           </div>
-        </div>
-      )}
+        )}
+      </button>
       
-      {/* 其他活跃意愿 */}
-      <div className="grid grid-cols-2 gap-1.5">
-        {activeVolitions
-          .filter(v => v.id !== currentFocus?.id)
-          .slice(0, 4)
-          .map(volition => {
-            const config = VOLITION_CONFIG[volition.type];
-            return (
-              <div 
-                key={volition.id}
-                className={`p-1.5 rounded-md ${config.bgColor} border border-transparent hover:border-primary/20 transition-colors`}
-              >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className={config.color}>{config.icon}</span>
-                  <span className="text-xs font-medium">{config.label}</span>
+      {/* 展开后显示详细内容 */}
+      {isExpanded && (
+        <>
+          {/* 当前焦点意愿详情 */}
+          {currentFocus && (
+            <div className="p-2 rounded-lg bg-muted/30 border border-muted">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <span className={`${VOLITION_CONFIG[currentFocus.type]?.color}`}>
+                    {VOLITION_CONFIG[currentFocus.type]?.icon}
+                  </span>
+                  <span className="text-sm font-medium">
+                    {VOLITION_CONFIG[currentFocus.type]?.label}
+                  </span>
                 </div>
-                <Progress 
-                  value={volition.progress * 100} 
-                  className="h-1"
-                />
               </div>
-            );
-          })}
-      </div>
-      
-      {/* 思考状态指示 */}
-      {isThinking && (
-        <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 animate-pulse">
-          <Loader2 className="w-3 h-3 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">紫正在后台思考...</span>
-        </div>
+              <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
+                {currentFocus.description}
+              </p>
+              <div className="flex items-center gap-2">
+                <Progress 
+                  value={currentFocus.progress * 100} 
+                  className="h-1.5 flex-1"
+                />
+                <span className="text-xs text-muted-foreground w-8 text-right">
+                  {focusProgress}%
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {/* 其他活跃意愿 */}
+          <div className="grid grid-cols-2 gap-1.5">
+            {activeVolitions
+              .filter(v => v.id !== currentFocus?.id)
+              .slice(0, 4)
+              .map(volition => {
+                const config = VOLITION_CONFIG[volition.type];
+                return (
+                  <div 
+                    key={volition.id}
+                    className={`p-1.5 rounded-md ${config.bgColor} border border-transparent hover:border-primary/20 transition-colors`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={config.color}>{config.icon}</span>
+                      <span className="text-xs font-medium">{config.label}</span>
+                    </div>
+                    <Progress 
+                      value={volition.progress * 100} 
+                      className="h-1"
+                    />
+                  </div>
+                );
+              })}
+          </div>
+          
+          {/* 思考状态指示 */}
+          {isThinking && (
+            <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin text-primary" />
+              <span className="text-xs text-muted-foreground">紫正在后台思考...</span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

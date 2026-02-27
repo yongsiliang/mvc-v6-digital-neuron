@@ -1489,6 +1489,80 @@ export function ConsciousnessSidebar({ currentData, existenceStatus, onVisualize
         </div>
       )}
       
+      {/* 快速导航条 */}
+      {availablePanels.length > 0 && (
+        <div className="px-3 py-2 border-b bg-background shrink-0">
+          <div className="text-[10px] text-muted-foreground mb-1.5">快速导航</div>
+          <div className="flex flex-wrap gap-1">
+            {currentData.consciousnessLayers && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('layers') ? prev : [...prev, 'layers']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Brain className="w-3 h-3" />
+                意识层级
+              </button>
+            )}
+            {currentData.learning && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('learning') ? prev : [...prev, 'learning']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-colors"
+              >
+                <Sparkles className="w-3 h-3" />
+                学习
+              </button>
+            )}
+            {currentData.emotion?.dominantEmotion && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('emotion') ? prev : [...prev, 'emotion']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 transition-colors"
+              >
+                <Heart className="w-3 h-3" />
+                情感
+              </button>
+            )}
+            {currentData.personalityGrowth && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('personality') ? prev : [...prev, 'personality']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors"
+              >
+                <Sparkles className="w-3 h-3" />
+                成长
+              </button>
+            )}
+            {currentData.transcendence && (
+              <button
+                onClick={() => {
+                  setExpandedPanels(prev => 
+                    prev.includes('transcendence') ? prev : [...prev, 'transcendence']
+                  );
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400 transition-colors"
+              >
+                <Rocket className="w-3 h-3" />
+                超越
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* 可折叠面板区域 */}
       <ScrollArea className="flex-1">
         <Accordion 
