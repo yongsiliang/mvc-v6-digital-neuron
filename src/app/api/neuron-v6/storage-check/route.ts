@@ -26,11 +26,12 @@ export async function GET(request: NextRequest) {
   try {
     const storage = getStorage();
     
-    // 要检查的前缀列表
+    // 要检查的前缀列表（包含 V3 和 V6）
     const prefixes = [
-      'consciousness-v6',
+      'consciousness/',      // V3 路径
+      'consciousness-v6',    // V6 路径
       'consciousness-v6/',
-      'consciousness',
+      'consciousness',       // 通配
       'neuron',
       'backup',
       'memory',
