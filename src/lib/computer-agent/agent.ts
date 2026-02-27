@@ -23,9 +23,14 @@ import type {
   TaskStep,
   TaskExecutionState,
   ScreenAnalysis,
+  ScreenElement,
   AtomicAction,
   MouseOperation,
   KeyboardOperation,
+  Point,
+  Rectangle,
+  AppInfo,
+  WindowInfo,
   IInputController,
   IVisionSystem,
   IAppManager,
@@ -42,6 +47,9 @@ import {
   StepStatus,
   AgentEventType as EventType,
   DEFAULT_AGENT_CONFIG,
+  MouseAction,
+  MouseButton,
+  KeyboardAction,
 } from './types';
 import { LLMClient } from 'coze-coding-dev-sdk';
 import { createInputController } from './input';
@@ -201,6 +209,185 @@ export class ComputerAgent {
     }
     
     return success(analysisResult.value);
+  }
+  
+  // ════════════════════════════════════════════════════════════════════
+  // 底层操作 API - 直接暴露子系统功能
+  // ════════════════════════════════════════════════════════════════════
+  
+  /**
+   * 截取屏幕
+   */
+  async captureScreen(region?: Rectangle): Promise<Result<string>> {
+    return this.visionSystem.captureScreen(region);
+  }
+  
+  /**
+   * 在屏幕上查找元素
+   */
+  async findElement(description: string): Promise<Result<ScreenElement>> {
+    // 先获取屏幕分析
+    const analysisResult = await this.analyzeScreen();
+    if (!analysisResult.success) {
+      return failure(analysisResult.error);
+    }
+    
+    return this.visionSystem.findElement(description, analysisResult.value);
+  }
+  
+  // ────────────────────────────────────────────────────────────────────
+  // 鼠标操作
+  // ────────────────────────────────────────────────────────────────────
+  
+  /**
+   * 移动鼠标
+   */
+  async moveMouse(x: number, y: number, speed?: number): Promise<Result<void>> {
+    const operation: MouseOperation = {
+      action: MouseAction.MOVE,
+      position: { x, y },
+      speed,
+    };
+    return this.inputController.executeMouse(operation);
+  }
+  
+  /**
+   * 点击鼠标
+   */
+  async click(
+    x?: number, 
+    y?: number, 
+    button: MouseButton = MouseButton.LEFT,
+    doubleClick: boolean = false
+  ): Promise<Result<void>> {
+    const operation: MouseOperation = {
+      action: doubleClick ? MouseAction.DOUBLE_CLICK : MouseAction.CLICK,
+      position: x !== undefined && y !== undefined ? { x, y } : undefined,
+      button,
+    };
+    return this.inputController.executeMouse(operation);
+  }
+  
+  /**
+   * 右键点击
+   */
+  async rightClick(x?: number, y?: number): Promise<Result<void>> {
+    return this.click(x, y, MouseButton.RIGHT, false);
+  }
+  
+  /**
+   * 双击
+   */
+  async doubleClick(x?: number, y?: number): Promise<Result<void>> {
+    return this.click(x, y, MouseButton.LEFT, true);
+  }
+  
+  /**
+   * 拖拽
+   */
+  async drag(fromX: number, fromY: number, toX: number, toY: number): Promise<Result<void>> {
+    const operation: MouseOperation = {
+      action: MouseAction.DRAG,
+      startPosition: { x: fromX, y: fromY },
+      position: { x: toX, y: toY },
+    };
+    return this.inputController.executeMouse(operation);
+  }
+  
+  /**
+   * 滚动
+   */
+  async scroll(amount: number, direction: 'up' | 'down' | 'left' | 'right' = 'down'): Promise<Result<void>> {
+    const operation: MouseOperation = {
+      action: MouseAction.SCROLL,
+      scrollAmount: amount,
+      scrollDirection: direction,
+    };
+    return this.inputController.executeMouse(operation);
+  }
+  
+  /**
+   * 获取鼠标当前位置
+   */
+  async getMousePosition(): Promise<Result<Point>> {
+    return this.inputController.getMousePosition();
+  }
+  
+  // ────────────────────────────────────────────────────────────────────
+  // 键盘操作
+  // ────────────────────────────────────────────────────────────────────
+  
+  /**
+   * 输入文字
+   */
+  async typeText(text: string, interval: number = 50): Promise<Result<void>> {
+    const operation: KeyboardOperation = {
+      action: KeyboardAction.TYPE,
+      text,
+      interval,
+    };
+    return this.inputController.executeKeyboard(operation);
+  }
+  
+  /**
+   * 按下单个键
+   */
+  async pressKey(key: string): Promise<Result<void>> {
+    const operation: KeyboardOperation = {
+      action: KeyboardAction.PRESS,
+      keys: [key],
+    };
+    return this.inputController.executeKeyboard(operation);
+  }
+  
+  /**
+   * 按下快捷键组合
+   */
+  async hotkey(keys: string[]): Promise<Result<void>> {
+    const operation: KeyboardOperation = {
+      action: KeyboardAction.HOTKEY,
+      keys,
+    };
+    return this.inputController.executeKeyboard(operation);
+  }
+  
+  // ────────────────────────────────────────────────────────────────────
+  // 应用管理
+  // ────────────────────────────────────────────────────────────────────
+  
+  /**
+   * 启动应用
+   */
+  async launchApp(name: string, args?: string[]): Promise<Result<AppInfo>> {
+    return this.appManager.launchApp(name, args);
+  }
+  
+  /**
+   * 列出应用
+   */
+  async listApps(): Promise<Result<AppInfo[]>> {
+    return this.appManager.listApps();
+  }
+  
+  /**
+   * 列出窗口
+   */
+  async listWindows(): Promise<Result<WindowInfo[]>> {
+    return this.appManager.listWindows();
+  }
+  
+  /**
+   * 聚焦窗口
+   */
+  async focusWindow(windowId: string | number): Promise<Result<void>> {
+    return this.appManager.focusWindow(windowId);
+  }
+  
+  /**
+   * 关闭窗口
+   */
+  async closeWindow(windowId: string | number): Promise<Result<void>> {
+    return this.appManager.closeWindow(windowId);
   }
   
   // ════════════════════════════════════════════════════════════════════
