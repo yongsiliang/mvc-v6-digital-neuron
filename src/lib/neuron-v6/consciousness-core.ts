@@ -762,6 +762,12 @@ export interface PersistedState {
   // 分层记忆状态（唯一的记忆持久化）
   layeredMemoryState?: ReturnType<LayeredMemorySystem['exportState']>;
   
+  // Hebbian神经网络状态
+  hebbianNetwork?: {
+    neurons: Array<{ id: string; label: string; activation: number }>;
+    synapses: Array<{ from: string; to: string; weight: number }>;
+  };
+  
   // 其他模块状态（不含 LongTermMemory）
   fullState?: {
     meaning: ReturnType<MeaningAssigner['exportState']>;
@@ -2475,6 +2481,12 @@ ${thinkingSection}
     const layeredStats = this.layeredMemory.getStats();
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
     
+    // 获取神经网络状态 - 使用单例以确保获取最新状态
+    const network = HebbianNetwork.getInstance();
+    const networkState = network.getNetworkState();
+    
+    console.log(`[持久化] 网络状态: ${networkState.neurons.length} 个神经元, ${networkState.synapses.length} 个突触`);
+    
     return {
       version: '6.0',
       timestamp: Date.now(),
@@ -2497,6 +2509,19 @@ ${thinkingSection}
       },
       conversationHistory: this.conversationHistory.slice(-50),
       layeredMemoryState: this.layeredMemory.exportState(),
+      // 保存神经网络状态
+      hebbianNetwork: {
+        neurons: networkState.neurons.map(n => ({
+          id: n.id,
+          label: n.label,
+          activation: n.activation,
+        })),
+        synapses: networkState.synapses.map(s => ({
+          from: s.from,
+          to: s.to,
+          weight: s.weight,
+        })),
+      },
       fullState: {
         meaning: this.meaningAssigner.exportState(),
         self: this.selfConsciousness.exportState(),
@@ -2522,6 +2547,45 @@ ${thinkingSection}
       
       // 根据分层记忆的核心层重建 longTermMemory 的关键节点
       this.rebuildKnowledgeGraphFromLayeredMemory();
+    }
+    
+    // 恢复神经网络状态
+    if (state.hebbianNetwork) {
+      console.log(`[意识核心] 恢复神经网络: ${state.hebbianNetwork.neurons.length} 个神经元, ${state.hebbianNetwork.synapses.length} 个突触`);
+      
+      // 直接在现有网络上创建神经元（createNeuron 会处理重复 ID）
+      let neuronsCreated = 0;
+      let neuronsExisting = 0;
+      
+      for (const neuron of state.hebbianNetwork.neurons) {
+        const existing = this.network.getNetworkState().neurons.find(n => n.id === neuron.id);
+        if (!existing) {
+          this.network.createNeuron({
+            id: neuron.id,
+            label: neuron.label,
+          });
+          neuronsCreated++;
+        } else {
+          neuronsExisting++;
+        }
+      }
+      
+      // 创建突触
+      let synapsesCreated = 0;
+      for (const synapse of state.hebbianNetwork.synapses) {
+        try {
+          this.network.createSynapse({
+            from: synapse.from,
+            to: synapse.to,
+            weight: synapse.weight,
+          });
+          synapsesCreated++;
+        } catch {
+          // 突触可能已存在，忽略错误
+        }
+      }
+      
+      console.log(`[意识核心] 神经网络恢复完成: 新增 ${neuronsCreated} 个神经元, ${synapsesCreated} 个突触`);
     }
     
     // 类型安全的恢复对话历史
@@ -2747,6 +2811,79 @@ ${thinkingSection}
       networkNeuronCount: networkState.stats.totalNeurons,
       networkSynapseCount: networkState.stats.totalSynapses,
     };
+  }
+  
+  /**
+   * 迁移神经元到网络（用于 V3 数据迁移）
+   * 直接操作核心实例的网络，避免单例不一致问题
+   */
+  migrateNeurons(neurons: Array<{
+    id: string;
+    label: string;
+    type?: string;
+    activation?: number;
+    preferenceVector?: number[];
+  }>): { created: number; existing: number } {
+    let created = 0;
+    let existing = 0;
+    
+    for (const n of neurons) {
+      const existingNeuron = this.network.getNeuron(n.id);
+      if (existingNeuron) {
+        existing++;
+      } else {
+        // 映射类型
+        let neuronType: 'concept' | 'abstract' | 'sensory' | 'emotion' = 'concept';
+        if (n.type === 'abstract') neuronType = 'abstract';
+        else if (n.type === 'trap') neuronType = 'concept'; // 将 trap 映射为 concept
+        
+        this.network.createNeuron({
+          id: n.id,
+          label: n.label,
+          type: neuronType,
+          preferenceVector: n.preferenceVector,
+        });
+        if (n.activation) {
+          this.network.setActivation(n.id, n.activation);
+        }
+        created++;
+      }
+    }
+    
+    console.log(`[意识核心] 迁移神经元: 创建 ${created}, 已存在 ${existing}`);
+    return { created, existing };
+  }
+  
+  /**
+   * 迁移突触到网络（用于 V3 数据迁移）
+   */
+  migrateSynapses(synapses: Array<{
+    from: string;
+    to: string;
+    weight: number;
+  }>): { created: number; skipped: number } {
+    let created = 0;
+    let skipped = 0;
+    
+    for (const s of synapses) {
+      const fromNeuron = this.network.getNeuron(s.from);
+      const toNeuron = this.network.getNeuron(s.to);
+      
+      if (!fromNeuron || !toNeuron) {
+        skipped++;
+        continue;
+      }
+      
+      this.network.createSynapse({
+        from: s.from,
+        to: s.to,
+        weight: s.weight,
+      });
+      created++;
+    }
+    
+    console.log(`[意识核心] 迁移突触: 创建 ${created}, 跳过 ${skipped}`);
+    return { created, skipped };
   }
 
   /**

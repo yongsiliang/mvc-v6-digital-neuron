@@ -8,8 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Storage } from 'coze-coding-dev-sdk';
+import { S3Storage, HeaderUtils } from 'coze-coding-dev-sdk';
 import { HebbianNetwork } from '@/lib/neuron-v6/hebbian-network';
+import { getSharedCore, resetSharedCore } from '@/lib/neuron-v6/shared-core';
 
 function getStorage(): S3Storage {
   return new S3Storage({
@@ -66,7 +67,7 @@ interface V3Backup {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { key, preview = false } = body;
+    const { key, preview = false, forceInit = false } = body;
     
     if (!key) {
       return NextResponse.json(
@@ -116,61 +117,42 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // 2. 重置 V6 网络
-    console.log('[迁移] 重置 V6 网络...');
-    HebbianNetwork.reset();
-    const network = HebbianNetwork.getInstance();
-    
-    // 3. 迁移神经元
-    console.log('[迁移] 迁移神经元...');
-    let neuronsCreated = 0;
-    const neuronIdMap = new Map<string, string>(); // V3 ID -> V6 ID
-    
-    for (const v3Neuron of v3Data.neurons) {
-      const v6Neuron = network.createNeuron({
-        id: v3Neuron.id, // 保留原始 ID
-        label: v3Neuron.label,
-        type: v3Neuron.type,
-        preferenceVector: v3Neuron.preferenceVector,
-        bias: 0.1,
-      });
-      
-      // 设置激活值
-      network.setActivation(v6Neuron.id, v3Neuron.activation);
-      
-      neuronIdMap.set(v3Neuron.id, v6Neuron.id);
-      neuronsCreated++;
+    // 2. 获取 V6 核心实例（支持强制重新初始化）
+    if (forceInit) {
+      console.log('[迁移] 强制重新初始化核心实例...');
+      resetSharedCore();
     }
     
-    console.log(`[迁移] 创建了 ${neuronsCreated} 个神经元`);
+    const headers = HeaderUtils.extractForwardHeaders(request.headers);
+    const core = await getSharedCore(headers);
+    
+    // 3. 迁移神经元（直接操作核心实例的网络）
+    console.log('[迁移] 迁移神经元...');
+    const neuronResult = core.migrateNeurons(v3Data.neurons.map(n => ({
+      id: n.id,
+      label: n.label,
+      type: n.type,
+      activation: n.activation,
+      preferenceVector: n.preferenceVector,
+    })));
     
     // 4. 迁移突触
     console.log('[迁移] 迁移突触...');
-    let synapsesCreated = 0;
-    let synapsesSkipped = 0;
+    const synapseResult = core.migrateSynapses(v3Data.synapses.map(s => ({
+      from: s.from,
+      to: s.to,
+      weight: s.weight,
+    })));
     
-    for (const v3Synapse of v3Data.synapses) {
-      const fromId = neuronIdMap.get(v3Synapse.from);
-      const toId = neuronIdMap.get(v3Synapse.to);
-      
-      if (!fromId || !toId) {
-        synapsesSkipped++;
-        continue;
-      }
-      
-      network.createSynapse({
-        from: fromId,
-        to: toId,
-        weight: v3Synapse.weight,
-      });
-      
-      synapsesCreated++;
-    }
+    // 5. 立即保存状态（避免热更新导致单例丢失）
+    console.log('[迁移] 保存迁移后的状态...');
+    const state = core.getPersistedState();
+    const { PersistenceManagerV6 } = await import('@/lib/neuron-v6/consciousness-core');
+    await PersistenceManagerV6.save(state);
+    console.log('[迁移] 状态已保存');
     
-    console.log(`[迁移] 创建了 ${synapsesCreated} 个突触, 跳过 ${synapsesSkipped} 个`);
-    
-    // 5. 获取最终状态
-    const stats = network.getStats();
+    // 6. 获取最终状态
+    const stats = core.getStats();
     
     return NextResponse.json({
       success: true,
@@ -181,22 +163,21 @@ export async function POST(request: NextRequest) {
         date: new Date(v3Data.timestamp).toLocaleString('zh-CN'),
       },
       migration: {
-        neuronsCreated,
-        synapsesCreated,
-        synapsesSkipped,
+        neuronsCreated: neuronResult.created,
+        neuronsExisting: neuronResult.existing,
+        synapsesCreated: synapseResult.created,
+        synapsesSkipped: synapseResult.skipped,
       },
       result: {
-        totalNeurons: stats.totalNeurons,
-        totalSynapses: stats.totalSynapses,
-        averageWeight: Math.round(stats.averageWeight * 100) / 100,
-        density: stats.density.toExponential(4),
+        totalNeurons: stats.networkNeuronCount,
+        totalSynapses: stats.networkSynapseCount,
       },
       identity: v3Data.identity,
       preservedData: {
         conversations: v3Data.conversationHistory?.length || 0,
         hypotheses: v3Data.hypotheses?.length || 0,
       },
-      message: `成功迁移 ${neuronsCreated} 个神经元和 ${synapsesCreated} 个突触到 V6`,
+      message: `成功迁移 ${neuronResult.created} 个神经元和 ${synapseResult.created} 个突触到 V6`,
     });
     
   } catch (error) {
