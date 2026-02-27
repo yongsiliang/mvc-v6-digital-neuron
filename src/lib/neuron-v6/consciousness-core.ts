@@ -188,8 +188,8 @@ import {
   EvolutionEvent,
   createSelfTranscendenceSystem,
 } from './self-transcendence';
-import { HebbianNetwork } from '../neuron-v3/hebbian-network';
-import { InnateKnowledgeInitializer, getInitializedNetwork } from '../neuron-v3/innate-knowledge';
+import { HebbianNetwork } from './hebbian-network';
+import { InnateKnowledgeInitializer, getInitializedNetwork } from './innate-knowledge';
 import { v4 as uuidv4 } from 'uuid';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';

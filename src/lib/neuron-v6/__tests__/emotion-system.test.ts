@@ -35,7 +35,7 @@ describe('EmotionEngine', () => {
     it('应该能创建情感体验', () => {
       const experience = engine.experience(
         'joy',
-        { type: 'conversation', description: '测试场景' },
+        { type: 'conversation', description: '测试场景', relatedConcepts: ['测试'] },
         0.7
       );
       expect(experience).toBeDefined();
@@ -45,7 +45,7 @@ describe('EmotionEngine', () => {
     });
 
     it('情感体验应该更新活跃情感', () => {
-      engine.experience('joy', { type: 'conversation', description: '测试' }, 0.8);
+      engine.experience('joy', { type: 'conversation', description: '测试', relatedConcepts: [] }, 0.8);
       const state = engine.getState();
       expect(state.activeEmotions.length).toBeGreaterThan(0);
     });
@@ -62,7 +62,7 @@ describe('EmotionEngine', () => {
     });
 
     it('应该能衰减活跃情感', () => {
-      engine.experience('joy', { type: 'conversation', description: '测试' }, 0.9);
+      engine.experience('joy', { type: 'conversation', description: '测试', relatedConcepts: [] }, 0.9);
       const beforeState = engine.getState();
       const beforeIntensity = beforeState.activeEmotions[0]?.intensity || 0;
       
@@ -78,14 +78,14 @@ describe('EmotionEngine', () => {
 
   describe('情感驱动行为', () => {
     it('应该能生成情感驱动行为', () => {
-      engine.experience('curiosity', { type: 'conversation', description: '测试' }, 0.8);
+      engine.experience('curiosity', { type: 'conversation', description: '测试', relatedConcepts: [] }, 0.8);
       const behaviors = engine.getEmotionDrivenBehaviors();
       expect(behaviors).toBeDefined();
       expect(Array.isArray(behaviors)).toBe(true);
     });
 
     it('不同情感应该生成不同行为', () => {
-      engine.experience('joy', { type: 'event', description: '开心事件' }, 0.7);
+      engine.experience('joy', { type: 'observation', description: '开心事件', relatedConcepts: [] }, 0.7);
       const joyBehaviors = engine.getEmotionDrivenBehaviors();
       
       expect(joyBehaviors.length).toBeGreaterThan(0);
@@ -101,7 +101,7 @@ describe('EmotionEngine', () => {
 
   describe('情感报告', () => {
     it('应该能生成情感报告', () => {
-      engine.experience('joy', { type: 'conversation', description: '测试' }, 0.7);
+      engine.experience('joy', { type: 'conversation', description: '测试', relatedConcepts: [] }, 0.7);
       const report = engine.getEmotionReport();
       expect(report).toBeDefined();
       expect(report.length).toBeGreaterThan(0);
@@ -112,8 +112,8 @@ describe('EmotionEngine', () => {
   describe('复杂情感', () => {
     it('应该能处理复杂情感', () => {
       // 同时体验多种情感
-      engine.experience('joy', { type: 'conversation', description: '成功' }, 0.6);
-      engine.experience('anxiety', { type: 'conversation', description: '担忧' }, 0.4);
+      engine.experience('joy', { type: 'conversation', description: '成功', relatedConcepts: [] }, 0.6);
+      engine.experience('anxiety', { type: 'thought', description: '担忧', relatedConcepts: [] }, 0.4);
       
       const state = engine.getState();
       expect(state.activeEmotions.length).toBeGreaterThanOrEqual(1);
@@ -122,7 +122,7 @@ describe('EmotionEngine', () => {
 
   describe('情感记忆', () => {
     it('应该能创建情感记忆', () => {
-      const exp = engine.experience('joy', { type: 'event', description: '测试事件' }, 0.8);
+      const exp = engine.experience('joy', { type: 'observation', description: '测试事件', relatedConcepts: [] }, 0.8);
       const memory = engine.createEmotionalMemory(exp);
       
       expect(memory).toBeDefined();
@@ -131,7 +131,7 @@ describe('EmotionEngine', () => {
     });
 
     it('应该能检索情感记忆', () => {
-      const exp = engine.experience('joy', { type: 'event', description: '快乐时光' }, 0.9);
+      const exp = engine.experience('joy', { type: 'memory', description: '快乐时光', relatedConcepts: [] }, 0.9);
       engine.createEmotionalMemory(exp);
       
       const memories = engine.retrieveEmotionalMemories('快乐');
