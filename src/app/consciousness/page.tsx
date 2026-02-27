@@ -8,11 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, Sparkles, MessageCircle, Activity, Timer, Network, ChevronDown, ChevronUp, Heart, Link2, MessagesSquare, Moon, Lightbulb, Gem, InfinityIcon, Cpu } from 'lucide-react';
+import { Brain, Sparkles, MessageCircle, Activity, Timer, Network, ChevronDown, ChevronUp, Heart, Link2, MessagesSquare, Moon, Lightbulb, Gem, InfinityIcon, Cpu, Layers } from 'lucide-react';
 import { 
   ConsciousnessDashboard, 
   ConsciousnessVisualizationData 
 } from '@/components/visualization/consciousness-dashboard';
+import { VisualizationPanel } from '@/components/visualization/visualization-panel';
 import { ConsciousnessSidebar } from '@/components/neuron/consciousness-sidebar';
 import { DanmakuContainer, DanmakuMessage } from '@/components/neuron/danmaku';
 import { DraggablePanel } from '@/components/neuron/draggable-panel';
@@ -617,6 +618,9 @@ export default function ConsciousnessPage() {
   // 可视化数据
   const [visualizationData, setVisualizationData] = useState<ConsciousnessVisualizationData | null>(null);
   const [showVisualization, setShowVisualization] = useState(false);
+  
+  // 神经网络和记忆图谱可视化
+  const [showNeuralViz, setShowNeuralViz] = useState(false);
   
   // 弹幕消息
   const [danmakuMessages, setDanmakuMessages] = useState<DanmakuMessage[]>([]);
@@ -1251,6 +1255,16 @@ export default function ConsciousnessPage() {
                 <Network className="w-4 h-4" />
                 <span>{showVisualization ? '关闭' : '可视化'}</span>
               </Button>
+              {/* 神经网络可视化按钮 */}
+              <Button
+                variant={showNeuralViz ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowNeuralViz(!showNeuralViz)}
+                className="gap-1.5"
+              >
+                <Layers className="w-4 h-4" />
+                <span>{showNeuralViz ? '关闭' : '网络'}</span>
+              </Button>
             </div>
 
             {/* 移动端：简洁状态 + 操作按钮 */}
@@ -1268,6 +1282,14 @@ export default function ConsciousnessPage() {
                 className="h-8 w-8"
               >
                 <Network className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowNeuralViz(!showNeuralViz)}
+                className="h-8 w-8"
+              >
+                <Layers className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -1648,6 +1670,20 @@ export default function ConsciousnessPage() {
             data={visualizationData}
             isLoading={false}
           />
+        </DraggablePanel>
+      )}
+      
+      {/* 神经网络和记忆图谱可视化悬浮窗口 */}
+      {showNeuralViz && (
+        <DraggablePanel
+          title="神经网络与记忆"
+          icon={<span className="text-lg">🔮</span>}
+          onClose={() => setShowNeuralViz(false)}
+          defaultPosition={{ x: 50, y: 100 }}
+          defaultSize={{ width: 360, height: 450 }}
+          className="md:!right-4 md:!top-20 md:!w-[380px] md:!h-[520px]"
+        >
+          <VisualizationPanel onClose={() => setShowNeuralViz(false)} />
         </DraggablePanel>
       )}
     </div>
