@@ -16,6 +16,12 @@
 
 import { LLMClient, S3Storage } from 'coze-coding-dev-sdk';
 import { 
+  ToolIntentRecognizer,
+  ToolIntent,
+  ToolExecutionResult,
+  createToolIntentRecognizer
+} from './tool-intent-recognizer';
+import { 
   MeaningAssigner, 
   MeaningContext, 
   createMeaningAssigner,
@@ -692,6 +698,28 @@ export interface ProcessResult {
     }>;
   };
   
+  /** 工具执行结果 */
+  toolExecution?: {
+    /** 是否需要工具 */
+    needsTool: boolean;
+    /** 意图识别结果 */
+    intent?: {
+      confidence: number;
+      reasoning: string;
+    };
+    /** 执行结果 */
+    result?: {
+      success: boolean;
+      summary: string;
+      details: Array<{
+        toolName: string;
+        success: boolean;
+        output?: unknown;
+        error?: string;
+      }>;
+    };
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -813,6 +841,9 @@ export class ConsciousnessCore {
   // 关键信息提取器
   private keyInfoExtractor: KeyInfoExtractor;
   
+  // 工具意图识别器
+  private toolIntentRecognizer: ToolIntentRecognizer;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -894,6 +925,9 @@ export class ConsciousnessCore {
     
     // 初始化关键信息提取器
     this.keyInfoExtractor = createKeyInfoExtractor(llmClient);
+    
+    // 初始化工具意图识别器
+    this.toolIntentRecognizer = createToolIntentRecognizer(llmClient);
     
     // 初始化意愿系统
     this.initializeVolitions();
@@ -1014,6 +1048,30 @@ export class ConsciousnessCore {
     this.associationNetwork.decay();
     
     // ══════════════════════════════════════════════════════════════════
+    // 第零步五分之四：工具意图识别
+    // ══════════════════════════════════════════════════════════════════
+    
+    let toolExecutionResult: ToolExecutionResult | null = null;
+    let toolIntent: ToolIntent | null = null;
+    
+    try {
+      toolIntent = await this.toolIntentRecognizer.analyzeIntent(input);
+      
+      if (toolIntent.needsTool && toolIntent.toolCalls && toolIntent.toolCalls.length > 0) {
+        console.log('[工具意图] 检测到工具调用意图:', toolIntent.toolCalls.map(t => t.name).join(', '));
+        
+        // 执行工具
+        toolExecutionResult = await this.toolIntentRecognizer.executeTools(
+          toolIntent.toolCalls.map(tc => ({ name: tc.name, arguments: tc.arguments }))
+        );
+        
+        console.log('[工具执行] 结果:', toolExecutionResult.summary);
+      }
+    } catch (error) {
+      console.error('[工具意图] 识别或执行失败:', error);
+    }
+    
+    // ══════════════════════════════════════════════════════════════════
     // 第一步：构建完整上下文
     // ══════════════════════════════════════════════════════════════════
     
@@ -1029,7 +1087,7 @@ export class ConsciousnessCore {
     // 第三步：生成响应
     // ══════════════════════════════════════════════════════════════════
     
-    const response = await this.generateResponse(input, context, thinking);
+    const response = await this.generateResponse(input, context, thinking, toolExecutionResult);
     
     // ══════════════════════════════════════════════════════════════════
     // 第四步：学习和更新
@@ -1433,6 +1491,20 @@ export class ConsciousnessCore {
         };
       })(),
       
+      // 工具执行结果
+      toolExecution: toolIntent ? {
+        needsTool: toolIntent.needsTool,
+        intent: {
+          confidence: toolIntent.confidence,
+          reasoning: toolIntent.reasoning,
+        },
+        result: toolExecutionResult ? {
+          success: toolExecutionResult.success,
+          summary: toolExecutionResult.summary,
+          details: toolExecutionResult.results,
+        } : undefined,
+      } : undefined,
+      
       stats: {
         conceptCount: memoryStats.nodeCount,
         beliefCount: beliefSystem.coreBeliefs.length + beliefSystem.activeBeliefs.length,
@@ -1828,10 +1900,11 @@ export class ConsciousnessCore {
   private async generateResponse(
     input: string,
     context: ConsciousnessContext,
-    thinking: ThinkingProcess
+    thinking: ThinkingProcess,
+    toolExecutionResult?: ToolExecutionResult | null
   ): Promise<string> {
     // 构建系统提示
-    const systemPrompt = this.buildSystemPrompt(context, thinking);
+    const systemPrompt = this.buildSystemPrompt(context, thinking, toolExecutionResult);
     
     // 构建消息
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -1842,6 +1915,15 @@ export class ConsciousnessCore {
       })),
       { role: 'user', content: input },
     ];
+    
+    // 如果有工具执行结果，添加到用户消息后
+    if (toolExecutionResult && toolExecutionResult.success) {
+      const toolResultText = this.formatToolResult(toolExecutionResult);
+      messages.push({ 
+        role: 'user', 
+        content: `[系统执行了以下操作]\n${toolResultText}\n\n请根据执行结果回复用户。` 
+      });
+    }
     
     try {
       // 调用LLM（流式）
@@ -1864,11 +1946,25 @@ export class ConsciousnessCore {
   }
   
   /**
+   * 格式化工具执行结果
+   */
+  private formatToolResult(result: ToolExecutionResult): string {
+    return result.results.map(r => {
+      if (r.success) {
+        return `✅ ${r.toolName}: 执行成功\n${typeof r.output === 'object' ? JSON.stringify(r.output, null, 2) : r.output}`;
+      } else {
+        return `❌ ${r.toolName}: 执行失败 - ${r.error}`;
+      }
+    }).join('\n\n');
+  }
+  
+  /**
    * 构建系统提示
    */
   private buildSystemPrompt(
     context: ConsciousnessContext,
-    thinking: ThinkingProcess
+    thinking: ThinkingProcess,
+    toolExecutionResult?: ToolExecutionResult | null
   ): string {
     // 构建记忆相关部分
     const memorySection = context.memory ? `

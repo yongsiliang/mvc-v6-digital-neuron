@@ -90,3 +90,15 @@ export function getCurrentCore(): ConsciousnessCore | null {
 export function isCoreInitialized(): boolean {
   return getGlobalStore().isInitialized;
 }
+
+/**
+ * 重置共享核心实例
+ * 用于开发环境中的热更新或手动重置
+ */
+export function resetSharedCore(): void {
+  const store = getGlobalStore();
+  store.sharedCore = null;
+  store.isInitialized = false;
+  store.initializationPromise = null;
+  console.log('[SharedCore] 核心实例已重置');
+}

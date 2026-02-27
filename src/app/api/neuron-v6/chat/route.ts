@@ -20,18 +20,30 @@ import {
   ThinkingProcess,
   LearningResult,
 } from '@/lib/neuron-v6/consciousness-core';
-import { getSharedCore } from '@/lib/neuron-v6/shared-core';
+import { getSharedCore, resetSharedCore, getCurrentCore } from '@/lib/neuron-v6/shared-core';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message } = body;
+    const { message, resetCore } = body;
     
     if (!message) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+    
+    // 检查是否需要重置核心实例（开发环境热更新后可能需要）
+    if (resetCore) {
+      resetSharedCore();
+    }
+    
+    // 检查核心实例是否有工具识别器（如果没有，重置）
+    const currentCore = getCurrentCore();
+    if (currentCore && !(currentCore as unknown as { toolIntentRecognizer?: unknown }).toolIntentRecognizer) {
+      console.log('[V6] 检测到核心实例缺少工具识别器，正在重置...');
+      resetSharedCore();
     }
     
     const headers = HeaderUtils.extractForwardHeaders(request.headers);
@@ -131,6 +143,15 @@ export async function POST(request: NextRequest) {
             selfObservation: result.consciousnessLayers.selfObservation,
             emergenceReport: result.consciousnessLayers.emergenceReport,
           });
+          
+          // 发送工具执行结果（如果有）
+          if (result.toolExecution) {
+            send('toolExecution', {
+              needsTool: result.toolExecution.needsTool,
+              intent: result.toolExecution.intent,
+              result: result.toolExecution.result,
+            });
+          }
           
           // 发送情感状态
           send('emotion', {
