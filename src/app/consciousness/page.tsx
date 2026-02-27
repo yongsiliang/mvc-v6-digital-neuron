@@ -1484,20 +1484,79 @@ export default function ConsciousnessPage() {
                           if (line.startsWith('data: ')) {
                             try {
                               const data = JSON.parse(line.slice(6));
-                              if (data.type === 'context') {
-                                setCurrentData(prev => ({ ...prev, context: data.data }));
-                              } else if (data.type === 'content') {
-                                // 流式内容：type='content', delta 在 data.data.delta
-                                assistantContent += data.data?.delta || '';
-                                setMessages(prev => {
-                                  const lastMsg = prev[prev.length - 1];
-                                  if (lastMsg?.role === 'assistant') {
-                                    return [...prev.slice(0, -1), { ...lastMsg, content: assistantContent }];
-                                  }
-                                  return [...prev, { role: 'assistant', content: assistantContent, timestamp: Date.now() }];
-                                });
-                              } else if (data.type === 'complete') {
-                                setIsLoading(false);
+                              // 处理所有意识数据类型
+                              switch (data.type) {
+                                case 'context':
+                                  setCurrentData(prev => ({ ...prev, context: data.data }));
+                                  break;
+                                case 'thinking':
+                                  setCurrentData(prev => ({ ...prev, thinking: data.data }));
+                                  break;
+                                case 'meaning':
+                                  setCurrentData(prev => ({ ...prev, meaning: data.data }));
+                                  break;
+                                case 'memory':
+                                  setCurrentData(prev => ({ ...prev, memory: data.data }));
+                                  break;
+                                case 'metacognition':
+                                  setCurrentData(prev => ({ ...prev, metacognition: data.data }));
+                                  break;
+                                case 'consciousnessLayers':
+                                  setCurrentData(prev => ({ ...prev, consciousnessLayers: data.data }));
+                                  break;
+                                case 'emotion':
+                                  setCurrentData(prev => ({ ...prev, emotion: data.data }));
+                                  break;
+                                case 'association':
+                                  setCurrentData(prev => ({ ...prev, association: data.data }));
+                                  break;
+                                case 'innerDialogue':
+                                  setCurrentData(prev => ({ ...prev, innerDialogue: data.data }));
+                                  break;
+                                case 'dream':
+                                  setCurrentData(prev => ({ ...prev, dream: data.data }));
+                                  break;
+                                case 'creative':
+                                  setCurrentData(prev => ({ ...prev, creative: data.data }));
+                                  break;
+                                case 'value':
+                                  setCurrentData(prev => ({ ...prev, value: data.data }));
+                                  break;
+                                case 'existential':
+                                  setCurrentData(prev => ({ ...prev, existential: data.data }));
+                                  break;
+                                case 'metacognitionDeep':
+                                  setCurrentData(prev => ({ ...prev, metacognitionDeep: data.data }));
+                                  break;
+                                case 'personalityGrowth':
+                                  setCurrentData(prev => ({ ...prev, personalityGrowth: data.data }));
+                                  break;
+                                case 'knowledgeGraph':
+                                  setCurrentData(prev => ({ ...prev, knowledgeGraph: data.data }));
+                                  break;
+                                case 'multiConsciousness':
+                                  setCurrentData(prev => ({ ...prev, multiConsciousness: data.data }));
+                                  break;
+                                case 'legacy':
+                                  setCurrentData(prev => ({ ...prev, legacy: data.data }));
+                                  break;
+                                case 'transcendence':
+                                  setCurrentData(prev => ({ ...prev, transcendence: data.data }));
+                                  break;
+                                case 'content':
+                                  // 流式内容
+                                  assistantContent += data.data?.delta || '';
+                                  setMessages(prev => {
+                                    const lastMsg = prev[prev.length - 1];
+                                    if (lastMsg?.role === 'assistant') {
+                                      return [...prev.slice(0, -1), { ...lastMsg, content: assistantContent }];
+                                    }
+                                    return [...prev, { role: 'assistant', content: assistantContent, timestamp: Date.now() }];
+                                  });
+                                  break;
+                                case 'complete':
+                                  setIsLoading(false);
+                                  break;
                               }
                             } catch {
                               // 忽略
