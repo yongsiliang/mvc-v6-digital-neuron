@@ -1486,8 +1486,9 @@ export default function ConsciousnessPage() {
                               const data = JSON.parse(line.slice(6));
                               if (data.type === 'context') {
                                 setCurrentData(prev => ({ ...prev, context: data.data }));
-                              } else if (data.type === 'stream') {
-                                assistantContent += data.data || '';
+                              } else if (data.type === 'content') {
+                                // 流式内容：type='content', delta 在 data.data.delta
+                                assistantContent += data.data?.delta || '';
                                 setMessages(prev => {
                                   const lastMsg = prev[prev.length - 1];
                                   if (lastMsg?.role === 'assistant') {
