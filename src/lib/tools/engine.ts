@@ -544,7 +544,15 @@ const LOCAL_TOOL_NAMES = [
   // 自动化
   'auto_type', 'auto_hotkey', 'auto_click', 'auto_script',
   // 屏幕操作
-  'screen_capture',
+  'screen_capture', 'screen_analyze', 'screen_find_element',
+  // 鼠标操作
+  'mouse_move', 'mouse_click', 'mouse_drag', 'mouse_scroll',
+  // 键盘操作
+  'keyboard_type', 'keyboard_press', 'keyboard_hotkey',
+  // 浏览器自动化
+  'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'browser_evaluate',
+  // 自动化任务
+  'automation_execute', 'automation_status', 'automation_stop',
   // 系统通知
   'sys_notify',
 ];

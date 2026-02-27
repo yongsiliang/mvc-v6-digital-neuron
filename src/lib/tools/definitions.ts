@@ -9,6 +9,9 @@
 
 import type { ToolDefinition, ToolCategory } from './types';
 
+// 导入 Computer Agent 工具
+import { COMPUTER_AGENT_TOOLS } from './definitions/computer-agent';
+
 // ─────────────────────────────────────────────────────────────────────
 // 文件系统工具
 // ─────────────────────────────────────────────────────────────────────
@@ -578,6 +581,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   ...SCREEN_TOOLS,
   ...APPLICATION_TOOLS,
   ...AUTOMATION_TOOLS,
+  ...COMPUTER_AGENT_TOOLS,
 ];
 
 /**
