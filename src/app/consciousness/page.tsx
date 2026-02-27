@@ -16,6 +16,12 @@ import {
 import { ConsciousnessSidebar } from '@/components/neuron/consciousness-sidebar';
 import { DanmakuContainer, DanmakuMessage } from '@/components/neuron/danmaku';
 import { DraggablePanel } from '@/components/neuron/draggable-panel';
+import { 
+  VolitionProgress, 
+  ProactiveMessageBubble, 
+  useProactiveBehavior,
+  ProactiveMessage as ProactiveMsgType
+} from '@/components/neuron/proactive-indicator';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -550,6 +556,30 @@ export default function ConsciousnessPage() {
   // 弹幕消息
   const [danmakuMessages, setDanmakuMessages] = useState<DanmakuMessage[]>([]);
   
+  // 主动行为 hook
+  const {
+    volitionState,
+    proactiveMessages,
+    isThinking,
+    removeMessage,
+    refresh: refreshProactive,
+  } = useProactiveBehavior({
+    pollInterval: 15000, // 15秒轮询
+    enabled: true,
+    onNewMessage: (msg: ProactiveMsgType) => {
+      // 收到新主动消息时，添加到消息列表
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: msg.content,
+        timestamp: msg.timestamp,
+        isProactive: true,
+      }]);
+      
+      // 清除该消息（已处理）
+      removeMessage(msg.id);
+    },
+  });
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -1048,6 +1078,16 @@ export default function ConsciousnessPage() {
               </Button>
             </div>
           </div>
+          
+          {/* 意愿进度显示 */}
+          {volitionState && (
+            <div className="mt-3 pt-3 border-t">
+              <VolitionProgress 
+                volitionState={volitionState} 
+                isThinking={isThinking}
+              />
+            </div>
+          )}
         </header>
 
         {/* 消息列表 */}
@@ -1139,6 +1179,14 @@ export default function ConsciousnessPage() {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+          
+          {/* 后台思考状态指示器 */}
+          {isThinking && (
+            <div className="mt-2 flex items-center gap-2 p-2 bg-purple-50 dark:bg-purple-950/30 rounded text-xs text-purple-600 dark:text-purple-400">
+              <Sparkles className="w-3 h-3 animate-pulse" />
+              <span>紫正在进行后台思考，可能会有新的想法想和你分享...</span>
             </div>
           )}
         </div>
