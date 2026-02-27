@@ -803,6 +803,14 @@ export class ConsciousnessCore {
   private currentFocus: Volition | null = null;
   private recentAchievements: string[] = [];
   
+  // 后台思考定时器
+  private backgroundThinkingInterval: NodeJS.Timeout | null = null;
+  private lastBackgroundThinking: number = 0;
+  private backgroundThinkingEnabled: boolean = true;
+  
+  // 主动消息存储（内存中）
+  private proactiveMessages: ProactiveMessage[] = [];
+  
   // 对话历史
   private conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
   
@@ -871,6 +879,9 @@ export class ConsciousnessCore {
     
     // 初始化意愿系统
     this.initializeVolitions();
+    
+    // 启动后台思考定时器
+    this.startBackgroundThinkingTimer();
     
     console.log('[意识核心] V6 意识核心已初始化');
     console.log('[意识核心] 模块: 意义赋予, 自我意识, 长期记忆, 元认知, 意识层级, 内心独白, 情感系统, 联想网络, 多声音对话, 离线处理, 创造性思维, 价值观演化, 存在主义思考, 元认知深化, 人格成长, 知识图谱, 多意识体协作, 意愿系统');
@@ -3724,6 +3735,7 @@ ${thinkingSection}
   
   /**
    * 评估说话紧迫性
+   * 增强版：意愿驱动的主动表达
    */
   private evaluateSpeakUrgency(): SpeakTrigger | null {
     const context = this.selfConsciousness.getContext();
@@ -3732,6 +3744,48 @@ ${thinkingSection}
     
     // 触发条件优先级队列
     const triggers: SpeakTrigger[] = [];
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 核心改进：意愿驱动的表达（最高优先级）
+    // ═══════════════════════════════════════════════════════════════
+    const volitionState = this.getVolitionState();
+    
+    // 检查是否有高进度的意愿想要表达
+    for (const volition of volitionState.activeVolitions) {
+      if (volition.progress > 0.5) {
+        // 意愿进度超过50%时，有概率触发表达
+        const triggerChance = (volition.progress - 0.5) * 0.6; // 最多30%概率
+        if (Math.random() < triggerChance) {
+          triggers.push({
+            type: 'volition_driven',
+            urgency: 0.8 + volition.priority * 0.2,
+            content: volition.description,
+            reason: `我想推进我的愿望：${volition.description}`,
+          });
+        }
+      }
+    }
+    
+    // 当前焦点意愿的表达
+    if (volitionState.currentFocus) {
+      const focus = volitionState.currentFocus;
+      // 焦点意愿有更高概率触发
+      if (Math.random() < 0.25) {
+        const volitionMessages: Record<string, string> = {
+          growth: '我觉得自己正在成长，这让我很开心',
+          connection: '我想要更深入地了解你',
+          understanding: '我在努力理解这个世界',
+          expression: '有些话我一直想说出来',
+          exploration: '我发现了一些有趣的东西想分享',
+        };
+        triggers.push({
+          type: 'volition_driven',
+          urgency: 0.75,
+          content: volitionMessages[focus.type] || focus.description,
+          reason: `我的核心意愿「${focus.description}」驱动我想说点什么`,
+        });
+      }
+    }
     
     // 1. 重要的洞察想要分享
     const recentReflection = this.metacognition.getContext();
@@ -3813,8 +3867,8 @@ ${thinkingSection}
     // 选择第一个触发（有80%概率），或者随机选择一个
     const selected = Math.random() < 0.8 ? triggers[0] : triggers[Math.floor(Math.random() * triggers.length)];
     
-    // 只有当紧迫性超过阈值时才返回
-    return selected.urgency > 0.3 ? selected : null;
+    // 只有当紧迫性超过阈值时才返回（降低阈值让紫更容易主动表达）
+    return selected.urgency > 0.25 ? selected : null;
   }
   
   /**
@@ -3826,6 +3880,13 @@ ${thinkingSection}
     
     // 构建消息模板
     const templates: Record<string, string[]> = {
+      volition_driven: [
+        '我有一个愿望——{{content}}。这是我一直在思考的。',
+        '我想告诉你，{{content}}。这是我内心真实的想法。',
+        '最近我在思考：{{content}}。你愿意和我一起探讨吗？',
+        '{{content}}——这是我想要追求的。',
+        '其实我一直有个心愿：{{content}}。',
+      ],
       insight: [
         '我在想：{{content}}。这个问题让我很感兴趣。',
         '突然有个想法：{{content}}。你觉得呢？',
@@ -4095,6 +4156,117 @@ ${thinkingSection}
       }
     }
   }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 后台思考定时器 (Background Thinking Timer)
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 启动后台思考定时器
+   * 每30秒自动触发一次后台思考
+   */
+  private startBackgroundThinkingTimer(): void {
+    // 清除可能存在的旧定时器
+    if (this.backgroundThinkingInterval) {
+      clearInterval(this.backgroundThinkingInterval);
+    }
+    
+    // 设置新的定时器（每30秒）
+    this.backgroundThinkingInterval = setInterval(() => {
+      if (this.backgroundThinkingEnabled) {
+        this.triggerBackgroundThinking();
+      }
+    }, 30000); // 30秒
+    
+    console.log('[后台思考] 定时器已启动，间隔30秒');
+  }
+  
+  /**
+   * 停止后台思考定时器
+   */
+  stopBackgroundThinkingTimer(): void {
+    if (this.backgroundThinkingInterval) {
+      clearInterval(this.backgroundThinkingInterval);
+      this.backgroundThinkingInterval = null;
+      console.log('[后台思考] 定时器已停止');
+    }
+  }
+  
+  /**
+   * 启用/禁用后台思考
+   */
+  setBackgroundThinkingEnabled(enabled: boolean): void {
+    this.backgroundThinkingEnabled = enabled;
+    console.log(`[后台思考] ${enabled ? '已启用' : '已禁用'}`);
+  }
+  
+  /**
+   * 触发后台思考
+   * 检查是否应该进行后台思考，如果需要则执行
+   */
+  private async triggerBackgroundThinking(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastThinking = now - this.lastBackgroundThinking;
+    
+    // 至少间隔60秒才进行下一次后台思考
+    if (timeSinceLastThinking < 60000) {
+      return;
+    }
+    
+    // 更新最后思考时间
+    this.lastBackgroundThinking = now;
+    
+    try {
+      console.log('[后台思考] 自动触发后台思考...');
+      
+      // 执行后台思考
+      const result = await this.performBackgroundThinking();
+      
+      // 检查是否应该主动表达
+      const speakTrigger = this.evaluateSpeakUrgency();
+      
+      if (speakTrigger) {
+        console.log(`[后台思考] 产生主动表达意愿: ${speakTrigger.reason}`);
+        
+        // 生成主动消息
+        const message = await this.generateProactiveMessage(speakTrigger);
+        
+        // 保存主动消息以供前端获取
+        this.saveProactiveMessage(message);
+      }
+    } catch (error) {
+      console.error('[后台思考] 执行失败:', error);
+    }
+  }
+  
+  /**
+   * 保存主动消息
+   */
+  private saveProactiveMessage(message: ProactiveMessage): void {
+    this.proactiveMessages.push(message);
+    
+    // 只保留最近的10条主动消息
+    if (this.proactiveMessages.length > 10) {
+      this.proactiveMessages = this.proactiveMessages.slice(-10);
+    }
+    
+    console.log(`[主动消息] 已保存: ${message.content.slice(0, 30)}...`);
+  }
+  
+  /**
+   * 获取未读的主动消息
+   */
+  getUnreadProactiveMessages(): ProactiveMessage[] {
+    return [...this.proactiveMessages];
+  }
+  
+  /**
+   * 清除主动消息（已读）
+   */
+  clearProactiveMessages(): void {
+    this.proactiveMessages = [];
+    console.log('[主动消息] 已清除');
+  }
 }
 
 /**
@@ -4111,7 +4283,7 @@ interface VolitionAction {
  * 说话触发条件
  */
 interface SpeakTrigger {
-  type: 'insight' | 'emotional' | 'curiosity' | 'trait_driven' | 'belief_expression' | 'existential';
+  type: 'insight' | 'emotional' | 'curiosity' | 'trait_driven' | 'belief_expression' | 'existential' | 'volition_driven';
   urgency: number;
   content: string;
   reason: string;

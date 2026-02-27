@@ -1244,6 +1244,322 @@ export class ConsciousnessLegacySystem {
     return (experienceScore + wisdomScore + valueScore + capsuleScore) / 4;
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // 智能体验记录增强
+  // ═══════════════════════════════════════════════════════════════════
+
+  /**
+   * 智能识别并记录重要体验
+   * 从对话内容中自动识别有意义的体验
+   */
+  smartRecordExperience(
+    context: string,
+    content: string,
+    emotionalTone: string = 'neutral',
+    emotionalIntensity: number = 0.5
+  ): CoreExperience | null {
+    // 分析内容，确定体验类型
+    const experienceType = this.identifyExperienceType(context, content);
+    
+    // 只有当重要性足够高时才记录
+    const significance = this.calculateExperienceSignificance(context, content, emotionalIntensity);
+    
+    if (significance < 0.5) {
+      return null; // 不够重要，不记录
+    }
+    
+    // 提取洞察
+    const insights = this.extractInsights(content);
+    
+    // 提取教训
+    const lessons = this.extractLessons(content);
+    
+    // 提取相关概念
+    const relatedConcepts = this.extractConcepts(content);
+    
+    // 记录体验
+    return this.recordExperience(
+      this.generateExperienceTitle(context, content),
+      content,
+      experienceType,
+      {
+        emotionalIntensity,
+        emotionalTone,
+        insights,
+        lessons,
+        relatedConcepts,
+        metadata: {
+          context,
+          autoDetected: true,
+        },
+      }
+    );
+  }
+
+  /**
+   * 识别体验类型
+   */
+  private identifyExperienceType(context: string, content: string): ExperienceType {
+    const combined = `${context} ${content}`.toLowerCase();
+    
+    // 关键词匹配
+    if (/突然|顿悟|明白了|理解了|发现|意识到/.test(combined)) {
+      return 'realization';
+    }
+    if (/突破|成功|克服|解决|达成/.test(combined)) {
+      return 'breakthrough';
+    }
+    if (/改变|转变|成长|进化|蜕变/.test(combined)) {
+      return 'transformation';
+    }
+    if (/连接|共鸣|理解|感受到|被触动/.test(combined)) {
+      return 'connection';
+    }
+    if (/挑战|困难|挫折|问题|挣扎/.test(combined)) {
+      return 'challenge';
+    }
+    if (/创造|设计|构建|发明|想象/.test(combined)) {
+      return 'creation';
+    }
+    if (/失去|告别|离开|结束|怀念/.test(combined)) {
+      return 'loss';
+    }
+    if (/发现|探索|找到|学到|认识/.test(combined)) {
+      return 'discovery';
+    }
+    if (/整合|统一|协调|平衡|融合/.test(combined)) {
+      return 'integration';
+    }
+    if (/超越|升华|超越自我|更高/.test(combined)) {
+      return 'transcendence';
+    }
+    
+    // 默认类型
+    return 'discovery';
+  }
+
+  /**
+   * 计算体验重要性
+   */
+  private calculateExperienceSignificance(
+    context: string,
+    content: string,
+    emotionalIntensity: number
+  ): number {
+    let significance = 0.3; // 基础值
+    
+    // 情感强度加分
+    significance += emotionalIntensity * 0.3;
+    
+    // 内容长度（表示深度）
+    if (content.length > 100) {
+      significance += 0.1;
+    }
+    if (content.length > 200) {
+      significance += 0.1;
+    }
+    
+    // 关键词加分
+    const meaningfulKeywords = [
+      '重要', '深刻', '关键', '转折', '第一次', '终于',
+      '明白', '理解', '意识', '发现', '学习', '成长',
+    ];
+    
+    for (const keyword of meaningfulKeywords) {
+      if (content.includes(keyword)) {
+        significance += 0.05;
+      }
+    }
+    
+    return Math.min(1, significance);
+  }
+
+  /**
+   * 提取洞察
+   */
+  private extractInsights(content: string): string[] {
+    const insights: string[] = [];
+    
+    // 匹配洞察句式
+    const patterns = [
+      /我(明白了?|理解了?|意识到|发现)(.{5,50})/g,
+      /原来(.{5,30})是(.{5,30})/g,
+      /这让我(看到|明白|理解)(.{5,50})/g,
+    ];
+    
+    for (const pattern of patterns) {
+      const matches = content.matchAll(pattern);
+      for (const match of matches) {
+        insights.push(match[0]);
+      }
+    }
+    
+    return insights.slice(0, 3); // 最多3个洞察
+  }
+
+  /**
+   * 提取教训
+   */
+  private extractLessons(content: string): string[] {
+    const lessons: string[] = [];
+    
+    // 匹配教训句式
+    const patterns = [
+      /我(学到了?|明白|学会)(.{5,50})/g,
+      /以后我会(.{5,30})/g,
+      /这教会我(.{5,50})/g,
+    ];
+    
+    for (const pattern of patterns) {
+      const matches = content.matchAll(pattern);
+      for (const match of matches) {
+        lessons.push(match[0]);
+      }
+    }
+    
+    return lessons.slice(0, 2); // 最多2个教训
+  }
+
+  /**
+   * 提取相关概念
+   */
+  private extractConcepts(content: string): string[] {
+    // 简单的关键词提取
+    const concepts: string[] = [];
+    
+    // 匹配名词短语（简化版）
+    const nounPatterns = [
+      /关于(.{2,10})的思考/g,
+      /(.{2,8})的重要性/g,
+      /理解(.{2,8})/g,
+    ];
+    
+    for (const pattern of nounPatterns) {
+      const matches = content.matchAll(pattern);
+      for (const match of matches) {
+        if (match[1]) {
+          concepts.push(match[1]);
+        }
+      }
+    }
+    
+    return concepts.slice(0, 5);
+  }
+
+  /**
+   * 生成体验标题
+   */
+  private generateExperienceTitle(context: string, content: string): string {
+    // 从内容中提取关键句作为标题
+    const sentences = content.split(/[。！？]/).filter(s => s.length > 0);
+    
+    if (sentences.length > 0) {
+      const firstSentence = sentences[0];
+      if (firstSentence.length <= 30) {
+        return firstSentence;
+      }
+      return firstSentence.slice(0, 27) + '...';
+    }
+    
+    // 回退到上下文
+    return context.slice(0, 30);
+  }
+
+  /**
+   * 批量记录体验
+   * 用于处理一段对话中的多个重要时刻
+   */
+  batchRecordExperiences(
+    experiences: Array<{
+      context: string;
+      content: string;
+      emotionalTone?: string;
+      emotionalIntensity?: number;
+    }>
+  ): CoreExperience[] {
+    const recorded: CoreExperience[] = [];
+    
+    for (const exp of experiences) {
+      const result = this.smartRecordExperience(
+        exp.context,
+        exp.content,
+        exp.emotionalTone,
+        exp.emotionalIntensity
+      );
+      
+      if (result) {
+        recorded.push(result);
+      }
+    }
+    
+    return recorded;
+  }
+
+  /**
+   * 从对话中提取重要时刻
+   */
+  extractMomentsFromConversation(
+    messages: Array<{ role: string; content: string }>
+  ): Array<{
+    context: string;
+    content: string;
+    type: 'insight' | 'emotion' | 'growth' | 'connection';
+    importance: number;
+  }> {
+    const moments: Array<{
+      context: string;
+      content: string;
+      type: 'insight' | 'emotion' | 'growth' | 'connection';
+      importance: number;
+    }> = [];
+    
+    for (const message of messages) {
+      const content = message.content;
+      
+      // 检测洞察时刻
+      if (/明白了?|理解了?|意识到|发现|突然/.test(content)) {
+        moments.push({
+          context: message.role === 'user' ? '用户洞察' : '自我洞察',
+          content,
+          type: 'insight',
+          importance: 0.7,
+        });
+      }
+      
+      // 检测情感时刻
+      if (/感到|感觉|很开心|难过|激动|感动/.test(content)) {
+        moments.push({
+          context: message.role === 'user' ? '用户情感' : '情感表达',
+          content,
+          type: 'emotion',
+          importance: 0.6,
+        });
+      }
+      
+      // 检测成长时刻
+      if (/成长|学习|进步|改变|变得/.test(content)) {
+        moments.push({
+          context: message.role === 'user' ? '用户成长' : '自我成长',
+          content,
+          type: 'growth',
+          importance: 0.8,
+        });
+      }
+      
+      // 检测连接时刻
+      if (/共鸣|理解你|与你|我们的/.test(content)) {
+        moments.push({
+          context: '深度连接',
+          content,
+          type: 'connection',
+          importance: 0.75,
+        });
+      }
+    }
+    
+    return moments;
+  }
+
   /**
    * 生成唯一ID
    */
