@@ -33,11 +33,23 @@ export async function GET(request: NextRequest) {
     const headers = HeaderUtils.extractForwardHeaders(request.headers);
     const core = await getSharedCore(headers);
     
-    // 获取网络状态 - 使用单例以确保获取最新状态
+    // 从持久化状态获取网络数据
+    const persistedState = core.getPersistedState();
+    const hebbianNetwork = persistedState.hebbianNetwork;
+    
+    // 同时尝试从 HebbianNetwork 单例获取
     const network = HebbianNetwork.getInstance();
     const networkState = network.getNetworkState();
     
-    if (!networkState || !networkState.neurons || networkState.neurons.length === 0) {
+    // 优先使用持久化状态中的数据，如果为空则使用单例数据
+    const neurons = (hebbianNetwork?.neurons && hebbianNetwork.neurons.length > 0) 
+      ? hebbianNetwork.neurons 
+      : networkState.neurons;
+    const synapses = (hebbianNetwork?.synapses && hebbianNetwork.synapses.length > 0) 
+      ? hebbianNetwork.synapses 
+      : networkState.synapses;
+    
+    if (!neurons || neurons.length === 0) {
       return Response.json({
         success: true,
         neurons: [],
@@ -56,9 +68,6 @@ export async function GET(request: NextRequest) {
         message: '网络尚未初始化或迁移',
       });
     }
-    
-    const neurons = networkState.neurons;
-    const synapses = networkState.synapses;
     
     // ═══════════════════════════════════════════════════════════════
     // 统计信息

@@ -16,47 +16,45 @@ interface VizNeuron {
   id: string;
   label: string;
   activation: number;
-  type: 'sensory' | 'concept' | 'emotion' | 'abstract' | 'trap';
-  totalActivations: number;
+  type: 'percept' | 'concept' | 'emotion' | 'abstract' | 'trap';
 }
 
 interface VizSynapse {
+  id: string;
   from: string;
   to: string;
-  fromLabel: string;
-  toLabel: string;
   weight: number;
 }
 
 interface NetworkStats {
-  totalNeurons: number;
-  totalSynapses: number;
-  averageActivation: number;
+  neuronCount: number;
+  synapseCount: number;
+  avgActivation: number;
   highlyActiveCount: number;
-  averageWeight: number;
-  strongSynapseCount: number;
-  density: string;
+  density: number;
   neuronsByType: Record<string, number>;
-  highlyActiveNeurons: Array<{
-    id: string;
-    label: string;
-    activation: number;
-  }>;
-  strongSynapses: Array<{
-    from: string;
-    to: string;
-    weight: number;
-  }>;
-  visualization?: {
-    neurons: VizNeuron[];
-    synapses: VizSynapse[];
-  };
+  entropy: number;
 }
 
 interface HebbianNetworkData {
   success: boolean;
-  timestamp: string;
-  network: NetworkStats;
+  neurons: Array<{
+    id: string;
+    label: string;
+    activation: number;
+    type: string;
+  }>;
+  synapses: Array<{
+    from: string;
+    to: string;
+    weight: number;
+  }>;
+  stats: NetworkStats;
+  visualization: {
+    neurons: VizNeuron[];
+    synapses: VizSynapse[];
+  };
+  message: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -64,7 +62,7 @@ interface HebbianNetworkData {
 // ─────────────────────────────────────────────────────────────────────
 
 const NEURON_TYPE_COLORS: Record<string, string> = {
-  sensory: '#3b82f6',   // 蓝色 - 感知
+  percept: '#3b82f6',   // 蓝色 - 感知
   concept: '#10b981',   // 绿色 - 概念
   emotion: '#ec4899',   // 粉色 - 情感
   abstract: '#8b5cf6',  // 紫色 - 抽象
@@ -102,19 +100,33 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
 
     const centerX = width / 2;
     const centerY = height / 2;
-    const radius = Math.min(width, height) * 0.38;
+
+    // 按类型分组
+    const trapNodes = neurons.filter(n => n.type === 'trap');
+    const otherNodes = neurons.filter(n => n.type !== 'trap');
 
     nodesRef.current = neurons.map((neuron, index) => {
-      const angle = (index / neurons.length) * Math.PI * 2 - Math.PI / 2;
-      const r = radius * (0.5 + Math.random() * 0.5);
+      let angle: number;
+      let radius: number;
+
+      // 陷阱节点在外圈，其他在中心
+      if (neuron.type === 'trap') {
+        const idx = trapNodes.indexOf(neuron);
+        angle = (idx / Math.max(trapNodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+        radius = Math.min(width, height) * 0.42;
+      } else {
+        const idx = otherNodes.indexOf(neuron);
+        angle = (idx / Math.max(otherNodes.length, 1)) * Math.PI * 2;
+        radius = Math.min(width, height) * (0.15 + Math.random() * 0.2);
+      }
 
       return {
         ...neuron,
-        x: centerX + Math.cos(angle) * r,
-        y: centerY + Math.sin(angle) * r,
+        x: centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 20,
+        y: centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 20,
         vx: 0,
         vy: 0,
-        radius: 10 + Math.abs(neuron.activation) * 8 + Math.min((neuron.totalActivations || 0) * 0.3, 6),
+        radius: neuron.type === 'trap' ? 6 : 8 + neuron.activation * 4,
       };
     });
     
@@ -135,7 +147,7 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
         const dx = nodes[j].x - nodes[i].x;
         const dy = nodes[j].y - nodes[i].y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = 500 / (dist * dist);
+        const force = 300 / (dist * dist);
 
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
@@ -156,26 +168,30 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
         const dx = target.x - source.x;
         const dy = target.y - source.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = (dist - 70) * 0.003 * Math.abs(synapse.weight);
+        const force = (dist - 60) * 0.003 * Math.abs(synapse.weight);
 
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-
-        source.vx += fx;
-        source.vy += fy;
-        target.vx -= fx;
-        target.vy -= fy;
+        source.vx += (dx / dist) * force;
+        source.vy += (dy / dist) * force;
+        target.vx -= (dx / dist) * force;
+        target.vy -= (dy / dist) * force;
       }
     }
 
-    // 向心引力和边界约束
-    const padding = 25;
+    // 中心引力
+    const padding = 20;
     for (const node of nodes) {
-      node.vx += (centerX - node.x) * 0.0005;
-      node.vy += (centerY - node.y) * 0.0005;
+      const dx = centerX - node.x;
+      const dy = centerY - node.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
-      node.vx *= 0.9;
-      node.vy *= 0.9;
+      let centerForce = 0.0005;
+      if (node.type === 'trap') centerForce = -0.0001; // 陷阱向外推
+
+      node.vx += (dx / dist) * centerForce * dist;
+      node.vy += (dy / dist) * centerForce * dist;
+
+      node.vx *= 0.85;
+      node.vy *= 0.85;
 
       node.x += node.vx;
       node.y += node.vy;
@@ -199,7 +215,7 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
 
     // 背景
     const bgGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 2);
-    bgGradient.addColorStop(0, 'rgba(139, 92, 246, 0.08)');
+    bgGradient.addColorStop(0, 'rgba(59, 130, 246, 0.05)');
     bgGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
@@ -210,15 +226,13 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
       const target = nodes.find(n => n.id === synapse.to);
 
       if (source && target) {
-        const absWeight = Math.abs(synapse.weight);
-        const color = synapse.weight > 0 ? WEIGHT_COLORS.positive : WEIGHT_COLORS.negative;
-        const opacity = Math.min(0.2 + absWeight * 0.4, 0.6);
-
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
-        ctx.strokeStyle = color + Math.round(opacity * 255).toString(16).padStart(2, '0');
-        ctx.lineWidth = 0.5 + absWeight * 2;
+        
+        const color = synapse.weight > 0 ? WEIGHT_COLORS.positive : WEIGHT_COLORS.negative;
+        ctx.strokeStyle = color + Math.floor(Math.min(Math.abs(synapse.weight), 1) * 80 + 20).toString(16).padStart(2, '0');
+        ctx.lineWidth = Math.abs(synapse.weight) * 1.5;
         ctx.stroke();
       }
     }
@@ -226,14 +240,14 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
     // 绘制节点
     for (const node of nodes) {
       const color = NEURON_TYPE_COLORS[node.type] || NEURON_TYPE_COLORS.concept;
-      const radius = Math.max(node.radius, 8);
+      const radius = Math.max(node.radius, 5);
       const isHighlighted = highlightedId === node.id;
       const isHovered = hoveredNode?.id === node.id;
 
       // 光晕
       const glowRadius = radius * (isHighlighted || isHovered ? 2.5 : 2);
       const glowGradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, glowRadius);
-      glowGradient.addColorStop(0, color + '50');
+      glowGradient.addColorStop(0, color + '40');
       glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = glowGradient;
       ctx.beginPath();
@@ -246,7 +260,7 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
         node.x, node.y, radius
       );
       nodeGradient.addColorStop(0, color);
-      nodeGradient.addColorStop(1, color + 'cc');
+      nodeGradient.addColorStop(1, color + 'bb');
 
       ctx.beginPath();
       ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
@@ -254,20 +268,56 @@ function NetworkCanvas({ neurons, synapses, width, height, onNodeClick, highligh
       ctx.fill();
 
       ctx.strokeStyle = isHighlighted ? '#ffffff' : color;
-      ctx.lineWidth = isHighlighted ? 3 : 1.5;
+      ctx.lineWidth = isHighlighted ? 2 : 1;
       ctx.stroke();
 
-      // 标签
-      if (isHovered || isHighlighted || node.totalActivations > 3) {
-        ctx.font = '10px system-ui';
+      // 陷阱标记
+      if (node.type === 'trap') {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, radius + 3, 0, Math.PI * 2);
+        ctx.strokeStyle = color + '60';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 高亮时显示标签
+      if (isHighlighted || isHovered) {
+        ctx.font = 'bold 10px system-ui';
         const labelWidth = ctx.measureText(node.label).width + 8;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.fillRect(node.x - labelWidth / 2, node.y + radius + 3, labelWidth, 13);
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(node.label, node.x, node.y + radius + 10);
       }
+    }
+
+    // 图例
+    const legendY = 12;
+    let legendX = 10;
+    ctx.font = '9px system-ui';
+
+    for (const [type, color] of Object.entries(NEURON_TYPE_COLORS)) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(legendX, legendY, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#9ca3af';
+      ctx.textAlign = 'left';
+      const typeLabels: Record<string, string> = {
+        percept: '感知',
+        concept: '概念',
+        emotion: '情感',
+        abstract: '抽象',
+        trap: '陷阱',
+      };
+      ctx.fillText(typeLabels[type] || type, legendX + 6, legendY + 3);
+
+      legendX += 50;
     }
   }, [synapses, width, height, highlightedId, hoveredNode]);
 
@@ -377,8 +427,8 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
   }, [fetchData]);
 
   // 从API数据提取可视化的神经元和突触
-  const vizNeurons: VizNeuron[] = data?.network?.visualization?.neurons || [];
-  const vizSynapses: VizSynapse[] = data?.network?.visualization?.synapses || [];
+  const vizNeurons: VizNeuron[] = data?.visualization?.neurons || [];
+  const vizSynapses: VizSynapse[] = data?.visualization?.synapses || [];
 
   if (loading) {
     return (
@@ -408,7 +458,7 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
     );
   }
 
-  const stats = data?.network;
+  const stats = data?.stats;
 
   return (
     <Card className={className}>
@@ -451,97 +501,86 @@ export function HebbianNetworkVisualization({ className }: HebbianNetworkVisuali
                     </div>
                   </div>
                 )}
-                <div className="text-xs text-muted-foreground text-center">
-                  共 {stats?.totalNeurons || 0} 个神经元, {stats?.totalSynapses || 0} 个突触
-                </div>
               </div>
             ) : (
               <div className="text-center text-muted-foreground py-8 text-sm">
                 暂无网络数据
-                <p className="text-xs mt-1">开始对话后将自动构建神经网络</p>
+                <p className="text-xs mt-1">开始对话后将自动形成神经元连接</p>
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="stats" className="mt-2">
-            <ScrollArea className="h-[220px]">
-              <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-muted/50 rounded-md p-2">
-                    <div className="text-xs text-muted-foreground">神经元总数</div>
-                    <div className="font-bold text-lg">{stats?.totalNeurons || 0}</div>
-                  </div>
-                  <div className="bg-muted/50 rounded-md p-2">
-                    <div className="text-xs text-muted-foreground">突触总数</div>
-                    <div className="font-bold text-lg">{stats?.totalSynapses || 0}</div>
-                  </div>
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-muted/50 rounded-md p-2 text-center">
+                  <div className="text-xs text-muted-foreground">神经元</div>
+                  <div className="font-bold text-lg">{stats?.neuronCount || 0}</div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">平均激活度</span>
-                    <span className="font-medium">{((stats?.averageActivation || 0) * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">高激活神经元</span>
-                    <span className="font-medium">{stats?.highlyActiveCount || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">平均突触权重</span>
-                    <span className="font-medium">{(stats?.averageWeight || 0).toFixed(3)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">强连接数</span>
-                    <span className="font-medium">{stats?.strongSynapseCount || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">网络密度</span>
-                    <span className="font-medium text-xs">{stats?.density || '0'}</span>
-                  </div>
+                <div className="bg-muted/50 rounded-md p-2 text-center">
+                  <div className="text-xs text-muted-foreground">突触</div>
+                  <div className="font-bold text-lg">{stats?.synapseCount || 0}</div>
                 </div>
+              </div>
 
-                {stats?.neuronsByType && Object.keys(stats.neuronsByType).length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="text-xs font-medium">类型分布</div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">平均激活</span>
+                  <span className="font-medium">{((stats?.avgActivation || 0) * 100).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">网络密度</span>
+                  <span className="font-medium">{((stats?.density || 0) * 100).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">高激活神经元</span>
+                  <span className="font-medium">{stats?.highlyActiveCount || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">网络熵</span>
+                  <span className="font-medium">{stats?.entropy?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+
+              {stats?.neuronsByType && (
+                <div className="pt-2 border-t">
+                  <div className="text-xs font-medium mb-2">类型分布</div>
+                  <div className="flex flex-wrap gap-1.5">
                     {Object.entries(stats.neuronsByType).map(([type, count]) => (
-                      <div key={type} className="flex justify-between items-center">
-                        <Badge variant="outline" className="text-xs"
-                          style={{ borderColor: NEURON_TYPE_COLORS[type] || '#6b7280' }}>
-                          {type}
-                        </Badge>
-                        <span>{count}</span>
-                      </div>
+                      <Badge key={type} variant="outline" className="text-xs">
+                        {type === 'trap' ? '陷阱' : type === 'concept' ? '概念' : type}: {count}
+                      </Badge>
                     ))}
                   </div>
-                )}
-              </div>
-            </ScrollArea>
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="activity" className="mt-2">
-            <ScrollArea className="h-[220px]">
+            <ScrollArea className="h-[200px]">
               <div className="space-y-2">
-                {stats?.strongSynapses && stats.strongSynapses.length > 0 ? (
-                  stats.strongSynapses.slice(0, 15).map((synapse, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-xs">
-                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <span className="truncate">{synapse.from}</span>
-                        <span className={synapse.weight > 0 ? 'text-green-500' : 'text-red-500'}>
-                          {synapse.weight > 0 ? '→' : '⊣'}
-                        </span>
-                        <span className="truncate">{synapse.to}</span>
+                {data?.neurons && data.neurons.length > 0 ? (
+                  data.neurons.slice(0, 20).map((neuron) => (
+                    <div
+                      key={neuron.id}
+                      className="flex items-center gap-2 p-2 bg-muted/50 rounded-md"
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: NEURON_TYPE_COLORS[neuron.type] || NEURON_TYPE_COLORS.concept }}
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm truncate">{neuron.label}</div>
                       </div>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs shrink-0 ${synapse.weight > 0 ? 'border-green-500 text-green-600' : 'border-red-500 text-red-600'}`}
-                      >
-                        {synapse.weight.toFixed(2)}
-                      </Badge>
+                      <div className="text-xs text-muted-foreground">
+                        {(neuron.activation * 100).toFixed(0)}%
+                      </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-muted-foreground py-8 text-sm">
-                    暂无强连接数据
+                  <div className="text-center text-muted-foreground py-4 text-sm">
+                    暂无活跃神经元
                   </div>
                 )}
               </div>
