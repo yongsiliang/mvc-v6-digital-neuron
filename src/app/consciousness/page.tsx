@@ -1185,12 +1185,11 @@ export default function ConsciousnessPage() {
 
   return (
     <div className="h-screen flex flex-col md:flex-row bg-background">
-      {/* 顶部主动分享泡泡 */}
+      {/* 顶部主动分享泡泡 - 一条一条依次弹出 */}
       <ProactiveBubbleContainer
         messages={proactiveMessages}
         onDismiss={removeMessage}
-        maxVisible={2}
-        autoHideDuration={6000}
+        autoHideDuration={5000}
       />
       
       {/* 弹幕区域 */}

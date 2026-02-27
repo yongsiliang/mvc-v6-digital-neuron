@@ -291,41 +291,63 @@ function TopBubble({ message, onDismiss, autoHideDuration = 5000 }: TopBubblePro
   );
 }
 
-// 泡泡容器
+// 泡泡容器 - 一次只显示一条消息
 interface ProactiveBubbleContainerProps {
   messages: ProactiveMessage[];
   onDismiss: (id: string) => void;
-  maxVisible?: number;
   autoHideDuration?: number;
 }
 
 export function ProactiveBubbleContainer({ 
   messages, 
   onDismiss, 
-  maxVisible = 3,
   autoHideDuration = 5000 
 }: ProactiveBubbleContainerProps) {
-  const visibleMessages = messages.slice(-maxVisible);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [showBubble, setShowBubble] = useState(true);
   
-  if (visibleMessages.length === 0) return null;
+  // 当前要显示的消息
+  const currentMessage = messages[currentIndex];
+  
+  // 当消息列表变化时，重置索引
+  useEffect(() => {
+    if (messages.length > 0 && currentIndex >= messages.length) {
+      setCurrentIndex(0);
+      setShowBubble(true);
+    }
+  }, [messages.length, currentIndex]);
+  
+  // 处理当前消息消失
+  const handleCurrentDismiss = useCallback((id: string) => {
+    setShowBubble(false);
+    
+    // 延迟后显示下一条或清除
+    setTimeout(() => {
+      if (currentIndex < messages.length - 1) {
+        // 还有下一条，显示下一条
+        setCurrentIndex(prev => prev + 1);
+        setShowBubble(true);
+      } else {
+        // 没有更多了，清除当前消息
+        onDismiss(id);
+        setCurrentIndex(0);
+      }
+    }, 400); // 等待退出动画完成
+  }, [currentIndex, messages.length, onDismiss]);
+  
+  if (!currentMessage) return null;
   
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none">
-      {visibleMessages.map((msg, index) => (
-        <div 
-          key={msg.id} 
-          className="pointer-events-auto animate-bounce-gentle"
-          style={{ 
-            animationDelay: `${index * 100}ms`,
-          }}
-        >
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+      {showBubble && (
+        <div className="pointer-events-auto animate-bounce-gentle">
           <TopBubble 
-            message={msg} 
-            onDismiss={onDismiss}
+            message={currentMessage} 
+            onDismiss={handleCurrentDismiss}
             autoHideDuration={autoHideDuration}
           />
         </div>
-      ))}
+      )}
     </div>
   );
 }
