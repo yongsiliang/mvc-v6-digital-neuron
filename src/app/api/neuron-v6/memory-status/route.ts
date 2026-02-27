@@ -32,37 +32,33 @@ export async function GET(request: NextRequest) {
       console.log('[Memory Status] 数据库读取失败:', error);
     }
     
-    // 从 fullState.memory 中提取创造者节点
-    const memoryState = persistedState.fullState?.memory;
-    const creatorNodes: Array<{ label: string; content: string; importance: number }> = [];
+    // 从分层记忆状态中提取核心记忆
+    const layeredMemoryState = persistedState.layeredMemoryState;
+    const coreMemories: Array<{ key: string; value: string }> = [];
     
-    console.log('[Memory Status] fullState exists:', !!persistedState.fullState);
-    console.log('[Memory Status] memoryState exists:', !!memoryState);
-    console.log('[Memory Status] nodes count:', memoryState?.knowledgeGraph?.nodes?.length || 0);
+    console.log('[Memory Status] layeredMemoryState exists:', !!layeredMemoryState);
     
-    if (memoryState?.knowledgeGraph?.nodes) {
-      console.log('[Memory Status] All nodes:', JSON.stringify(memoryState.knowledgeGraph.nodes.map((n: { label: string; content: string }) => ({ label: n.label, content: n.content?.slice(0, 50) }))));
-      for (const node of memoryState.knowledgeGraph.nodes) {
-        if (node.label === '创造者' || 
-            node.label.toLowerCase().includes('创造者') ||
-            node.content?.includes('创造者') ||
-            node.tags?.some((t: string) => t.includes('创造者'))) {
-          creatorNodes.push({
-            label: node.label,
-            content: node.content,
-            importance: node.importance,
-          });
-        }
+    // 提取创造者信息
+    if (layeredMemoryState?.core?.creator) {
+      coreMemories.push({
+        key: 'creator',
+        value: `创造者是${layeredMemoryState.core.creator.name}。${layeredMemoryState.core.creator.description}`,
+      });
+    }
+    
+    // 提取核心关系
+    if (layeredMemoryState?.core?.coreRelationships) {
+      for (const rel of layeredMemoryState.core.coreRelationships) {
+        coreMemories.push({
+          key: `relationship_${rel.personName}`,
+          value: `${rel.personName}是我的${rel.relationshipType}`,
+        });
       }
     }
     
-    // 从 identity.traits 中提取创造者特质
-    const creatorTraits = persistedState.identity.traits.filter(
-      (t: { name: string }) => t.name === '创造者' || t.name.toLowerCase().includes('创造者')
-    );
-    
     // 确定创造者信息
-    const creatorName = dbCreatorName || (creatorNodes.length > 0 ? extractCreatorName(creatorNodes[0].content) : null);
+    const creatorMemory = coreMemories.find(m => m.key === 'creator');
+    const creatorName = dbCreatorName || (creatorMemory ? extractCreatorName(creatorMemory.value) : null);
     
     return Response.json({
       success: true,
@@ -76,10 +72,11 @@ export async function GET(request: NextRequest) {
         whoAmI: persistedState.identity.whoAmI,
         traits: persistedState.identity.traits.slice(0, 10),
       },
-      memory: {
-        stats: persistedState.memory,
-        creatorNodes: creatorNodes,
-        creatorTraits: creatorTraits,
+      layeredMemory: {
+        stats: persistedState.layeredMemory,
+        coreMemories: coreMemories,
+        consolidatedCount: layeredMemoryState?.consolidated?.length || 0,
+        episodicCount: layeredMemoryState?.episodic?.length || 0,
       },
       database: {
         creatorName: dbCreatorName,

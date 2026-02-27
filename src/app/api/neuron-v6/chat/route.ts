@@ -374,7 +374,7 @@ export async function GET(request: NextRequest) {
         initialized: true,
         version: state?.version,
         identity: state?.identity,
-        memory: state?.memory,
+        layeredMemory: state?.layeredMemory,
       }), {
         headers: { 'Content-Type': 'application/json' },
       });

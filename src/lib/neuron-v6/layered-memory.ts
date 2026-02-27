@@ -822,6 +822,77 @@ export class LayeredMemorySystem {
   }
   
   // ════════════════════════════════════════════════════════════════
+  // 辅助方法
+  // ════════════════════════════════════════════════════════════════
+  
+  /**
+   * 获取核心记忆列表（用于知识图谱重建）
+   */
+  getCoreMemories(): Array<{ key: string; value: string; type: 'creator' | 'relationship' | 'value' | 'preference' }> {
+    const memories: Array<{ key: string; value: string; type: 'creator' | 'relationship' | 'value' | 'preference' }> = [];
+    
+    // 创造者
+    if (this.core.creator) {
+      memories.push({
+        key: 'creator',
+        value: `创造者是${this.core.creator.name}。${this.core.creator.description}`,
+        type: 'creator',
+      });
+    }
+    
+    // 核心关系
+    for (const rel of this.core.coreRelationships) {
+      memories.push({
+        key: `relationship_${rel.personName}`,
+        value: `${rel.personName}是我的${rel.relationshipType}。重要性：${rel.importance.toFixed(1)}`,
+        type: 'relationship',
+      });
+    }
+    
+    // 核心价值观
+    for (const value of this.core.coreValues) {
+      memories.push({
+        key: `value_${value}`,
+        value: `我重视${value}`,
+        type: 'value',
+      });
+    }
+    
+    // 核心偏好
+    for (const pref of this.core.corePreferences) {
+      memories.push({
+        key: `preference_${pref}`,
+        value: `我喜欢${pref}`,
+        type: 'preference',
+      });
+    }
+    
+    return memories;
+  }
+  
+  /**
+   * 获取巩固记忆列表
+   */
+  getConsolidatedMemories(options?: { limit?: number; minImportance?: number }): ConsolidatedMemory[] {
+    let memories = Array.from(this.consolidated.values());
+    
+    // 按重要性排序
+    memories.sort((a, b) => b.importance - a.importance);
+    
+    // 过滤低重要性
+    if (options?.minImportance) {
+      memories = memories.filter(m => m.importance >= options.minImportance!);
+    }
+    
+    // 限制数量
+    if (options?.limit) {
+      memories = memories.slice(0, options.limit);
+    }
+    
+    return memories;
+  }
+  
+  // ════════════════════════════════════════════════════════════════
   // 状态导出/导入
   // ════════════════════════════════════════════════════════════════
   

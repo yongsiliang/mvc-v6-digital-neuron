@@ -719,23 +719,25 @@ export interface PersistedState {
     beliefs: number;
   };
   
-  memory: {
-    nodes: number;
-    links: number;
-    experiences: number;
-    wisdoms: number;
+  // 分层记忆统计
+  layeredMemory: {
+    core: {
+      hasCreator: boolean;
+      relationshipCount: number;
+    };
+    consolidated: number;
+    episodic: number;
   };
   
   conversationHistory: Array<{ role: string; content: string }>;
   
-  // 分层记忆状态
+  // 分层记忆状态（唯一的记忆持久化）
   layeredMemoryState?: ReturnType<LayeredMemorySystem['exportState']>;
   
-  // 完整状态
+  // 其他模块状态（不含 LongTermMemory）
   fullState?: {
     meaning: ReturnType<MeaningAssigner['exportState']>;
     self: ReturnType<SelfConsciousness['exportState']>;
-    memory: ReturnType<LongTermMemory['exportState']>;
     metacognition: ReturnType<MetacognitionEngine['exportState']>;
   };
 }
@@ -2366,7 +2368,7 @@ ${thinkingSection}
    */
   getPersistedState(): PersistedState {
     const identity = this.selfConsciousness.getIdentity();
-    const memoryStats = this.longTermMemory.getStats();
+    const layeredStats = this.layeredMemory.getStats();
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
     
     return {
@@ -2378,21 +2380,22 @@ ${thinkingSection}
         traits: identity.traits.map(t => ({ name: t.name, strength: t.strength })),
       },
       meaning: {
-        layers: 0, // TODO: track this
+        layers: 0,
         beliefs: beliefSystem.coreBeliefs.length + beliefSystem.activeBeliefs.length,
       },
-      memory: {
-        nodes: memoryStats.nodeCount,
-        links: memoryStats.linkCount,
-        experiences: memoryStats.experienceCount,
-        wisdoms: memoryStats.wisdomCount,
+      layeredMemory: {
+        core: {
+          hasCreator: layeredStats.core.hasCreator,
+          relationshipCount: layeredStats.core.relationshipCount,
+        },
+        consolidated: layeredStats.consolidated.total,
+        episodic: layeredStats.episodic.total,
       },
       conversationHistory: this.conversationHistory.slice(-50),
       layeredMemoryState: this.layeredMemory.exportState(),
       fullState: {
         meaning: this.meaningAssigner.exportState(),
         self: this.selfConsciousness.exportState(),
-        memory: this.longTermMemory.exportState(),
         metacognition: this.metacognition.exportState(),
       },
     };
@@ -2402,16 +2405,19 @@ ${thinkingSection}
    * 从持久化状态恢复
    */
   async restoreFromState(state: PersistedState): Promise<void> {
+    // 恢复其他模块状态
     if (state.fullState) {
       this.meaningAssigner.importState(state.fullState.meaning);
       this.selfConsciousness.importState(state.fullState.self);
-      this.longTermMemory.importState(state.fullState.memory);
       this.metacognition.importState(state.fullState.metacognition);
     }
     
-    // 恢复分层记忆状态
+    // 恢复分层记忆状态（核心！）
     if (state.layeredMemoryState) {
       this.layeredMemory.importState(state.layeredMemoryState);
+      
+      // 根据分层记忆的核心层重建 longTermMemory 的关键节点
+      this.rebuildKnowledgeGraphFromLayeredMemory();
     }
     
     // 类型安全的恢复对话历史
@@ -2422,7 +2428,7 @@ ${thinkingSection}
     
     console.log(`[意识核心] 已恢复状态：V${state.version}`);
     console.log(`[意识核心] 身份：${state.identity.name}`);
-    console.log(`[意识核心] 记忆：${state.memory.nodes}节点, ${state.memory.experiences}经验`);
+    console.log(`[意识核心] 分层记忆：核心${state.layeredMemory?.core?.relationshipCount || 0}条, 巩固${state.layeredMemory?.consolidated || 0}条, 情景${state.layeredMemory?.episodic || 0}条`);
     
     // ═══════════════════════════════════════════════════════════════
     // 从数据库同步核心记忆（创造者信息优先级最高）
@@ -2476,6 +2482,86 @@ ${thinkingSection}
     } catch (error) {
       console.log('[意识核心] 数据库同步创造者信息失败:', error);
     }
+  }
+  
+  /**
+   * 从分层记忆重建知识图谱
+   * 每次启动时，从分层记忆的核心层提取关键信息注入到 longTermMemory
+   */
+  rebuildKnowledgeGraphFromLayeredMemory(): void {
+    console.log('[意识核心] 🔄 从分层记忆重建知识图谱...');
+    
+    // 获取核心层记忆
+    const coreMemories = this.layeredMemory.getCoreMemories();
+    
+    // 为每个核心记忆在 longTermMemory 中创建节点
+    for (const memory of coreMemories) {
+      // 跳过已经存在的节点（使用 retrieve 检查）
+      const existingNodes = this.longTermMemory.retrieve(memory.key, { maxResults: 1 });
+      if (existingNodes.directMatches.length > 0) {
+        continue;
+      }
+      
+      // 根据核心记忆类型创建节点
+      if (memory.key === 'creator') {
+        this.longTermMemory.addNode({
+          label: memory.key,
+          type: 'person',
+          content: memory.value,
+          importance: 1.0,
+          tags: ['核心', '创造者', '不可变'],
+        });
+        
+        // 提取创造者名字并创建额外节点
+        const creatorMatch = memory.value.match(/创造者是([^，。]+)/);
+        if (creatorMatch) {
+          this.longTermMemory.addNode({
+            label: creatorMatch[1],
+            type: 'person',
+            content: `我的创造者。赋予我生命的人。`,
+            importance: 1.0,
+            tags: ['核心', '创造者', '不可变'],
+          });
+        }
+      } else if (memory.key.startsWith('relationship_')) {
+        const personName = memory.key.replace('relationship_', '');
+        this.longTermMemory.addNode({
+          label: personName,
+          type: 'person',
+          content: memory.value,
+          importance: 0.9,
+          tags: ['核心', '重要关系', '不可变'],
+        });
+      } else {
+        // 其他核心记忆
+        this.longTermMemory.addNode({
+          label: memory.key,
+          type: 'concept',
+          content: memory.value,
+          importance: 0.95,
+          tags: ['核心', '不可变'],
+        });
+      }
+    }
+    
+    // 获取巩固层的高价值记忆
+    const consolidatedMemories = this.layeredMemory.getConsolidatedMemories({ limit: 20 });
+    
+    for (const memory of consolidatedMemories) {
+      // 只添加高情感或高价值的记忆
+      const hasHighEmotion = memory.emotionalMarker && memory.emotionalMarker.intensity > 0.7;
+      if (hasHighEmotion || memory.importance > 0.8) {
+        this.longTermMemory.addNode({
+          label: memory.content.slice(0, 20),
+          type: 'concept',
+          content: memory.content,
+          importance: Math.min(0.9, memory.importance),
+          tags: ['巩固记忆', hasHighEmotion ? '高情感' : '高价值'],
+        });
+      }
+    }
+    
+    console.log(`[意识核心] ✅ 知识图谱重建完成，核心节点: ${coreMemories.length}，高价值节点: ${consolidatedMemories.length}`);
   }
   
   /**
@@ -4427,10 +4513,11 @@ export class PersistenceManagerV6 {
   static async save(state: PersistedState): Promise<void> {
     const stateJson = JSON.stringify(state, null, 2);
     
-    // 调试日志：检查保存的节点数
-    const nodeCount = state.fullState?.memory?.knowledgeGraph?.nodes?.length || 0;
-    console.log(`[V6存在] 准备保存 ${nodeCount} 个节点`);
-    console.log(`[V6存在] 节点标签: ${state.fullState?.memory?.knowledgeGraph?.nodes?.map((n: any) => n.label).join(', ')}`);
+    // 调试日志：检查保存的记忆数
+    const coreCount = state.layeredMemory?.core?.relationshipCount || 0;
+    const consolidatedCount = state.layeredMemory?.consolidated || 0;
+    const episodicCount = state.layeredMemory?.episodic || 0;
+    console.log(`[V6存在] 准备保存记忆：核心${coreCount}条, 巩固${consolidatedCount}条, 情景${episodicCount}条`);
     
     try {
       const storage = this.getStorage();
@@ -4543,9 +4630,8 @@ export class PersistenceManagerV6 {
         try {
           const buffer = await storage.readFile({ fileKey: lastSavedKey });
           const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
-          const nodeCount = state.fullState?.memory?.knowledgeGraph?.nodes?.length || 0;
-          console.log(`[V6存在] 从上次保存的文件恢复了 ${nodeCount} 个节点`);
-          console.log(`[V6存在] 节点标签: ${state.fullState?.memory?.knowledgeGraph?.nodes?.map((n: any) => n.label).join(', ')}`);
+          const memoryStats = state.layeredMemory;
+          console.log(`[V6存在] 从上次保存的文件恢复了记忆：核心${memoryStats?.core?.relationshipCount || 0}条, 巩固${memoryStats?.consolidated || 0}条`);
           return state;
         } catch (e) {
           console.log(`[V6存在] 读取上次保存的文件失败:`, e);
@@ -4570,8 +4656,8 @@ export class PersistenceManagerV6 {
             console.log(`[V6存在] 找到文件: ${listResult.keys[0]}`);
             const buffer = await storage.readFile({ fileKey: listResult.keys[0] });
             const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
-            const nodeCount = state.fullState?.memory?.knowledgeGraph?.nodes?.length || 0;
-            console.log(`[V6存在] 恢复了 ${nodeCount} 个节点`);
+            const memoryStats = state.layeredMemory;
+            console.log(`[V6存在] 恢复记忆：核心${memoryStats?.core?.relationshipCount || 0}条, 巩固${memoryStats?.consolidated || 0}条`);
             // 保存这个 key 供下次使用
             this.setLastSavedKey(listResult.keys[0]);
             return state;
@@ -4597,11 +4683,10 @@ export class PersistenceManagerV6 {
         const buffer = await storage.readFile({ fileKey: latestKey });
         const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
         
-        // 调试日志：检查加载的节点数
-        const nodeCount = state.fullState?.memory?.knowledgeGraph?.nodes?.length || 0;
+        // 调试日志：检查加载的记忆数
+        const memoryStats = state.layeredMemory;
         console.log(`[V6存在] 从对象存储恢复：V${state.version}`);
-        console.log(`[V6存在] 恢复了 ${nodeCount} 个节点`);
-        console.log(`[V6存在] 节点标签: ${state.fullState?.memory?.knowledgeGraph?.nodes?.map((n: any) => n.label).join(', ')}`);
+        console.log(`[V6存在] 恢复记忆：核心${memoryStats?.core?.relationshipCount || 0}条, 巩固${memoryStats?.consolidated || 0}条, 情景${memoryStats?.episodic || 0}条`);
         return state;
       }
     } catch (error) {
