@@ -1321,8 +1321,8 @@ export default function ConsciousnessPage() {
         </div>
 
         {/* 输入区域 */}
-        <div className="border-t p-2 md:p-4">
-          <div className="flex gap-2">
+        <div className="border-t p-3 md:p-4 bg-background/95 backdrop-blur-sm">
+          <div className="flex gap-2 items-center">
             <input
               ref={inputRef}
               type="text"
@@ -1330,7 +1330,7 @@ export default function ConsciousnessPage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               placeholder="与紫对话..."
-              className="flex-1 rounded-lg border bg-background px-3 md:px-4 py-2 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary"
+              className="flex-1 rounded-full border bg-background px-4 py-2.5 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
               disabled={isLoading}
             />
             <Button
@@ -1339,14 +1339,14 @@ export default function ConsciousnessPage() {
               onClick={performReflection}
               disabled={isReflecting || messages.length < 2}
               title="主动反思"
-              className="shrink-0 h-9 w-9 md:h-10 md:w-10"
+              className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full"
             >
-              <Brain className={`w-4 h-4 ${isReflecting ? 'animate-pulse' : ''}`} />
+              <Brain className={`w-5 h-5 md:w-4 md:h-4 ${isReflecting ? 'animate-pulse' : ''}`} />
             </Button>
             <button
               onClick={sendMessage}
               disabled={isLoading || !input.trim()}
-              className="px-4 md:px-6 py-2 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 text-sm md:text-base shrink-0"
+              className="px-5 md:px-6 py-2.5 bg-primary text-primary-foreground rounded-full disabled:opacity-50 text-sm md:text-base shrink-0 min-h-[44px] font-medium"
             >
               发送
             </button>

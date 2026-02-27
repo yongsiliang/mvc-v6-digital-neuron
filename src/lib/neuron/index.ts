@@ -20,9 +20,6 @@ export { MeaningCore } from './meaning';
 export { DecisionCore } from './decision';
 export { SensoryNeuron, MotorLanguageNeuron, MotorActionNeuron, getSensoryNeuron, getMotorLanguageNeuron, getMotorActionNeuron } from './sensory';
 
-// 导出博弈引擎
-export { LatentGameEngine, type InnerThought, type GameResult } from './latent-game';
-
 // 导出链接强度管理器
 export { 
   NeuronLinkDynamics, 

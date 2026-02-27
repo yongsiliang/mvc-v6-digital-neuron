@@ -312,9 +312,9 @@ function TopBubble({ message, onDismiss, autoHideDuration = 5000 }: TopBubblePro
           : 'opacity-0 -translate-y-4 scale-95'}
       `}
     >
-      <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r ${config.gradient} border ${config.border} shadow-lg backdrop-blur-sm max-w-md`}>
+      <div className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 rounded-2xl bg-gradient-to-r ${config.gradient} border ${config.border} shadow-lg backdrop-blur-sm w-[calc(100vw-2rem)] max-w-md`}>
         {/* 头像 */}
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold shadow-md">
+        <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs md:text-sm font-bold shadow-md">
           紫
         </div>
         
@@ -322,18 +322,18 @@ function TopBubble({ message, onDismiss, autoHideDuration = 5000 }: TopBubblePro
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
             <span className={config.iconColor}>{config.icon}</span>
-            <span className={`text-xs font-medium ${config.labelColor}`}>
+            <span className={`text-[10px] md:text-xs font-medium ${config.labelColor}`}>
               {config.label}
             </span>
           </div>
-          <p className="text-sm text-foreground/90 line-clamp-2 leading-relaxed">
+          <p className="text-xs md:text-sm text-foreground/90 line-clamp-2 leading-relaxed">
             {message.content}
           </p>
         </div>
         
         {/* 关闭提示 */}
-        <div className="flex-shrink-0 w-5 h-5 rounded-full bg-white/50 dark:bg-black/20 flex items-center justify-center">
-          <span className="text-[10px] text-muted-foreground">×</span>
+        <div className="flex-shrink-0 w-4 h-4 md:w-5 md:h-5 rounded-full bg-white/50 dark:bg-black/20 flex items-center justify-center">
+          <span className="text-[8px] md:text-[10px] text-muted-foreground">×</span>
         </div>
       </div>
     </div>

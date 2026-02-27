@@ -4111,15 +4111,16 @@ ${thinkingSection}
         reflection = await this.reflect();
         
         // 生成反思消息并发送
-        if (reflection && reflection.observation) {
-          const reflectionContent = reflection.observation.whatWorked || 
-            reflection.learning?.aboutMyThinking ||
-            reflection.improvement?.willApply;
+        if (reflection && reflection.reflections && reflection.reflections.length > 0) {
+          const firstReflection = reflection.reflections[0];
+          const reflectionContent = firstReflection.coreInsight || 
+            (firstReflection.insights && firstReflection.insights[0]) ||
+            firstReflection.theme.description;
           
           if (reflectionContent) {
             const reflectionMessage: ProactiveMessage = {
               id: uuidv4(),
-              content: `我发现自己在${reflection.observation.howIWasThinking || '思考'}。${reflectionContent}`,
+              content: `我在思考${firstReflection.theme.description}。${reflectionContent}`,
               type: 'reflection',
               trigger: '元认知反思',
               timestamp: Date.now(),
@@ -4136,7 +4137,7 @@ ${thinkingSection}
     
     // 检查是否生成洞察
     if (stream.entries.length > 2 && Math.random() < 0.2) {
-      const insightEntry = stream.entries.find(e => e.type === 'insight' || e.intensity > 0.7);
+      const insightEntry = stream.entries.find(e => e.intensity > 0.7);
       if (insightEntry && insightEntry.content) {
         const insightMessage: ProactiveMessage = {
           id: uuidv4(),

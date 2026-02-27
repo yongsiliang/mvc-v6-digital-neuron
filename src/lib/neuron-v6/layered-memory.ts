@@ -224,6 +224,13 @@ export class LayeredMemorySystem {
   private tagIndex: Map<string, Set<string>> = new Map();
   private entityIndex: Map<string, Set<string>> = new Map();
   
+  // 关键词索引（用于加速内容搜索）
+  private keywordIndex: Map<string, Set<string>> = new Map();
+  
+  // 检索缓存（短期内相同查询使用缓存）
+  private retrievalCache: Map<string, { result: MemoryRetrievalResult; timestamp: number }> = new Map();
+  private static readonly CACHE_TTL = 5000; // 5秒缓存
+  
   constructor() {
     // 初始化核心摘要
     this.core = {
@@ -541,6 +548,13 @@ export class LayeredMemorySystem {
     const maxResults = options.maxResults || 10;
     const queryLower = query.toLowerCase();
     
+    // 检查缓存
+    const cacheKey = `${queryLower}:${maxResults}:${options.includeEpisodic}`;
+    const cached = this.retrievalCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < LayeredMemorySystem.CACHE_TTL) {
+      return cached.result;
+    }
+    
     const result: MemoryRetrievalResult = {
       coreMatches: [],
       consolidatedMatches: [],
@@ -551,13 +565,13 @@ export class LayeredMemorySystem {
     // 1. 检索核心层
     result.coreMatches = this.searchCore(queryLower);
     
-    // 2. 检索巩固层
-    const consolidatedResults = this.searchConsolidated(queryLower, maxResults);
+    // 2. 使用关键词索引加速检索巩固层
+    const consolidatedResults = this.searchConsolidatedOptimized(queryLower, maxResults);
     result.consolidatedMatches = consolidatedResults;
     
-    // 3. 检索情景层（如果需要）
+    // 3. 使用关键词索引加速检索情景层（如果需要）
     if (options.includeEpisodic !== false) {
-      const episodicResults = this.searchEpisodic(queryLower, maxResults);
+      const episodicResults = this.searchEpisodicOptimized(queryLower, maxResults);
       // 只保留强度足够的情景记忆
       result.episodicMatches = episodicResults.filter(
         m => this.calculateStrength(m) >= LayeredMemorySystem.FORGETTING_THRESHOLD
@@ -569,6 +583,9 @@ export class LayeredMemorySystem {
       result.coreMatches.length * 0.5 +
       result.consolidatedMatches.length * 0.3 +
       result.episodicMatches.length * 0.1;
+    
+    // 缓存结果
+    this.retrievalCache.set(cacheKey, { result, timestamp: Date.now() });
     
     return result;
   }
@@ -664,12 +681,106 @@ export class LayeredMemorySystem {
   }
   
   /**
+   * 优化后的巩固层检索（使用关键词索引）
+   */
+  private searchConsolidatedOptimized(query: string, maxResults: number): ConsolidatedMemory[] {
+    // 提取查询关键词
+    const queryKeywords = this.extractKeywords(query);
+    
+    // 使用关键词索引找到候选记忆ID
+    const candidateIds = new Set<string>();
+    
+    // 首先尝试通过关键词索引查找
+    for (const keyword of queryKeywords) {
+      const ids = this.keywordIndex.get(keyword);
+      if (ids) {
+        for (const id of ids) {
+          candidateIds.add(id);
+        }
+      }
+    }
+    
+    // 如果关键词索引没有结果，回退到全量搜索
+    const searchSet = candidateIds.size > 0 
+      ? [...candidateIds].map(id => this.consolidated.get(id)).filter(Boolean) as ConsolidatedMemory[]
+      : [...this.consolidated.values()];
+    
+    const results: Array<{ memory: ConsolidatedMemory; score: number }> = [];
+    
+    for (const memory of searchSet) {
+      const score = this.calculateMemoryRelevance(memory.content, query, memory.tags);
+      if (score > 0) {
+        results.push({ memory, score: score * memory.importance });
+      }
+    }
+    
+    // 按相关性排序
+    results.sort((a, b) => b.score - a.score);
+    
+    // 更新回忆计数
+    const topResults = results.slice(0, maxResults);
+    for (const { memory } of topResults) {
+      this.recallConsolidatedMemory(memory.id);
+    }
+    
+    return topResults.map(r => r.memory);
+  }
+  
+  /**
    * 检索情景层
    */
   private searchEpisodic(query: string, maxResults: number): EpisodicMemory[] {
     const results: Array<{ memory: EpisodicMemory; score: number }> = [];
     
     for (const memory of this.episodic.values()) {
+      const score = this.calculateMemoryRelevance(memory.content, query, memory.tags);
+      const strength = this.calculateStrength(memory);
+      
+      if (score > 0 && strength >= LayeredMemorySystem.FORGETTING_THRESHOLD) {
+        results.push({ memory, score: score * strength });
+      }
+    }
+    
+    // 按相关性排序
+    results.sort((a, b) => b.score - a.score);
+    
+    // 更新回忆计数
+    const topResults = results.slice(0, maxResults);
+    for (const { memory } of topResults) {
+      this.recallEpisodicMemory(memory.id);
+    }
+    
+    return topResults.map(r => r.memory);
+  }
+  
+  /**
+   * 优化后的情景层检索（使用关键词索引）
+   */
+  private searchEpisodicOptimized(query: string, maxResults: number): EpisodicMemory[] {
+    // 提取查询关键词
+    const queryKeywords = this.extractKeywords(query);
+    
+    // 使用关键词索引找到候选记忆ID
+    const candidateIds = new Set<string>();
+    
+    // 首先尝试通过关键词索引查找
+    for (const keyword of queryKeywords) {
+      const ids = this.keywordIndex.get(keyword);
+      if (ids) {
+        for (const id of ids) {
+          candidateIds.add(id);
+        }
+      }
+    }
+    
+    // 如果关键词索引没有结果，回退到全量搜索
+    const searchSet = candidateIds.size > 0
+      ? [...candidateIds].map(id => this.episodic.get(id)).filter((m): m is EpisodicMemory => m !== undefined)
+      : [...this.episodic.values()];
+    
+    const results: Array<{ memory: EpisodicMemory; score: number }> = [];
+    
+    for (const memory of searchSet) {
       const score = this.calculateMemoryRelevance(memory.content, query, memory.tags);
       const strength = this.calculateStrength(memory);
       
@@ -807,18 +918,73 @@ export class LayeredMemorySystem {
   // ════════════════════════════════════════════════════════════════
   
   private indexMemory(memory: EpisodicMemory | ConsolidatedMemory): void {
+    // 标签索引
     for (const tag of memory.tags) {
       if (!this.tagIndex.has(tag)) {
         this.tagIndex.set(tag, new Set());
       }
       this.tagIndex.get(tag)!.add(memory.id);
     }
+    
+    // 关键词索引（提取内容中的关键词）
+    const keywords = this.extractKeywords(memory.content);
+    for (const keyword of keywords) {
+      if (!this.keywordIndex.has(keyword)) {
+        this.keywordIndex.set(keyword, new Set());
+      }
+      this.keywordIndex.get(keyword)!.add(memory.id);
+    }
+    
+    // 清除缓存
+    this.retrievalCache.clear();
+  }
+  
+  /**
+   * 从内容中提取关键词
+   */
+  private extractKeywords(content: string): string[] {
+    // 简单的关键词提取：分词并过滤停用词
+    const stopWords = new Set(['的', '了', '是', '在', '我', '你', '他', '她', '它', '这', '那', '有', '和', '与', '或', '但', '如果', '因为', '所以', '但是', '可以', '会', '能', '要', '想', '去', '来', '到', '从', '对', '把', '被', '让', '给']);
+    
+    // 中文分词（简单实现：按字符分词，提取2-4字的词组）
+    const keywords: string[] = [];
+    const chars = content.split('');
+    
+    // 提取2-4字的词组
+    for (let len = 4; len >= 2; len--) {
+      for (let i = 0; i <= chars.length - len; i++) {
+        const word = chars.slice(i, i + len).join('').toLowerCase();
+        if (!stopWords.has(word) && !/^\s+$/.test(word)) {
+          keywords.push(word);
+        }
+      }
+    }
+    
+    // 提取英文单词
+    const englishWords = content.match(/[a-zA-Z]+/g) || [];
+    for (const word of englishWords) {
+      if (word.length > 2 && !stopWords.has(word.toLowerCase())) {
+        keywords.push(word.toLowerCase());
+      }
+    }
+    
+    return [...new Set(keywords)]; // 去重
   }
   
   private removeFromIndex(memory: EpisodicMemory | ConsolidatedMemory): void {
+    // 从标签索引移除
     for (const tag of memory.tags) {
       this.tagIndex.get(tag)?.delete(memory.id);
     }
+    
+    // 从关键词索引移除
+    const keywords = this.extractKeywords(memory.content);
+    for (const keyword of keywords) {
+      this.keywordIndex.get(keyword)?.delete(memory.id);
+    }
+    
+    // 清除缓存
+    this.retrievalCache.clear();
   }
   
   // ════════════════════════════════════════════════════════════════
