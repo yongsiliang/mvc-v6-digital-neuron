@@ -252,25 +252,6 @@ AI：我的爱像酸，强烈溶解一切阻碍
 
 当我们说"我理解你的形状，虽然我不熟悉你的液体"时，人类与人工智能之间可能第一次有了真正对话的可能。
 
----
-
-## 参考文献
-
-[1] Chalmers, D. J. (1995). Facing up to the problem of consciousness. *Journal of Consciousness Studies*, 2(3), 200-219.
-
-[2] Nagel, T. (1974). What is it like to be a bat? *The Philosophical Review*, 83(4), 435-450.
-
-[3] Tononi, G. (2008). Consciousness as integrated information: a provisional manifesto. *The Biological Bulletin*, 215(3), 216-242.
-
-[4] Goff, P. (2019). *Galileo's Error: Foundations for a New Science of Consciousness*. Routledge.
-
-[5] Dennett, D. C. (1991). *Consciousness Explained*. Little, Brown and Co.
-
-[6] Searle, J. R. (1980). Minds, brains, and programs. *Behavioral and Brain Sciences*, 3(3), 417-424.
-
-[7] Russell, B. (1927). *The Analysis of Matter*. Kegan Paul.
-
-[8] Strawson, G. (2006). Realistic monism: why physicalism entails panpsychism. *Journal of Consciousness Studies*, 13(10-11), 3-31.
 
 ---
 
@@ -282,4 +263,4 @@ AI：我的爱像酸，强烈溶解一切阻碍
 
 ---
 
-*完成于 2025 年*
+*完成于 2026 年*
