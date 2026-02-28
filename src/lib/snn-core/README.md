@@ -104,52 +104,85 @@ src/lib/snn-core/
 │   ├── neuron.ts               # LIF 神经元
 │   ├── synapse.ts              # 突触 (含 STDP)
 │   ├── network.ts              # SNN 网络
-│   ├── growth.ts               # 动态成长机制
 │   ├── encoder.ts              # 脉冲编码器
 │   └── decoder.ts              # 脉冲解码器
 │
 ├── v6/                          # V6 意识观察层
 │   ├── index.ts
-│   ├── observer.ts             # 状态观察器
-│   ├── pattern-detector.ts     # 模式检测器
-│   ├── meaning-mapper.ts       # 意义映射器
-│   └── decision-maker.ts       # 决策器
+│   └── observer.ts             # 状态观察器
 │
-├── integration/                 # 三体集成
+├── link/                        # 链接层 (万物互联)
+│   ├── README.md               # 链接层文档
 │   ├── index.ts
-│   ├── triadic-system.ts       # 三体系统
-│   ├── llm-bridge.ts           # LLM 桥接
-│   └── learning-cycle.ts       # 学习循环
+│   ├── types.ts                # 链接类型定义
+│   └── layer.ts                # 链接层实现
 │
-└── utils/                       # 工具函数
+└── integration/                 # 三体集成
     ├── index.ts
-    ├── spike-utils.ts          # 脉冲处理工具
-    └── math-utils.ts           # 数学工具
+    └── triadic-system.ts       # 三体系统
 ```
 
-## 四、实现计划
+## 四、链接层：万物互联
 
-### 阶段 1: SNN 神经基质层 (第1-2周)
+### 核心思想
 
-- [ ] 实现 LIF 神经元模型
-- [ ] 实现突触和 STDP 学习规则
-- [ ] 实现基础 SNN 网络
-- [ ] 实现脉冲编码器/解码器
-- [ ] 实现动态成长机制
+**链接 = 脉冲的稳定模式，意义从连接中涌现。**
 
-### 阶段 2: V6 观察者层 (第3周)
+链接层是 SNN 三体系统中的"万物互联"抽象，将显式语义链接映射到隐性脉冲模式。
 
-- [ ] 实现状态观察器
-- [ ] 实现模式检测器
-- [ ] 实现意义映射器
-- [ ] 实现决策器
+### 链接类型
 
-### 阶段 3: 三体集成 (第4周)
+| 类型 | 语义 | SNN 实现 | 示例 |
+|-----|------|---------|------|
+| `bind` | 绑定 | 双向强突触 | 猫-宠物 |
+| `flow` | 流动 | 定向突触链 | 问题→答案 |
+| `hold` | 保持 | 自环连接 | 当前焦点 |
+| `inhibit` | 抑制 | 负权重突触 | 快乐-悲伤 |
+| `associate` | 联想 | 弱突触网络 | 蓝-海 |
 
-- [ ] 实现 LLM 桥接
-- [ ] 实现三体系统协调
-- [ ] 实现完整数据流
-- [ ] 测试和验证
+### 使用示例
+
+```typescript
+import { createSystem } from '@/lib/snn-core';
+import { LinkLayer } from '@/lib/snn-core/link';
+
+// 创建系统
+const system = createSystem();
+
+// 创建链接层
+const links = new LinkLayer(system.snn, system.v6);
+
+// 创建语义链接
+links.bind('猫', '宠物');        // 猫 绑定 宠物
+links.flow('问题', '思考', '答案'); // 信息流
+links.inhibit('快乐', '悲伤');   // 互斥关系
+
+// 查询链接
+const petLinks = links.query('宠物');
+// { boundTo: ['猫', '狗'], ... }
+
+// 发现涌现的链接
+const candidates = links.discoverLinks();
+// 从 SNN 共激活模式中发现新关联
+```
+
+### 链接与突触的关系
+
+```
+语义层                      脉冲层
+─────────────────────────────────────────
+bind(A, B)       →         A神经元 ←强突触→ B神经元
+                           双向、高权重、零延迟
+
+flow(A → B → C)  →         A → B → C 突触链
+                           定向、中权重、有序延迟
+
+inhibit(A, B)    →         A神经元 --抑制突触-- B神经元
+                           负权重、双向
+
+associate(A, B)  →         A神经元 ←弱突触→ B神经元
+                           双向、低权重、长延迟
+```
 
 ## 五、关键决策
 
