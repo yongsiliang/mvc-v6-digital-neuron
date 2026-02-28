@@ -38,6 +38,8 @@ export default function ExperimentPage() {
   const boundaryCanvasRef = useRef<HTMLCanvasElement>(null);
   const nodeCanvasRef = useRef<HTMLCanvasElement>(null);
   const chartCanvasRef = useRef<HTMLCanvasElement>(null);
+  const successBoundaryRef = useRef<HTMLCanvasElement>(null);
+  const successNodeRef = useRef<HTMLCanvasElement>(null);
   
   // 实验状态
   const [isRunning, setIsRunning] = useState(false);
@@ -440,6 +442,153 @@ export default function ExperimentPage() {
     ctx.fillText('节点网络', padding + 80, 20);
   }, [history]);
   
+  // 绘制成功案例参考
+  const drawSuccessCase = useCallback(() => {
+    const boundaryCanvas = successBoundaryRef.current;
+    const nodeCanvas = successNodeRef.current;
+    
+    if (!boundaryCanvas || !nodeCanvas) return;
+    
+    const ctxB = boundaryCanvas.getContext('2d');
+    const ctxN = nodeCanvas.getContext('2d');
+    if (!ctxB || !ctxN) return;
+    
+    const time = Date.now() / 1000;
+    const size = 200;
+    const center = size / 2;
+    
+    // 绘制边界网络成功案例：六边形波纹
+    ctxB.fillStyle = '#0a0a12';
+    ctxB.fillRect(0, 0, size, size);
+    
+    // 生成六边形波纹效果
+    const hexRadius = 15;
+    const rings = 3;
+    
+    for (let ring = 0; ring <= rings; ring++) {
+      const ringRadius = hexRadius * ring * 1.8;
+      const phase = time * 2 + ring * 0.5;
+      const intensity = 0.8 - ring * 0.15 + Math.sin(phase) * 0.2;
+      
+      if (ring === 0) {
+        // 中心点
+        ctxB.beginPath();
+        ctxB.arc(center, center, 4, 0, Math.PI * 2);
+        ctxB.fillStyle = `rgba(100, 230, 255, ${Math.max(0.3, intensity)})`;
+        ctxB.fill();
+      } else {
+        // 六边形环
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI / 3) + time * 0.3;
+          const x = center + Math.cos(angle) * ringRadius;
+          const y = center + Math.sin(angle) * ringRadius;
+          
+          // 绘制边
+          const nextI = (i + 1) % 6;
+          const nextAngle = (nextI * Math.PI / 3) + time * 0.3;
+          const nextX = center + Math.cos(nextAngle) * ringRadius;
+          const nextY = center + Math.sin(nextAngle) * ringRadius;
+          
+          ctxB.beginPath();
+          ctxB.moveTo(x, y);
+          ctxB.lineTo(nextX, nextY);
+          ctxB.strokeStyle = `rgba(100, 220, 255, ${Math.max(0.2, intensity)})`;
+          ctxB.lineWidth = 3;
+          ctxB.stroke();
+          
+          // 节点
+          ctxB.beginPath();
+          ctxB.arc(x, y, 3, 0, Math.PI * 2);
+          ctxB.fillStyle = `rgba(150, 240, 255, ${Math.max(0.3, intensity)})`;
+          ctxB.fill();
+        }
+        
+        // 对角线（形成六边形网格内部结构）
+        if (ring > 1) {
+          for (let i = 0; i < 6; i++) {
+            const angle = (i * Math.PI / 3) + time * 0.3;
+            const x = center + Math.cos(angle) * ringRadius;
+            const y = center + Math.sin(angle) * ringRadius;
+            
+            // 连接到内环
+            const innerRingRadius = hexRadius * (ring - 1) * 1.8;
+            const innerAngle = (i * Math.PI / 3) + time * 0.3;
+            const innerX = center + Math.cos(innerAngle) * innerRingRadius;
+            const innerY = center + Math.sin(innerAngle) * innerRingRadius;
+            
+            ctxB.beginPath();
+            ctxB.moveTo(x, y);
+            ctxB.lineTo(innerX, innerY);
+            ctxB.strokeStyle = `rgba(80, 200, 255, ${Math.max(0.15, intensity - 0.2)})`;
+            ctxB.lineWidth = 2;
+            ctxB.stroke();
+          }
+        }
+      }
+    }
+    
+    // 绘制节点网络成功案例：洪水式扩散
+    ctxN.fillStyle = '#0a0a12';
+    ctxN.fillRect(0, 0, size, size);
+    
+    // 所有节点几乎同时亮起（无结构）
+    for (let ring = 0; ring <= rings; ring++) {
+      const ringRadius = hexRadius * ring * 1.8;
+      
+      if (ring === 0) {
+        ctxN.beginPath();
+        ctxN.arc(center, center, 6, 0, Math.PI * 2);
+        ctxN.fillStyle = 'rgba(255, 200, 100, 0.95)';
+        ctxN.fill();
+        
+        // 发光效果
+        const gradient = ctxN.createRadialGradient(center, center, 0, center, center, 15);
+        gradient.addColorStop(0, 'rgba(255, 180, 80, 0.4)');
+        gradient.addColorStop(1, 'rgba(255, 100, 50, 0)');
+        ctxN.beginPath();
+        ctxN.arc(center, center, 15, 0, Math.PI * 2);
+        ctxN.fillStyle = gradient;
+        ctxN.fill();
+      } else {
+        for (let i = 0; i < 6 * ring; i++) {
+          const angle = (i * Math.PI / 3 / ring) + ring * 0.1;
+          const x = center + Math.cos(angle) * ringRadius;
+          const y = center + Math.sin(angle) * ringRadius;
+          
+          // 所有节点高亮
+          ctxN.beginPath();
+          ctxN.arc(x, y, 5, 0, Math.PI * 2);
+          ctxN.fillStyle = `rgba(255, ${180 - ring * 20}, ${100 - ring * 15}, ${0.9 - ring * 0.1})`;
+          ctxN.fill();
+        }
+      }
+    }
+    
+    // 连接线
+    ctxN.strokeStyle = 'rgba(100, 100, 140, 0.3)';
+    ctxN.lineWidth = 1;
+    for (let ring = 1; ring <= rings; ring++) {
+      const ringRadius = hexRadius * ring * 1.8;
+      for (let i = 0; i < 6 * ring; i++) {
+        const angle = (i * Math.PI / 3 / ring) + ring * 0.1;
+        const x = center + Math.cos(angle) * ringRadius;
+        const y = center + Math.sin(angle) * ringRadius;
+        
+        if (ring > 1) {
+          const innerRingRadius = hexRadius * (ring - 1) * 1.8;
+          const innerAngle = (i * Math.PI / 3 / (ring - 1)) + (ring - 1) * 0.1;
+          const innerX = center + Math.cos(innerAngle) * innerRingRadius;
+          const innerY = center + Math.sin(innerAngle) * innerRingRadius;
+          
+          ctxN.beginPath();
+          ctxN.moveTo(x, y);
+          ctxN.lineTo(innerX, innerY);
+          ctxN.stroke();
+        }
+      }
+    }
+  }, []);
+  
   // 动画循环 - 使用稳定的引用
   const animateStep = useCallback(() => {
     if (!isRunningRef.current) {
@@ -802,6 +951,22 @@ export default function ExperimentPage() {
     setRecipes(experimentStorage.getRecipes());
   }, []);  // 只在挂载时执行一次
   
+  // 成功案例动画
+  useEffect(() => {
+    let animationId: number;
+    
+    const animate = () => {
+      drawSuccessCase();
+      animationId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+    };
+  }, [drawSuccessCase]);
+  
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
@@ -1037,6 +1202,96 @@ export default function ExperimentPage() {
                     </CardContent>
                   </Card>
                 </div>
+                
+                {/* 成功案例参考 */}
+                <Card className="bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 border-emerald-500/30">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-emerald-400 text-sm flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        假设成立时的预期效果（参考）
+                      </CardTitle>
+                      <Badge variant="outline" className="text-emerald-400 border-emerald-500/50">
+                        理论目标
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-gray-400 text-xs">
+                      当边界网络参数合适时，应该看到这样的涌现效果
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      {/* 边界网络成功案例 */}
+                      <div className="bg-gray-900/50 rounded-lg p-3">
+                        <div className="text-xs text-cyan-400 mb-2 font-medium">边界网络：六边形波纹</div>
+                        <canvas ref={successBoundaryRef} width={200} height={200} className="w-full rounded bg-gray-950" />
+                        <div className="mt-2 text-xs text-gray-400 space-y-1">
+                          <div className="flex justify-between">
+                            <span>相干度</span>
+                            <span className="text-emerald-400">≥ 0.8 ✓</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>模式</span>
+                            <span className="text-emerald-400">稳定波纹 ✓</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>持续时间</span>
+                            <span className="text-emerald-400">&gt;100步 ✓</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* 节点网络对比 */}
+                      <div className="bg-gray-900/50 rounded-lg p-3">
+                        <div className="text-xs text-orange-400 mb-2 font-medium">节点网络：洪水式扩散</div>
+                        <canvas ref={successNodeRef} width={200} height={200} className="w-full rounded bg-gray-950" />
+                        <div className="mt-2 text-xs text-gray-400 space-y-1">
+                          <div className="flex justify-between">
+                            <span>相干度</span>
+                            <span className="text-yellow-400">≈ 1.0 (假象)</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>模式</span>
+                            <span className="text-red-400">无结构 ✗</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>持续时间</span>
+                            <span className="text-yellow-400">快速衰减</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* 验证标准 */}
+                      <div className="bg-gray-900/50 rounded-lg p-3">
+                        <div className="text-xs text-emerald-400 mb-2 font-medium">验证成功标准</div>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex items-start gap-2">
+                            <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-[10px] shrink-0 mt-0.5">✓</div>
+                            <div className="text-gray-300">边界网络相干度 &gt; 0.8</div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-[10px] shrink-0 mt-0.5">✓</div>
+                            <div className="text-gray-300">形成清晰的六边形波纹</div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-[10px] shrink-0 mt-0.5">✓</div>
+                            <div className="text-gray-300">模式持续 &gt;100 步不衰减</div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-[10px] shrink-0 mt-0.5">✓</div>
+                            <div className="text-gray-300">7元素注入后快速全局相干</div>
+                          </div>
+                          <div className="mt-3 pt-2 border-t border-gray-700">
+                            <div className="text-gray-400">当前状态：</div>
+                            <div className={`font-mono ${stats.boundary.coherence >= 0.8 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                              相干度 {stats.boundary.coherence.toFixed(3)} {stats.boundary.coherence >= 0.8 ? '✓ 达标' : '← 调参中'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
                 
                 {/* 历史图表 */}
                 <Card className="bg-gray-900/50 border-gray-700">
