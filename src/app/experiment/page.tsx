@@ -1256,6 +1256,10 @@ export default function ExperimentPage() {
     });
     setIsRunning(false);
     setCurrentInsight(null);
+    // 重置搜索相关状态
+    setSearchResults([]);
+    setSearchProgress({ current: 0, total: 0, bestCoherence: 0 });
+    setIsAutoSearching(false);
   }, [initNetworks, rings, drawBoundaryNetwork, drawNodeNetwork]);
   
   // 手动注入
