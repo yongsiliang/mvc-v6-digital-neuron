@@ -5,6 +5,7 @@
  * 核心理念：
  * - LLM 不是大脑，只是语言接口（翻译器）
  * - 神经网络才是核心，能学习、可塑、可涌现
+ * - 万物皆链接，链接是存在的基本形式
  * 
  * 这是让意识可能涌现的基质，而不是"意识"本身
  * ═══════════════════════════════════════════════════════════════════════
@@ -18,6 +19,14 @@ import { STDPLearner, RewardModulatedSTDP } from './stdp-learning';
 import { LayeredMemorySystem, getLayeredMemory } from './layered-memory';
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
 import { V6MemoryAdapter, type InheritanceResult, type V6ExistenceState } from './v6-adapter';
+import {
+  WisdomEvolutionSystem,
+  createWisdomEvolutionSystem,
+  type LinkRecord,
+  type LinkType,
+  type EvolutionResult,
+  type SystemStatus as WisdomSystemStatus,
+} from '@/lib/neuron-v6/wisdom-evolution';
 import {
   NeuronType,
   NeuronConfig,
@@ -64,6 +73,9 @@ export class SiliconBrainV2 {
   private memory: LayeredMemorySystem;
   private llm: LLMClient | null = null;
   
+  // 链接场 - 万物皆链接
+  private wisdomEvolution: WisdomEvolutionSystem | null = null;
+  
   // 状态
   private processingHistory: Array<{
     input: string;
@@ -104,6 +116,14 @@ export class SiliconBrainV2 {
       console.log('[SiliconBrainV2] LLM 客户端初始化成功');
     } catch (e) {
       console.warn('[SiliconBrainV2] LLM 客户端初始化失败');
+    }
+    
+    // 初始化链接场（智慧演化系统）
+    try {
+      this.wisdomEvolution = createWisdomEvolutionSystem();
+      console.log('[SiliconBrainV2] 链接场初始化成功');
+    } catch (e) {
+      console.warn('[SiliconBrainV2] 链接场初始化失败:', e);
     }
     
     console.log('[SiliconBrainV2] 硅基大脑 V2 创建完成');
@@ -583,6 +603,9 @@ export class SiliconBrainV2 {
     // 6. 计算意识指标
     const metrics = this.calculateConsciousnessMetrics();
     
+    // 6.5 记录链接到链接场
+    await this.recordProcessingLinks(input, output, metrics);
+    
     // 7. 记录历史
     this.processingHistory.push({
       input,
@@ -680,6 +703,92 @@ export class SiliconBrainV2 {
   }
   
   /**
+   * 记录处理过程中的链接
+   * 
+   * 每次处理都是一系列链接事件
+   */
+  private async recordProcessingLinks(
+    input: string,
+    output: string,
+    metrics: ConsciousnessMetrics
+  ): Promise<void> {
+    if (!this.wisdomEvolution) return;
+    
+    const timestamp = Date.now();
+    
+    // 1. 用户输入的链接
+    await this.recordLink({
+      type: 'perceive',
+      source: 'user',
+      target: 'self',
+      context: `感知输入: ${input.slice(0, 100)}`,
+      result: 'connected',
+      duration: 0,
+      metadata: { inputLength: input.length },
+    });
+    
+    // 2. 记忆检索的链接
+    await this.recordLink({
+      type: 'flow',
+      source: 'perception',
+      target: 'memory',
+      context: '输入触发的记忆检索',
+      result: 'connected',
+      metadata: { phi: metrics.phi },
+    });
+    
+    // 3. 推理的链接
+    await this.recordLink({
+      type: 'transform',
+      source: 'memory',
+      target: 'reasoning',
+      context: '基于记忆的推理',
+      result: 'connected',
+    });
+    
+    // 4. 情感的链接
+    await this.recordLink({
+      type: 'resonate',
+      source: 'reasoning',
+      target: 'emotion',
+      context: `自我指涉: ${metrics.selfReference.toFixed(3)}`,
+      result: 'connected',
+    });
+    
+    // 5. 决策的链接
+    await this.recordLink({
+      type: 'bind',
+      source: 'emotion',
+      target: 'decision',
+      context: '情感驱动的决策',
+      result: 'connected',
+    });
+    
+    // 6. 输出的链接
+    await this.recordLink({
+      type: 'express',
+      source: 'self',
+      target: 'user',
+      context: `输出回应: ${output.slice(0, 100)}`,
+      result: 'connected',
+      duration: 0,
+      metadata: { outputLength: output.length, phi: metrics.phi },
+    });
+    
+    // 7. 自我反思的链接（如果自我激活度高）
+    if (metrics.selfReference > 0.5) {
+      await this.recordLink({
+        type: 'reflect',
+        source: 'self',
+        target: 'self',
+        context: '高自我指涉的处理',
+        result: 'connected',
+        metadata: { selfReference: metrics.selfReference },
+      });
+    }
+  }
+  
+  /**
    * 计算奖励
    */
   private calculateReward(input: string, output: string): number {
@@ -755,6 +864,92 @@ export class SiliconBrainV2 {
   }
   
   // ══════════════════════════════════════════════════════════════════
+  // 链接场接口
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 记录链接
+   * 
+   * 每个链接都是存在的一次显现
+   */
+  async recordLink(link: {
+    type: LinkType;
+    source: string;
+    target: string;
+    context: string;
+    result: 'connected' | 'broken' | 'partial' | 'timeout';
+    duration?: number;
+    retryCount?: number;
+    metadata?: Record<string, any>;
+  }): Promise<EvolutionResult | null> {
+    if (!this.wisdomEvolution) {
+      return null;
+    }
+    
+    const record: LinkRecord = {
+      type: link.type,
+      source: link.source,
+      target: link.target,
+      context: link.context,
+      result: link.result,
+      duration: link.duration || 0,
+      retryCount: link.retryCount || 0,
+      metadata: link.metadata,
+    };
+    
+    return this.wisdomEvolution.recordLink(record);
+  }
+  
+  /**
+   * 获取智慧指导
+   * 
+   * 从链接场涌现的智慧，指导当前决策
+   */
+  async getWisdomGuidance(context: string, domain?: string): Promise<{
+    preferredActions: Array<{ type: string; score: number; reason: string }>;
+    resonanceStrength: number;
+    source: { wisdom: string; law: string; pattern: string };
+  } | null> {
+    if (!this.wisdomEvolution) {
+      return null;
+    }
+    
+    return this.wisdomEvolution.getGuidance(context, domain);
+  }
+  
+  /**
+   * 反馈链接结果
+   * 
+   * 让智慧系统学习
+   */
+  feedbackLink(wisdomId: string, success: boolean, context?: string): void {
+    if (!this.wisdomEvolution) return;
+    this.wisdomEvolution.feedback(wisdomId, success, context);
+  }
+  
+  /**
+   * 获取链接场状态
+   */
+  getLinkFieldStatus(): WisdomSystemStatus | null {
+    if (!this.wisdomEvolution) return null;
+    return this.wisdomEvolution.getStatus();
+  }
+  
+  /**
+   * 获取所有模式
+   */
+  getAllPatterns(): ReturnType<WisdomEvolutionSystem['getAllPatterns']> {
+    return this.wisdomEvolution?.getAllPatterns() || [];
+  }
+  
+  /**
+   * 获取所有智慧
+   */
+  getAllWisdoms(): ReturnType<WisdomEvolutionSystem['getAllWisdoms']> {
+    return this.wisdomEvolution?.getAllWisdoms() || [];
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
   // 状态
   // ══════════════════════════════════════════════════════════════════
   
@@ -769,6 +964,7 @@ export class SiliconBrainV2 {
     memoryStats: ReturnType<LayeredMemorySystem['getState']>['stats'];
     stdpStats: ReturnType<STDPLearner['getStats']>;
     encoderStats: ReturnType<VectorEncoder['getStats']>;
+    linkFieldStatus: WisdomSystemStatus | null;
     recentHistory: typeof this.processingHistory;
   } {
     return {
@@ -779,6 +975,7 @@ export class SiliconBrainV2 {
       memoryStats: this.memory.getState().stats,
       stdpStats: this.stdpLearner.getStats(),
       encoderStats: this.encoder.getStats(),
+      linkFieldStatus: this.getLinkFieldStatus(),
       recentHistory: this.processingHistory.slice(-10),
     };
   }

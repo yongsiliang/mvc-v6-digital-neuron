@@ -606,7 +606,7 @@ export function getWisdomEvolutionSystem(): WisdomEvolutionSystem | null {
 }
 
 // 重新导出类型
-export type { LinkRecord, LinkParticle } from './link-field';
+export type { LinkRecord, LinkParticle, LinkType, LinkResult } from './link-field';
 export type { PatternAttractor, AttractorPhase, PatternType } from './pattern-attractor';
 export type { LawEdge, AbstractLaw, LawEdgeType } from './law-network';
 export type { WisdomVector, WisdomGuidance, WisdomType } from './wisdom-space';
