@@ -107,13 +107,20 @@ export default function ExperimentPage() {
     const edges = new Map<string, any>();
     const adjacency = new Map<string, string[]>();
     
+    // 计算网格中心和缩放
+    const canvasSize = 400;
+    const hexRadius = Math.min(20, canvasSize / (ringCount * 4 + 2));
+    const centerX = canvasSize / 2;
+    const centerY = canvasSize / 2;
+    
     // 生成节点
     for (let q = -ringCount; q <= ringCount; q++) {
       for (let r = -ringCount; r <= ringCount; r++) {
         if (Math.abs(q + r) <= ringCount) {
           const id = `${q},${r}`;
-          const x = 200 + q * 1.5 * 25;
-          const y = 200 + (q * 0.866 + r * 1.732) * 25;
+          // 转换为像素坐标
+          const x = centerX + (q * 1.5) * hexRadius;
+          const y = centerY + (q * 0.866 + r * 1.732) * hexRadius;
           
           boundaryNodes.set(id, { id, x, y, edges: [] });
           nodeNetwork.set(id, { 
@@ -135,7 +142,8 @@ export default function ExperimentPage() {
         const neighborId = `${q + dir.q},${r + dir.r}`;
         
         if (boundaryNodes.has(neighborId)) {
-          const edgeId = [id, neighborId].sort().join('-');
+          // 使用 '|' 作为分隔符，避免与节点ID中的逗号冲突
+          const edgeId = [id, neighborId].sort().join('|');
           
           if (!edgeSet.has(edgeId)) {
             edgeSet.add(edgeId);
@@ -158,7 +166,7 @@ export default function ExperimentPage() {
     
     // 边邻接关系
     edges.forEach((edge, edgeId) => {
-      const [node1, node2] = edgeId.split('-');
+      const [node1, node2] = edgeId.split('|');
       const neighbors: string[] = [];
       
       const node1Edges = boundaryNodes.get(node1)?.edges || [];
@@ -366,7 +374,7 @@ export default function ExperimentPage() {
     
     // 绘制边
     edges.forEach((edge, edgeId) => {
-      const [node1Id, node2Id] = edgeId.split('-');
+      const [node1Id, node2Id] = edgeId.split('|');  // 使用 '|' 分割
       const node1 = boundary.get(node1Id);
       const node2 = boundary.get(node2Id);
       
