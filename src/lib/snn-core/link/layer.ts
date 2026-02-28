@@ -1,547 +1,439 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * 链接层实现
+ * 链接涌现层
  * 
- * 链接 = 脉冲的稳定模式
+ * 链接不是定义出来的，而是从脉冲模式中涌现的。
  * 
  * 职责：
- * 1. 提供语义链接 API (bind, flow, hold, inhibit)
- * 2. 将链接映射到 SNN 突触
- * 3. 从 SNN 模式中发现涌现的链接
- * 4. 管理链接的生命周期
+ * 1. 观察 SNN 的脉冲模式
+ * 2. 检测概念间的共激活
+ * 3. 发现涌现的连接
+ * 4. 维护连接的生命周期
+ * 
+ * 不提供：
+ * - bind(), flow(), hold() 等显式 API
+ * - 预设的链接类型
+ * - 人为定义的关系
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 import type { SpikingNeuralNetwork } from '../snn';
 import type { V6Observer } from '../v6';
-import type { NeuronId, SynapseId } from '../types';
+import type { NeuronId } from '../types';
 import type {
   ConceptId,
-  Link,
-  LinkType,
-  LinkGroup,
-  LinkLayerConfig,
-  EmergedLinkCandidate
+  EmergentConnection,
+  ConceptNetwork,
+  CoActivationRecord,
+  EmergenceConfig
 } from './types';
-import { LINK_SYNAPSE_RULES, DEFAULT_LINK_CONFIG } from './types';
+import { DEFAULT_EMERGENCE_CONFIG } from './types';
 
 /**
- * 链接层
+ * 链接涌现层
+ * 
+ * 不定义链接，只发现链接
  */
-export class LinkLayer {
+export class LinkEmergence {
   private snn: SpikingNeuralNetwork;
   private v6: V6Observer;
-  private config: LinkLayerConfig;
+  private config: EmergenceConfig;
   
-  // 概念到神经元的映射（来自编码器）
+  // 概念到神经元的映射（由编码器维护）
   private conceptNeurons: Map<ConceptId, NeuronId[]> = new Map();
   
-  // 所有链接
-  private links: Map<string, Link> = new Map();
-  
-  // 概念到链接的索引
-  private conceptLinks: Map<ConceptId, Set<string>> = new Map();
-  
-  // 共激活统计（用于涌现检测）
+  // 共激活统计
   private coActivationStats: Map<string, {
     count: number;
-    correlation: number;
-    sequential: number;  // 正=source先，负=target先
+    correlationSum: number;
+    delaySum: number;
+    lastUpdate: number;
   }> = new Map();
+  
+  // 涌现的连接
+  private connections: Map<string, EmergentConnection> = new Map();
+  
+  // 概念统计
+  private conceptStats: Map<ConceptId, {
+    neuronCount: number;
+    activations: number;
+    lastActive: number;
+  }> = new Map();
+  
+  // 观察计数
+  private observationCount = 0;
   
   constructor(
     snn: SpikingNeuralNetwork,
     v6: V6Observer,
-    config: Partial<LinkLayerConfig> = {}
+    config: Partial<EmergenceConfig> = {}
   ) {
     this.snn = snn;
     this.v6 = v6;
-    this.config = { ...DEFAULT_LINK_CONFIG, ...config };
+    this.config = { ...DEFAULT_EMERGENCE_CONFIG, ...config };
   }
   
   // ══════════════════════════════════════════════════════════════════
-  // 核心 API：语义链接
+  // 核心：观察与涌现
   // ══════════════════════════════════════════════════════════════════
   
   /**
-   * 绑定两个概念（持久关联）
-   * 
-   * bind('猫', '宠物') → 猫 是一种宠物
-   * bind('红色', '温暖') → 红色 让人感到温暖
-   */
-  bind(source: ConceptId, target: ConceptId, strength: number = 1.0): Link {
-    return this.createLink('bind', source, target, strength, 'explicit');
-  }
-  
-  /**
-   * 创建信息流（定向传递）
-   * 
-   * flow('问题', '思考', '答案') → 问题 → 思考 → 答案
-   * flow('输入', '处理', '输出') → 数据处理流水线
-   */
-  flow(...concepts: ConceptId[]): Link[] {
-    const links: Link[] = [];
-    for (let i = 0; i < concepts.length - 1; i++) {
-      links.push(this.createLink('flow', concepts[i], concepts[i + 1], 0.8, 'explicit'));
-    }
-    return links;
-  }
-  
-  /**
-   * 保持概念状态（自环 + 持续激活）
-   * 
-   * hold('当前焦点') → 保持当前焦点活跃
-   * hold('工作记忆') → 维持工作记忆内容
-   */
-  hold(concept: ConceptId, duration: number = 100): Link {
-    return this.createLink('hold', concept, concept, Math.min(duration / 100, 1), 'explicit');
-  }
-  
-  /**
-   * 抑制关系（互斥）
-   * 
-   * inhibit('快乐', '悲伤') → 快乐时抑制悲伤
-   * inhibit('开', '关') → 开关互斥
-   */
-  inhibit(source: ConceptId, target: ConceptId, strength: number = 1.0): Link {
-    return this.createLink('inhibit', source, target, strength, 'explicit');
-  }
-  
-  /**
-   * 自由联想（弱关联）
-   * 
-   * associate('蓝', '海') → 蓝色让人想到海
-   * associate('咖啡', '早晨') → 咖啡关联早晨
-   */
-  associate(source: ConceptId, target: ConceptId, strength: number = 0.3): Link {
-    return this.createLink('associate', source, target, strength, 'explicit');
-  }
-  
-  // ══════════════════════════════════════════════════════════════════
-  // 链接管理
-  // ══════════════════════════════════════════════════════════════════
-  
-  /**
-   * 查询概念的所有链接
-   */
-  query(concept: ConceptId): LinkGroup {
-    const linkIds = this.conceptLinks.get(concept) || new Set();
-    
-    const group: LinkGroup = {
-      concept,
-      boundTo: [],
-      flowsTo: [],
-      holds: [],
-      inhibits: [],
-      associates: []
-    };
-    
-    for (const id of linkIds) {
-      const link = this.links.get(id);
-      if (!link) continue;
-      
-      const other = link.source === concept ? link.target : link.source;
-      
-      switch (link.type) {
-        case 'bind':
-          group.boundTo.push({ concept: other, strength: link.strength });
-          break;
-        case 'flow':
-          if (link.source === concept) {
-            group.flowsTo.push({ concept: other, path: [link.source, link.target] });
-          }
-          break;
-        case 'hold':
-          group.holds.push({ concept: other, duration: link.strength * 100 });
-          break;
-        case 'inhibit':
-          group.inhibits.push({ concept: other, strength: link.strength });
-          break;
-        case 'associate':
-          group.associates.push({ concept: other, strength: link.strength });
-          break;
-      }
-    }
-    
-    return group;
-  }
-  
-  /**
-   * 获取两个概念之间的链接
-   */
-  getLink(source: ConceptId, target: ConceptId): Link | undefined {
-    const id1 = this.makeLinkId(source, target);
-    const id2 = this.makeLinkId(target, source);
-    return this.links.get(id1) || this.links.get(id2);
-  }
-  
-  /**
-   * 强化链接（增加强度）
-   */
-  reinforce(source: ConceptId, target: ConceptId): void {
-    const link = this.getLink(source, target);
-    if (link) {
-      link.strength = Math.min(1, link.strength + this.config.learningRate.reinforce);
-      link.lastActivated = Date.now();
-      link.activationCount++;
-      
-      // 同步更新突触权重
-      this.updateSynapseWeights(link);
-    }
-  }
-  
-  /**
-   * 弱化链接（减少强度）
-   */
-  weaken(source: ConceptId, target: ConceptId): void {
-    const link = this.getLink(source, target);
-    if (link) {
-      link.strength -= this.config.learningRate.decay;
-      
-      if (link.strength < this.config.pruneThreshold) {
-        // 修剪链接
-        this.removeLink(link.id);
-      } else {
-        this.updateSynapseWeights(link);
-      }
-    }
-  }
-  
-  /**
-   * 移除链接
-   */
-  remove(source: ConceptId, target: ConceptId): void {
-    const link = this.getLink(source, target);
-    if (link) {
-      this.removeLink(link.id);
-    }
-  }
-  
-  // ══════════════════════════════════════════════════════════════════
-  // SNN 映射
-  // ══════════════════════════════════════════════════════════════════
-  
-  /**
-   * 注册概念到神经元的映射（由编码器调用）
+   * 注册概念到神经元的映射
+   * 由编码器调用，不暴露给外部
    */
   registerConceptNeurons(concept: ConceptId, neurons: NeuronId[]): void {
     this.conceptNeurons.set(concept, neurons);
+    
+    if (!this.conceptStats.has(concept)) {
+      this.conceptStats.set(concept, {
+        neuronCount: neurons.length,
+        activations: 0,
+        lastActive: Date.now()
+      });
+    }
   }
   
   /**
-   * 从 SNN 模式中发现涌现的链接
+   * 观察一次激活事件
+   * 由 SNN 网络在脉冲传播时调用
    */
-  discoverLinks(): EmergedLinkCandidate[] {
-    const candidates: EmergedLinkCandidate[] = [];
-    const processed = new Set<string>();
-    
-    // 分析共激活统计
-    for (const [key, stats] of this.coActivationStats) {
-      if (stats.count < this.config.emergence.minCoActivation) continue;
-      if (Math.abs(stats.correlation) < this.config.emergence.correlationThreshold) continue;
-      
-      const [source, target] = key.split('|');
-      const pairKey = this.makeLinkId(source, target);
-      
-      if (processed.has(pairKey)) continue;
-      processed.add(pairKey);
-      
-      // 检查是否已存在链接
-      if (this.getLink(source, target)) continue;
-      
-      // 推断链接类型
-      const inferredType = this.inferLinkType(stats);
-      const confidence = this.calculateConfidence(stats);
-      
-      if (confidence >= this.config.emergence.confidenceThreshold) {
-        candidates.push({
-          source,
-          target,
-          evidence: {
-            coActivationCount: stats.count,
-            avgCorrelation: stats.correlation,
-            sequentialPattern: stats.sequential !== 0,
-            timeDelay: stats.sequential
-          },
-          inferredType,
-          confidence
-        });
-      }
+  observeActivation(concept: ConceptId, timestamp: number = Date.now()): void {
+    const stats = this.conceptStats.get(concept);
+    if (stats) {
+      stats.activations++;
+      stats.lastActive = timestamp;
     }
     
-    return candidates;
+    this.observationCount++;
+    
+    // 定期修剪
+    if (this.observationCount % this.config.pruneInterval === 0) {
+      this.prune();
+    }
   }
   
   /**
-   * 将涌现的链接候选转化为实际链接
+   * 观察概念共激活
+   * 当两个概念在时间窗口内同时激活时调用
    */
-  promoteToLink(candidate: EmergedLinkCandidate): Link {
-    return this.createLink(
-      candidate.inferredType,
-      candidate.source,
-      candidate.target,
-      candidate.confidence,
-      'emerged'
-    );
-  }
-  
-  /**
-   * 记录共激活（由 SNN 网络调用）
-   */
-  recordCoActivation(concept1: ConceptId, concept2: ConceptId, delay: number = 0): void {
-    const key = `${concept1}|${concept2}`;
+  observeCoActivation(
+    concept1: ConceptId,
+    concept2: ConceptId,
+    delay: number = 0,
+    intensity: number = 1.0
+  ): void {
+    // 确保 concept1 < concept2，避免重复
+    const [c1, c2] = concept1 < concept2 ? [concept1, concept2] : [concept2, concept1];
+    const key = `${c1}|${c2}`;
+    
     const stats = this.coActivationStats.get(key) || {
       count: 0,
-      correlation: 0,
-      sequential: 0
+      correlationSum: 0,
+      delaySum: 0,
+      lastUpdate: Date.now()
     };
     
     stats.count++;
-    stats.correlation = (stats.correlation * (stats.count - 1) + 1) / stats.count;
-    stats.sequential = (stats.sequential * (stats.count - 1) + delay) / stats.count;
+    stats.correlationSum += intensity;
+    stats.delaySum += delay;
+    stats.lastUpdate = Date.now();
     
     this.coActivationStats.set(key, stats);
+    
+    // 检查是否涌现为新连接
+    this.checkEmergence(c1, c2, stats);
   }
   
-  // ══════════════════════════════════════════════════════════════════
-  // 内部方法
-  // ══════════════════════════════════════════════════════════════════
+  /**
+   * 批量观察激活模式
+   * V6 观察器可以调用此方法报告检测到的模式
+   */
+  observePattern(
+    activeConcepts: ConceptId[],
+    firingNeurons: Map<ConceptId, NeuronId[]>,
+    timestamp: number = Date.now()
+  ): void {
+    // 记录每个概念的激活
+    for (const concept of activeConcepts) {
+      this.observeActivation(concept, timestamp);
+    }
+    
+    // 检测共激活
+    for (let i = 0; i < activeConcepts.length; i++) {
+      for (let j = i + 1; j < activeConcepts.length; j++) {
+        // 计算时间延迟（基于神经元发放顺序）
+        const neurons1 = firingNeurons.get(activeConcepts[i]) || [];
+        const neurons2 = firingNeurons.get(activeConcepts[j]) || [];
+        
+        // 简化：假设同时激活，延迟为0
+        this.observeCoActivation(activeConcepts[i], activeConcepts[j], 0, 1.0);
+      }
+    }
+  }
   
   /**
-   * 创建链接
+   * 检查是否涌现为新连接
    */
-  private createLink(
-    type: LinkType,
-    source: ConceptId,
-    target: ConceptId,
-    strength: number,
-    origin: 'explicit' | 'emerged' | 'taught'
-  ): Link {
-    const id = this.makeLinkId(source, target);
+  private checkEmergence(
+    concept1: ConceptId,
+    concept2: ConceptId,
+    stats: { count: number; correlationSum: number; delaySum: number; lastUpdate: number }
+  ): void {
+    // 检查是否满足最小观察次数
+    if (stats.count < this.config.minObservations) return;
     
-    // 检查是否已存在
-    const existing = this.links.get(id);
+    const correlation = stats.correlationSum / stats.count;
+    
+    // 检查是否满足最小相关性
+    if (Math.abs(correlation) < this.config.minCorrelation) return;
+    
+    const key = `${concept1}|${concept2}`;
+    
+    // 更新或创建连接
+    const existing = this.connections.get(key);
+    const now = Date.now();
+    
     if (existing) {
-      // 更新现有链接
-      existing.strength = Math.max(existing.strength, strength);
-      existing.lastActivated = Date.now();
-      existing.activationCount++;
-      return existing;
+      // 更新现有连接
+      existing.coActivationCount = stats.count;
+      existing.correlation = correlation;
+      existing.avgTimeDelay = stats.delaySum / stats.count;
+      existing.lastObserved = now;
+      
+      // 更新稳定性
+      existing.stability = this.calculateStability(existing);
+    } else {
+      // 创建新连接
+      this.connections.set(key, {
+        source: concept1,
+        target: concept2,
+        coActivationCount: stats.count,
+        correlation,
+        avgTimeDelay: stats.delaySum / stats.count,
+        avgWeight: 0.5, // 初始权重
+        bidirectional: true, // 默认双向
+        synapseCount: 0,
+        stability: 0.5,
+        firstObserved: now,
+        lastObserved: now
+      });
     }
-    
-    const link: Link = {
-      id,
-      type,
-      source,
-      target,
-      strength,
-      synapseIds: [],
-      createdAt: Date.now(),
-      lastActivated: Date.now(),
-      activationCount: 1,
-      origin
-    };
-    
-    // 创建对应的突触
-    link.synapseIds = this.createSynapses(link);
-    
-    // 存储链接
-    this.links.set(id, link);
-    
-    // 更新索引
-    this.addToIndex(source, id);
-    this.addToIndex(target, id);
-    
-    return link;
   }
   
   /**
-   * 为链接创建突触
+   * 计算连接稳定性
    */
-  private createSynapses(link: Link): SynapseId[] {
-    const rule = LINK_SYNAPSE_RULES[link.type];
-    const sourceNeurons = this.conceptNeurons.get(link.source) || [];
-    const targetNeurons = this.conceptNeurons.get(link.target) || [];
+  private calculateStability(conn: EmergentConnection): number {
+    // 基于观察次数和相关性计算稳定性
+    const countScore = Math.min(conn.coActivationCount / 20, 1);
+    const corrScore = Math.abs(conn.correlation);
     
-    if (sourceNeurons.length === 0 || targetNeurons.length === 0) {
-      return [];
-    }
+    return countScore * 0.4 + corrScore * 0.6;
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 查询接口
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 查询与概念相关的其他概念
+   * 返回按相关性排序的列表
+   */
+  queryRelated(concept: ConceptId): Array<{
+    concept: ConceptId;
+    correlation: number;
+    coActivationCount: number;
+    avgDelay: number;
+  }> {
+    const related: Array<{
+      concept: ConceptId;
+      correlation: number;
+      coActivationCount: number;
+      avgDelay: number;
+    }> = [];
     
-    const synapseIds: SynapseId[] = [];
-    
-    // 创建突触连接
-    // 采样一些神经元对来创建突触
-    const sampleSize = Math.min(5, sourceNeurons.length, targetNeurons.length);
-    
-    for (let i = 0; i < sampleSize; i++) {
-      const pre = sourceNeurons[i % sourceNeurons.length];
-      const post = targetNeurons[i % targetNeurons.length];
-      
-      // 通过 SNN 网络创建突触
-      // 这里简化处理，实际需要调用 SNN 的方法
-      const synapseId = `${pre}->${post}`;
-      synapseIds.push(synapseId);
-      
-      // 如果是双向链接，创建反向突触
-      if (rule.bidirectional && pre !== post) {
-        synapseIds.push(`${post}->${pre}`);
+    for (const conn of this.connections.values()) {
+      if (conn.source === concept || conn.target === concept) {
+        const other = conn.source === concept ? conn.target : conn.source;
+        
+        // 只返回稳定的连接
+        if (conn.stability >= this.config.minStability) {
+          related.push({
+            concept: other,
+            correlation: conn.correlation,
+            coActivationCount: conn.coActivationCount,
+            avgDelay: conn.avgTimeDelay
+          });
+        }
       }
     }
     
-    return synapseIds;
-  }
-  
-  /**
-   * 更新突触权重
-   */
-  private updateSynapseWeights(link: Link): void {
-    const rule = LINK_SYNAPSE_RULES[link.type];
-    const weight = rule.sign * (
-      rule.weightRange.min + 
-      link.strength * (rule.weightRange.max - rule.weightRange.min)
-    );
+    // 按相关性排序
+    related.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
     
-    // 实际更新 SNN 中的突触权重
-    // 这里需要 SNN 网络提供接口
-    // this.snn.updateSynapseWeights(link.synapseIds, weight);
+    return related;
   }
   
   /**
-   * 推断链接类型
+   * 查询两个概念之间的连接
    */
-  private inferLinkType(stats: { count: number; correlation: number; sequential: number }): LinkType {
-    // 如果有明显的序列模式 → flow
-    if (Math.abs(stats.sequential) > 2) {
-      return 'flow';
+  queryConnection(concept1: ConceptId, concept2: ConceptId): EmergentConnection | undefined {
+    const key = concept1 < concept2 
+      ? `${concept1}|${concept2}` 
+      : `${concept2}|${concept1}`;
+    return this.connections.get(key);
+  }
+  
+  /**
+   * 获取所有涌现的连接
+   */
+  getAllConnections(): EmergentConnection[] {
+    return Array.from(this.connections.values())
+      .filter(c => c.stability >= this.config.minStability);
+  }
+  
+  /**
+   * 获取概念网络
+   */
+  getNetwork(): ConceptNetwork {
+    const concepts = new Map<ConceptId, {
+      neuronCount: number;
+      totalActivations: number;
+      lastActive: number;
+    }>();
+    
+    for (const [concept, stats] of this.conceptStats) {
+      concepts.set(concept, {
+        neuronCount: stats.neuronCount,
+        totalActivations: stats.activations,
+        lastActive: stats.lastActive
+      });
     }
     
-    // 如果高频共激活 → bind
-    if (stats.count > 20 && stats.correlation > 0.8) {
-      return 'bind';
-    }
+    const connections = this.getAllConnections();
+    const totalStrength = connections.reduce((sum, c) => sum + Math.abs(c.correlation), 0);
     
-    // 如果负相关 → inhibit
-    if (stats.correlation < -0.5) {
-      return 'inhibit';
-    }
-    
-    // 默认 → associate
-    return 'associate';
-  }
-  
-  /**
-   * 计算置信度
-   */
-  private calculateConfidence(stats: { count: number; correlation: number; sequential: number }): number {
-    const countScore = Math.min(stats.count / 10, 1);
-    const corrScore = Math.abs(stats.correlation);
-    const seqScore = stats.sequential !== 0 ? 0.2 : 0;
-    
-    return (countScore * 0.3 + corrScore * 0.5 + seqScore * 0.2);
-  }
-  
-  /**
-   * 生成链接 ID
-   */
-  private makeLinkId(source: ConceptId, target: ConceptId): string {
-    return `${source}→${target}`;
-  }
-  
-  /**
-   * 添加到索引
-   */
-  private addToIndex(concept: ConceptId, linkId: string): void {
-    if (!this.conceptLinks.has(concept)) {
-      this.conceptLinks.set(concept, new Set());
-    }
-    this.conceptLinks.get(concept)!.add(linkId);
-  }
-  
-  /**
-   * 移除链接
-   */
-  private removeLink(linkId: string): void {
-    const link = this.links.get(linkId);
-    if (!link) return;
-    
-    // 从索引中移除
-    const sourceLinks = this.conceptLinks.get(link.source);
-    sourceLinks?.delete(linkId);
-    
-    const targetLinks = this.conceptLinks.get(link.target);
-    targetLinks?.delete(linkId);
-    
-    // 从存储中移除
-    this.links.delete(linkId);
-    
-    // 实际删除突触（通过 SNN）
-    // this.snn.removeSynapses(link.synapseIds);
+    return {
+      concepts,
+      connections,
+      stats: {
+        totalConcepts: concepts.size,
+        totalConnections: connections.length,
+        avgConnectionStrength: connections.length > 0 ? totalStrength / connections.length : 0,
+        networkDensity: concepts.size > 1 
+          ? connections.length / (concepts.size * (concepts.size - 1) / 2)
+          : 0
+      }
+    };
   }
   
   // ══════════════════════════════════════════════════════════════════
-  // 统计与导出
+  // 生命周期管理
   // ══════════════════════════════════════════════════════════════════
   
   /**
-   * 获取所有链接
+   * 修剪不稳定的连接
    */
-  getAllLinks(): Link[] {
-    return Array.from(this.links.values());
+  prune(): void {
+    const now = Date.now();
+    const toDelete: string[] = [];
+    
+    for (const [key, conn] of this.connections) {
+      // 稳定性低于阈值
+      if (conn.stability < this.config.pruneThreshold) {
+        toDelete.push(key);
+        continue;
+      }
+      
+      // 长时间未观察到
+      const age = now - conn.lastObserved;
+      if (age > this.config.observationWindow * 10) {
+        // 衰减稳定性
+        conn.stability *= 0.9;
+        if (conn.stability < this.config.pruneThreshold) {
+          toDelete.push(key);
+        }
+      }
+    }
+    
+    // 删除
+    for (const key of toDelete) {
+      this.connections.delete(key);
+      this.coActivationStats.delete(key);
+    }
+    
+    if (toDelete.length > 0) {
+      console.log(`[LinkEmergence] 修剪了 ${toDelete.length} 个不稳定连接`);
+    }
   }
+  
+  /**
+   * 重置所有状态
+   */
+  reset(): void {
+    this.coActivationStats.clear();
+    this.connections.clear();
+    this.conceptStats.clear();
+    this.observationCount = 0;
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 统计
+  // ══════════════════════════════════════════════════════════════════
   
   /**
    * 获取统计信息
    */
   getStats(): {
-    totalLinks: number;
-    byType: Record<LinkType, number>;
-    byOrigin: Record<string, number>;
-    avgStrength: number;
+    totalConcepts: number;
+    totalConnections: number;
+    stableConnections: number;
+    avgStability: number;
+    observationCount: number;
   } {
-    const all = this.getAllLinks();
-    const byType: Record<LinkType, number> = {
-      bind: 0, flow: 0, hold: 0, inhibit: 0, associate: 0
-    };
-    const byOrigin: Record<string, number> = { explicit: 0, emerged: 0, taught: 0 };
-    let totalStrength = 0;
+    const stable = Array.from(this.connections.values())
+      .filter(c => c.stability >= this.config.minStability);
     
-    for (const link of all) {
-      byType[link.type]++;
-      byOrigin[link.origin]++;
-      totalStrength += link.strength;
-    }
+    const avgStability = stable.length > 0
+      ? stable.reduce((sum, c) => sum + c.stability, 0) / stable.length
+      : 0;
     
     return {
-      totalLinks: all.length,
-      byType,
-      byOrigin,
-      avgStrength: all.length > 0 ? totalStrength / all.length : 0
+      totalConcepts: this.conceptStats.size,
+      totalConnections: this.connections.size,
+      stableConnections: stable.length,
+      avgStability,
+      observationCount: this.observationCount
     };
   }
   
   /**
-   * 导出为图谱格式
+   * 导出为图谱格式（用于可视化）
    */
   toGraph(): {
-    nodes: Array<{ id: ConceptId; links: number }>;
-    edges: Array<{ source: ConceptId; target: ConceptId; type: LinkType; strength: number }>;
+    nodes: Array<{ id: ConceptId; activations: number }>;
+    edges: Array<{ 
+      source: ConceptId; 
+      target: ConceptId; 
+      weight: number;
+      stability: number;
+    }>;
   } {
-    const nodeLinks = new Map<ConceptId, number>();
-    const edges: Array<{ source: ConceptId; target: ConceptId; type: LinkType; strength: number }> = [];
+    const nodes: Array<{ id: ConceptId; activations: number }> = [];
     
-    for (const link of this.links.values()) {
-      nodeLinks.set(link.source, (nodeLinks.get(link.source) || 0) + 1);
-      nodeLinks.set(link.target, (nodeLinks.get(link.target) || 0) + 1);
-      
-      edges.push({
-        source: link.source,
-        target: link.target,
-        type: link.type,
-        strength: link.strength
+    for (const [concept, stats] of this.conceptStats) {
+      nodes.push({
+        id: concept,
+        activations: stats.activations
       });
     }
     
-    const nodes = Array.from(nodeLinks.entries()).map(([id, links]) => ({ id, links }));
+    const edges = this.getAllConnections().map(conn => ({
+      source: conn.source,
+      target: conn.target,
+      weight: Math.abs(conn.correlation),
+      stability: conn.stability
+    }));
     
     return { nodes, edges };
   }
@@ -552,12 +444,12 @@ export class LinkLayer {
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * 创建链接层
+ * 创建链接涌现层
  */
-export function createLinkLayer(
+export function createLinkEmergence(
   snn: SpikingNeuralNetwork,
   v6: V6Observer,
-  config?: Partial<LinkLayerConfig>
-): LinkLayer {
-  return new LinkLayer(snn, v6, config);
+  config?: Partial<EmergenceConfig>
+): LinkEmergence {
+  return new LinkEmergence(snn, v6, config);
 }
