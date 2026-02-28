@@ -626,33 +626,95 @@ export default function ExperimentPage() {
     const currentBoundaryParams = boundaryParamsRef.current;
     const currentNodeParams = nodeParamsRef.current;
     
-    // 边界网络演化
+    // 边界网络演化 - 使用改进的相位同步机制
     const newEdges = new Map(edges);
+    
+    // 第一步：计算全局激活水平（用于全局抑制）
+    let totalActivation = 0;
+    edges.forEach(edge => {
+      totalActivation += edge.intensity;
+    });
+    const avgActivation = totalActivation / edges.size;
+    const globalInhibition = avgActivation * 0.3; // 全局抑制强度
+    
+    // 第二步：计算目标相位（Kuramoto模型风格）
+    const targetPhases = new Map<string, number>();
     
     edges.forEach((edge, edgeId) => {
       const neighbors = adjacency.get(edgeId) || [];
+      
+      // 计算邻居相位的加权平均
+      let sinSum = 0;
+      let cosSum = 0;
+      let weightSum = 0;
+      
+      neighbors.forEach(neighborId => {
+        const neighbor = edges.get(neighborId);
+        if (neighbor && neighbor.intensity > currentBoundaryParams.threshold) {
+          const weight = neighbor.intensity;
+          sinSum += Math.sin(neighbor.phase) * weight;
+          cosSum += Math.cos(neighbor.phase) * weight;
+          weightSum += weight;
+        }
+      });
+      
+      if (weightSum > 0) {
+        // 目标相位 = 邻居相位的加权平均
+        targetPhases.set(edgeId, Math.atan2(sinSum / weightSum, cosSum / weightSum));
+      } else {
+        targetPhases.set(edgeId, edge.phase);
+      }
+    });
+    
+    // 第三步：更新每条边
+    edges.forEach((edge, edgeId) => {
+      const neighbors = adjacency.get(edgeId) || [];
+      const targetPhase = targetPhases.get(edgeId) || edge.phase;
+      
+      // 计算来自邻居的激励
       let inputFromNeighbors = 0;
       
       neighbors.forEach(neighborId => {
         const neighbor = edges.get(neighborId);
         if (neighbor && neighbor.intensity > currentBoundaryParams.threshold) {
-          const phaseDiff = Math.abs(edge.phase - neighbor.phase);
+          // 相位差越小，激励越强（同步激励）
+          const phaseDiff = edge.phase - neighbor.phase;
           const phaseFactor = Math.cos(phaseDiff);
           inputFromNeighbors += neighbor.intensity * currentBoundaryParams.neighborExcitation * phaseFactor;
         }
       });
       
-      const selfInput = edge.intensity * currentBoundaryParams.selfExcitation;
-      const oscillation = Math.sin(edge.age * currentBoundaryParams.oscillationFreq + edge.phase) * 0.05;
-      const decay = edge.intensity * currentBoundaryParams.decayRate;
+      // 自激励 + 邻居激励
+      const excitation = edge.intensity * currentBoundaryParams.selfExcitation + inputFromNeighbors;
       
-      let newIntensity = edge.intensity + inputFromNeighbors + selfInput + oscillation - decay;
+      // 全局抑制 + 衰减
+      const inhibition = globalInhibition + edge.intensity * currentBoundaryParams.decayRate;
+      
+      // 振荡项（保持微弱）
+      const oscillation = Math.sin(edge.age * currentBoundaryParams.oscillationFreq + edge.phase) * 0.02;
+      
+      // 更新强度
+      let newIntensity = edge.intensity + excitation - inhibition + oscillation;
       newIntensity = Math.max(0, Math.min(1, newIntensity));
+      
+      // 更新相位（向目标相位靠拢）
+      let phaseDiff = targetPhase - edge.phase;
+      // 归一化相位差到 [-π, π]
+      while (phaseDiff > Math.PI) phaseDiff -= 2 * Math.PI;
+      while (phaseDiff < -Math.PI) phaseDiff += 2 * Math.PI;
+      
+      // 相位同步速度取决于强度
+      const phaseSyncRate = 0.1 + newIntensity * 0.2;
+      let newPhase = edge.phase + phaseDiff * phaseSyncRate;
+      
+      // 保持相位在 [0, 2π]
+      while (newPhase > 2 * Math.PI) newPhase -= 2 * Math.PI;
+      while (newPhase < 0) newPhase += 2 * Math.PI;
       
       newEdges.set(edgeId, {
         id: edgeId,
         intensity: newIntensity,
-        phase: edge.phase + newIntensity * 0.1,
+        phase: newPhase,
         age: edge.age + 0.016
       });
     });
@@ -830,34 +892,75 @@ export default function ExperimentPage() {
             return;
           }
           
-          // 执行一步演化（复用animateStep的逻辑）
+          // 执行一步演化（使用改进的相位同步机制）
           const { boundary, node, edges, adjacency } = networkRef.current!;
           
           const newEdges = new Map(edges);
+          
+          // 全局抑制
+          let totalActivation = 0;
+          edges.forEach(edge => totalActivation += edge.intensity);
+          const avgActivation = totalActivation / edges.size;
+          const globalInhibition = avgActivation * 0.3;
+          
+          // 计算目标相位
+          const targetPhases = new Map<string, number>();
+          
           edges.forEach((edge, edgeId) => {
             const neighbors = adjacency.get(edgeId) || [];
-            let inputFromNeighbors = 0;
+            let sinSum = 0, cosSum = 0, weightSum = 0;
             
             neighbors.forEach(neighborId => {
               const neighbor = edges.get(neighborId);
               if (neighbor && neighbor.intensity > params.threshold) {
-                const phaseDiff = Math.abs(edge.phase - neighbor.phase);
+                const weight = neighbor.intensity;
+                sinSum += Math.sin(neighbor.phase) * weight;
+                cosSum += Math.cos(neighbor.phase) * weight;
+                weightSum += weight;
+              }
+            });
+            
+            if (weightSum > 0) {
+              targetPhases.set(edgeId, Math.atan2(sinSum / weightSum, cosSum / weightSum));
+            } else {
+              targetPhases.set(edgeId, edge.phase);
+            }
+          });
+          
+          // 更新边
+          edges.forEach((edge, edgeId) => {
+            const neighbors = adjacency.get(edgeId) || [];
+            const targetPhase = targetPhases.get(edgeId) || edge.phase;
+            
+            let inputFromNeighbors = 0;
+            neighbors.forEach(neighborId => {
+              const neighbor = edges.get(neighborId);
+              if (neighbor && neighbor.intensity > params.threshold) {
+                const phaseDiff = edge.phase - neighbor.phase;
                 const phaseFactor = Math.cos(phaseDiff);
                 inputFromNeighbors += neighbor.intensity * params.neighborExcitation * phaseFactor;
               }
             });
             
-            const selfInput = edge.intensity * params.selfExcitation;
-            const oscillation = Math.sin(edge.age * params.oscillationFreq + edge.phase) * 0.05;
-            const decay = edge.intensity * params.decayRate;
+            const excitation = edge.intensity * params.selfExcitation + inputFromNeighbors;
+            const inhibition = globalInhibition + edge.intensity * params.decayRate;
+            const oscillation = Math.sin(edge.age * params.oscillationFreq + edge.phase) * 0.02;
             
-            let newIntensity = edge.intensity + inputFromNeighbors + selfInput + oscillation - decay;
+            let newIntensity = edge.intensity + excitation - inhibition + oscillation;
             newIntensity = Math.max(0, Math.min(1, newIntensity));
+            
+            let phaseDiff = targetPhase - edge.phase;
+            while (phaseDiff > Math.PI) phaseDiff -= 2 * Math.PI;
+            while (phaseDiff < -Math.PI) phaseDiff += 2 * Math.PI;
+            const phaseSyncRate = 0.1 + newIntensity * 0.2;
+            let newPhase = edge.phase + phaseDiff * phaseSyncRate;
+            while (newPhase > 2 * Math.PI) newPhase -= 2 * Math.PI;
+            while (newPhase < 0) newPhase += 2 * Math.PI;
             
             newEdges.set(edgeId, {
               id: edgeId,
               intensity: newIntensity,
-              phase: edge.phase + newIntensity * 0.1,
+              phase: newPhase,
               age: edge.age + 0.016
             });
           });
