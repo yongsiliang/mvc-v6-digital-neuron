@@ -636,7 +636,7 @@ export default function ExperimentPage() {
     edges.forEach(edge => {
       totalActivation += edge.intensity;
     });
-    const avgActivation = totalActivation / edges.size;
+    const avgActivation = edges.size > 0 ? totalActivation / edges.size : 0;
     const globalInhibition = avgActivation * currentBoundaryParams.globalInhibition;
     
     // 第二步：计算目标相位（Kuramoto模型风格）
@@ -793,15 +793,15 @@ export default function ExperimentPage() {
     
     const result = {
       boundaryStats: {
-        avgIntensity: boundaryIntensity / newEdges.size,
+        avgIntensity: newEdges.size > 0 ? boundaryIntensity / newEdges.size : 0,
         coherence: boundaryCoherence,
-        patternStrength: boundaryCoherence * (activeEdges / newEdges.size),
+        patternStrength: newEdges.size > 0 ? boundaryCoherence * (activeEdges / newEdges.size) : 0,
         activeEdges
       },
       nodeStats: {
-        avgActivation: nodeActivation / newNodes.size,
+        avgActivation: newNodes.size > 0 ? nodeActivation / newNodes.size : 0,
         coherence: nodeCoherence,
-        patternStrength: nodeCoherence * (activeNodes / newNodes.size),
+        patternStrength: newNodes.size > 0 ? nodeCoherence * (activeNodes / newNodes.size) : 0,
         activeNodes
       }
     };
@@ -921,7 +921,7 @@ export default function ExperimentPage() {
           // 全局抑制
           let totalActivation = 0;
           edges.forEach(edge => totalActivation += edge.intensity);
-          const avgActivation = totalActivation / edges.size;
+          const avgActivation = edges.size > 0 ? totalActivation / edges.size : 0;
           const globalInhibition = avgActivation * params.globalInhibition;
           
           // 计算目标相位
@@ -1006,7 +1006,7 @@ export default function ExperimentPage() {
             : 0;
           
           coherenceSum += coherence;
-          patternSum += coherence * (boundaryCount / newEdges.size);
+          patternSum += newEdges.size > 0 ? coherence * (boundaryCount / newEdges.size) : 0;
           if (coherence > 0.5) stableCount++;
           
           currentStep++;
@@ -1172,6 +1172,11 @@ export default function ExperimentPage() {
       nodeCoherence: []
     });
     
+    // 清空搜索相关状态
+    setSearchResults([]);
+    setSearchProgress({ current: 0, total: 0, bestCoherence: 0 });
+    setIsAutoSearching(false);
+    
     // 初始化并开始
     setTimeout(() => {
       initNetworks(config.rings);
@@ -1218,6 +1223,11 @@ export default function ExperimentPage() {
       boundaryCoherence: [],
       nodeCoherence: []
     });
+    
+    // 清空搜索相关状态
+    setSearchResults([]);
+    setSearchProgress({ current: 0, total: 0, bestCoherence: 0 });
+    setIsAutoSearching(false);
     
     // 初始化并开始
     setTimeout(() => {
