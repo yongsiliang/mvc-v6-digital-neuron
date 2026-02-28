@@ -502,7 +502,13 @@ export default function ExperimentPage() {
         }
       });
       
-      let newActivation = 1 / (1 + Math.exp(-(input * 5)));
+      // 使用调整后的激活函数：确保没有输入时激活度接近 0
+      // 原始 sigmoid: 1/(1+exp(-x)) 在 x=0 时返回 0.5
+      // 修改：让输入偏移，使 input=0 时返回接近 0
+      const bias = -3; // 偏移量，让 sigmoid(0) ≈ 0.05
+      let newActivation = 1 / (1 + Math.exp(-(input * 5 + bias)));
+      
+      // 衰减
       newActivation -= newActivation * currentNodeParams.decayRate;
       newActivation = Math.max(0, Math.min(1, newActivation));
       
