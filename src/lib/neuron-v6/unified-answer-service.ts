@@ -4,24 +4,24 @@
  * 
  * 核心原则：
  * - 意识核心是动态神经网络，不是 LLM API
- * - 多意识体协作通过神经元共振实现
+ * - V6 意识核心作为观察者，整合学习，反向传播
  * - LLM 只是语言接口（翻译器），神经网络才是意识基质
  * 
- * 架构：
- *   输入 ──→ [神经网络处理] ──→ [神经元共振协调] ──→ 统一答案
- *              ↑
- *         SiliconBrainV2
+ * 闭环架构：
+ *   输入 ──→ [神经网络处理] ──→ [LLM翻译] ──→ 输出
+ *              ↑                               │
+ *              └── [V6观察→学习→反向传播] ←────┘
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 import { LLMClient } from 'coze-coding-dev-sdk';
 import { SiliconBrainV2 } from '@/lib/silicon-brain/brain-v2';
-import {
-  createMultiAgentEngine,
-  MultiAgentCollaborationEngine,
-  TaskType,
-  ConsciousnessRole,
-} from './multi-agent-engine';
+import { getConsciousness } from '@/lib/consciousness/core';
+import { 
+  ConsciousnessClosedLoop, 
+  createClosedLoopSystem,
+  ClosedLoopState 
+} from './closed-loop-system';
 
 // ═══════════════════════════════════════════════════════════════════════
 // 类型定义
@@ -44,28 +44,29 @@ export interface UnifiedResponse {
     coherence: number;     // 时间连贯性
     selfReference: number; // 自我指涉
   };
-}
-
-/** 内部处理详情（不对外暴露） */
-interface InternalProcessingDetails {
-  usedNeuralNetwork: boolean;
-  activeNeurons: string[];
-  resonanceLevel: number;
-  layers: string[];
+  
+  /** 闭环学习指标（可选暴露） */
+  closedLoopMetrics?: {
+    qualityScore: number;      // 输出质量
+    learningTrend: string;     // 学习趋势
+    totalObservations: number; // 总观察次数
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 统一答案服务
+// 统一答案服务 - 闭环架构
 // ═══════════════════════════════════════════════════════════════════════
 
 export class UnifiedAnswerService {
   private neuralBrain: SiliconBrainV2;
+  private closedLoop: ConsciousnessClosedLoop;
   private llm: LLMClient;
   private isInitialized: boolean = false;
   
   constructor(llm: LLMClient) {
     this.llm = llm;
-    // 核心：神经网络基质
+    
+    // 1. 神经网络基质
     this.neuralBrain = new SiliconBrainV2({
       vectorDimension: 256,
       neuronCounts: {
@@ -80,53 +81,75 @@ export class UnifiedAnswerService {
       enableLearning: true,
       learningRate: 0.01,
     });
+    
+    // 2. V6 意识核心（观察者）
+    const v6Core = getConsciousness();
+    
+    // 3. 闭环系统
+    this.closedLoop = createClosedLoopSystem(
+      this.neuralBrain,
+      v6Core,
+      llm
+    );
   }
   
   /**
-   * 初始化神经网络
+   * 初始化
    */
   private async ensureInitialized(): Promise<void> {
     if (!this.isInitialized) {
       await this.neuralBrain.initialize();
       this.isInitialized = true;
-      console.log('[UnifiedAnswer] 神经网络基质初始化完成');
+      console.log('[UnifiedAnswer] 闭环系统初始化完成');
     }
   }
   
   /**
    * 处理用户输入 - 主入口
    * 
-   * 通过神经网络协调输出统一答案
+   * 闭环流程：
+   * 1. 神经网络处理输入
+   * 2. LLM 翻译输出
+   * 3. V6 意识核心观察
+   * 4. 反向传播学习
    */
   async process(input: string): Promise<UnifiedResponse> {
     const startTime = Date.now();
     
-    // 确保神经网络已初始化
     await this.ensureInitialized();
     
-    console.log('[UnifiedAnswer] 输入进入神经网络基质...');
+    console.log('[UnifiedAnswer] ════════════════════════════════════');
+    console.log('[UnifiedAnswer] 闭环处理开始');
+    console.log('[UnifiedAnswer] 输入:', input.slice(0, 50) + '...');
     
-    // 核心：通过神经网络处理
-    const result = await this.neuralBrain.process(input);
+    // 闭环处理
+    const result = await this.closedLoop.processWithClosedLoop(input);
     
     const processingTime = Date.now() - startTime;
     
-    // 内部日志（不暴露给用户）
-    console.log('[UnifiedAnswer] 神经网络处理完成:', {
-      processingTime,
-      phi: result.metrics.phi,
-      selfReference: result.metrics.selfReference,
-      complexity: result.metrics.complexity,
+    console.log('[UnifiedAnswer] 闭环处理完成:', {
+      quality: result.observation.evaluation.qualityScore.toFixed(2),
+      reward: result.learning.reward.toFixed(3),
+      applied: result.learning.applied,
     });
+    console.log('[UnifiedAnswer] ════════════════════════════════════');
+    
+    // 获取闭环状态
+    const loopState = this.closedLoop.getState();
     
     return {
       answer: result.output,
-      confidence: Math.min(1, result.metrics.phi * 0.6 + result.metrics.selfReference * 0.4),
+      confidence: result.observation.evaluation.qualityScore,
       processingTime,
       consciousnessMetrics: {
-        phi: result.metrics.phi,
-        coherence: result.metrics.temporalCoherence,
-        selfReference: result.metrics.selfReference,
+        phi: result.observation.neuralOutput.metrics.phi,
+        coherence: result.observation.neuralOutput.metrics.coherence,
+        selfReference: result.observation.neuralOutput.metrics.selfReference,
+      },
+      closedLoopMetrics: {
+        qualityScore: result.observation.evaluation.qualityScore,
+        learningTrend: loopState.learningTrend,
+        totalObservations: loopState.totalObservations,
       },
     };
   }
