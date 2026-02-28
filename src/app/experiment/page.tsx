@@ -871,13 +871,30 @@ export default function ExperimentPage() {
         isRunningRef.current = false;
         
         // 设置参数
-        setBoundaryParams(params);
         boundaryParamsRef.current = params;
         
-        // 重置
-        setStep(0);
-        initNetworks(2); // 使用小网格加速
-        injectInfo('seven'); // 使用7元素注入
+        // 直接创建测试网络（不使用状态，避免异步问题）
+        const testNetwork = createTestNetwork(2);
+        
+        // 注入7元素
+        const injectPositions = [
+          { q: 0, r: 0 },
+          { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+          { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
+        ];
+        
+        injectPositions.forEach(pos => {
+          const nodeId = `${pos.q},${pos.r}`;
+          const node = testNetwork.nodes.get(nodeId);
+          if (node) {
+            node.edges.forEach((edgeId: string) => {
+              const edge = testNetwork.edges.get(edgeId);
+              if (edge) {
+                testNetwork.edges.set(edgeId, { ...edge, intensity: 0.9 });
+              }
+            });
+          }
+        });
         
         // 运行50步后评估
         let currentStep = 0;
@@ -892,8 +909,7 @@ export default function ExperimentPage() {
             return;
           }
           
-          // 执行一步演化（使用改进的相位同步机制）
-          const { boundary, node, edges, adjacency } = networkRef.current!;
+          const { edges, adjacency } = testNetwork;
           
           const newEdges = new Map(edges);
           
@@ -965,7 +981,7 @@ export default function ExperimentPage() {
             });
           });
           
-          networkRef.current!.edges = newEdges;
+          testNetwork.edges = newEdges;
           
           // 计算相干度
           let boundaryPhaseSum = { cos: 0, sin: 0 };
@@ -988,7 +1004,6 @@ export default function ExperimentPage() {
           if (coherence > 0.5) stableCount++;
           
           currentStep++;
-          setStep(currentStep);
           
           if (currentStep >= maxSteps) {
             resolve({
@@ -1001,10 +1016,69 @@ export default function ExperimentPage() {
           }
         };
         
-        setTimeout(() => {
-          requestAnimationFrame(testStep);
-        }, 10);
+        requestAnimationFrame(testStep);
       });
+    };
+    
+    // 创建测试网络的辅助函数
+    const createTestNetwork = (ringCount: number) => {
+      const nodes = new Map<string, any>();
+      const edges = new Map<string, any>();
+      const adjacency = new Map<string, string[]>();
+      
+      const hexRadius = 20;
+      const canvasSize = 400;
+      const centerX = canvasSize / 2;
+      const centerY = canvasSize / 2;
+      
+      // 生成节点
+      for (let q = -ringCount; q <= ringCount; q++) {
+        for (let r = -ringCount; r <= ringCount; r++) {
+          if (Math.abs(q + r) <= ringCount) {
+            const id = `${q},${r}`;
+            const x = centerX + (q * 1.5) * hexRadius;
+            const y = centerY + (q * 0.866 + r * 1.732) * hexRadius;
+            nodes.set(id, { id, x, y, edges: [] });
+          }
+        }
+      }
+      
+      // 生成边
+      const edgeSet = new Set<string>();
+      nodes.forEach((node, id) => {
+        const [q, r] = id.split(',').map(Number);
+        HEX_DIRECTIONS.forEach((dir) => {
+          const neighborId = `${q + dir.q},${r + dir.r}`;
+          if (nodes.has(neighborId)) {
+            const edgeId = [id, neighborId].sort().join('|');
+            if (!edgeSet.has(edgeId)) {
+              edgeSet.add(edgeId);
+              edges.set(edgeId, {
+                id: edgeId,
+                intensity: Math.random() * 0.1,
+                phase: Math.random() * Math.PI * 2,
+                age: 0
+              });
+              nodes.get(id).edges.push(edgeId);
+              nodes.get(neighborId)?.edges.push(edgeId);
+            }
+          }
+        });
+      });
+      
+      // 边邻接关系
+      edges.forEach((edge, edgeId) => {
+        const [node1, node2] = edgeId.split('|');
+        const neighbors: string[] = [];
+        const node1Edges = nodes.get(node1)?.edges || [];
+        const node2Edges = nodes.get(node2)?.edges || [];
+        [...node1Edges, ...node2Edges].forEach(e => {
+          if (e !== edgeId && !neighbors.includes(e)) neighbors.push(e);
+        });
+        adjacency.set(edgeId, neighbors);
+      });
+      
+      return { nodes, edges, adjacency };
     };
     
     // 运行搜索
@@ -1042,16 +1116,19 @@ export default function ExperimentPage() {
       if (autoSearchRef.current.bestParams) {
         setBoundaryParams(autoSearchRef.current.bestParams);
         boundaryParamsRef.current = autoSearchRef.current.bestParams;
+        setInjectionIntensity(0.9); // 确保注入强度正确
         
         // 用最佳参数运行一次
         setTimeout(() => {
-          initNetworks(4);
-          injectInfo('seven');
-          drawBoundaryNetwork();
-          drawNodeNetwork();
-          isRunningRef.current = true;
-          setIsRunning(true);
-          animationRef.current = requestAnimationFrame(animateStep);
+          initNetworks(rings);
+          setTimeout(() => {
+            injectInfo('seven');
+            drawBoundaryNetwork();
+            drawNodeNetwork();
+            isRunningRef.current = true;
+            setIsRunning(true);
+            animationRef.current = requestAnimationFrame(animateStep);
+          }, 50);
         }, 100);
       }
     };
