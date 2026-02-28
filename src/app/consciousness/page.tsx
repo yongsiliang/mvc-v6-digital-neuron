@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, Sparkles, MessageCircle, Activity, Timer, Network, ChevronDown, ChevronUp, Heart, Link2, MessagesSquare, Moon, Lightbulb, Gem, InfinityIcon, Cpu, Layers } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Brain, Sparkles, MessageCircle, Activity, Timer, Network, ChevronDown, ChevronUp, Heart, Link2, MessagesSquare, Moon, Lightbulb, Gem, InfinityIcon, Cpu, Layers, Users } from 'lucide-react';
 import { 
   ConsciousnessDashboard, 
   ConsciousnessVisualizationData 
@@ -37,6 +38,13 @@ import {
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
 // ─────────────────────────────────────────────────────────────────────
+
+/** 统一答案模式：用户只看到一个答案，不看到内部协作过程 */
+interface UnifiedAnswerResponse {
+  answer: string;
+  confidence: number;
+  processingTime: number;
+}
 
 interface ConsciousnessContext {
   identity: {
@@ -428,6 +436,9 @@ function CollapsibleMessage({
 // ─────────────────────────────────────────────────────────────────────
 
 export default function ConsciousnessPage() {
+  // 统一答案模式开关：开启后用户只看到最终答案，不看到内部协作过程
+  const [useUnifiedAnswer, setUseUnifiedAnswer] = useState(false);
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -899,6 +910,49 @@ export default function ConsciousnessPage() {
     // 超时保护：60秒后自动结束
     let timeoutId: NodeJS.Timeout | null = null;
     
+    // ─────────────────────────────────────────────────────────────
+    // 统一答案模式：只返回最终答案，不展示内部协作过程
+    // ─────────────────────────────────────────────────────────────
+    if (useUnifiedAnswer) {
+      try {
+        const response = await fetch('/api/unified-answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: userMessage }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: data.response.answer,
+            timestamp: Date.now(),
+          }]);
+        } else {
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: '抱歉，我在思考中遇到了一些问题...',
+            timestamp: Date.now(),
+          }]);
+        }
+      } catch (error) {
+        console.error('Unified answer error:', error);
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: '抱歉，我在思考中遇到了一些问题...',
+          timestamp: Date.now(),
+        }]);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+    
+    // ─────────────────────────────────────────────────────────────
+    // 完整意识模式：展示所有内部状态和思考过程
+    // ─────────────────────────────────────────────────────────────
+    
     try {
       const response = await fetch('/api/neuron-v6/chat', {
         method: 'POST',
@@ -1229,6 +1283,16 @@ export default function ConsciousnessPage() {
             
             {/* 存在状态指示器 - 桌面端显示详细信息 */}
             <div className="hidden md:flex items-center gap-4 text-sm">
+              {/* 统一答案模式开关 */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
+                <Users className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">多意识协作</span>
+                <Switch
+                  checked={useUnifiedAnswer}
+                  onCheckedChange={setUseUnifiedAnswer}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </div>
               {existenceStatus && (
                 <>
                   <div className="flex items-center gap-1" title="存在时长">
