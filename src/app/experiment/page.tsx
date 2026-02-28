@@ -94,6 +94,27 @@ export default function ExperimentPage() {
   // 当前模式
   const [mode, setMode] = useState<'experiment' | 'seven-element' | 'recipe'>('experiment');
   
+  // 自动参数搜索
+  const [isAutoSearching, setIsAutoSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState({ current: 0, total: 0, bestCoherence: 0 });
+  const [searchResults, setSearchResults] = useState<Array<{
+    params: BoundaryRules;
+    coherence: number;
+    patternStrength: number;
+    stableSteps: number;
+  }>>([]);
+  const autoSearchRef = useRef<{
+    bestParams: BoundaryRules | null;
+    bestCoherence: number;
+    testCount: number;
+    isRunning: boolean;
+  }>({
+    bestParams: null,
+    bestCoherence: 0,
+    testCount: 0,
+    isRunning: false
+  });
+  
   const animationRef = useRef<number>(0);
   const isRunningRef = useRef<boolean>(false);
   const networkRef = useRef<{
@@ -741,6 +762,208 @@ export default function ExperimentPage() {
     animationRef.current = requestAnimationFrame(animateStep);
   }, [drawBoundaryNetwork, drawNodeNetwork]);
   
+  // 自动参数搜索
+  const startAutoSearch = useCallback(() => {
+    if (isAutoSearching) return;
+    
+    setIsAutoSearching(true);
+    autoSearchRef.current = {
+      bestParams: null,
+      bestCoherence: 0,
+      testCount: 0,
+      isRunning: true
+    };
+    setSearchResults([]);
+    setSearchProgress({ current: 0, total: 100, bestCoherence: 0 });
+    
+    // 参数搜索空间
+    const paramRanges = {
+      selfExcitation: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3],
+      neighborExcitation: [0.1, 0.15, 0.2, 0.25, 0.3, 0.35],
+      decayRate: [0.005, 0.01, 0.015, 0.02],
+      oscillationFreq: [0.05, 0.08, 0.1, 0.12, 0.15],
+      threshold: [0.05, 0.08, 0.1],
+      propagationRate: [0.2, 0.3, 0.4]
+    };
+    
+    // 生成随机参数组合（采样100组）
+    const totalTests = 100;
+    const paramCombinations: BoundaryRules[] = [];
+    
+    for (let i = 0; i < totalTests; i++) {
+      paramCombinations.push({
+        selfExcitation: paramRanges.selfExcitation[Math.floor(Math.random() * paramRanges.selfExcitation.length)],
+        neighborExcitation: paramRanges.neighborExcitation[Math.floor(Math.random() * paramRanges.neighborExcitation.length)],
+        decayRate: paramRanges.decayRate[Math.floor(Math.random() * paramRanges.decayRate.length)],
+        oscillationFreq: paramRanges.oscillationFreq[Math.floor(Math.random() * paramRanges.oscillationFreq.length)],
+        threshold: paramRanges.threshold[Math.floor(Math.random() * paramRanges.threshold.length)],
+        propagationRate: paramRanges.propagationRate[Math.floor(Math.random() * paramRanges.propagationRate.length)]
+      });
+    }
+    
+    // 测试一组参数
+    const testParams = (params: BoundaryRules): Promise<{ coherence: number; patternStrength: number; stableSteps: number }> => {
+      return new Promise((resolve) => {
+        // 停止当前动画
+        cancelAnimationFrame(animationRef.current);
+        isRunningRef.current = false;
+        
+        // 设置参数
+        setBoundaryParams(params);
+        boundaryParamsRef.current = params;
+        
+        // 重置
+        setStep(0);
+        initNetworks(2); // 使用小网格加速
+        injectInfo('seven'); // 使用7元素注入
+        
+        // 运行50步后评估
+        let currentStep = 0;
+        const maxSteps = 50;
+        let coherenceSum = 0;
+        let patternSum = 0;
+        let stableCount = 0;
+        
+        const testStep = () => {
+          if (!autoSearchRef.current.isRunning) {
+            resolve({ coherence: 0, patternStrength: 0, stableSteps: 0 });
+            return;
+          }
+          
+          // 执行一步演化（复用animateStep的逻辑）
+          const { boundary, node, edges, adjacency } = networkRef.current!;
+          
+          const newEdges = new Map(edges);
+          edges.forEach((edge, edgeId) => {
+            const neighbors = adjacency.get(edgeId) || [];
+            let inputFromNeighbors = 0;
+            
+            neighbors.forEach(neighborId => {
+              const neighbor = edges.get(neighborId);
+              if (neighbor && neighbor.intensity > params.threshold) {
+                const phaseDiff = Math.abs(edge.phase - neighbor.phase);
+                const phaseFactor = Math.cos(phaseDiff);
+                inputFromNeighbors += neighbor.intensity * params.neighborExcitation * phaseFactor;
+              }
+            });
+            
+            const selfInput = edge.intensity * params.selfExcitation;
+            const oscillation = Math.sin(edge.age * params.oscillationFreq + edge.phase) * 0.05;
+            const decay = edge.intensity * params.decayRate;
+            
+            let newIntensity = edge.intensity + inputFromNeighbors + selfInput + oscillation - decay;
+            newIntensity = Math.max(0, Math.min(1, newIntensity));
+            
+            newEdges.set(edgeId, {
+              id: edgeId,
+              intensity: newIntensity,
+              phase: edge.phase + newIntensity * 0.1,
+              age: edge.age + 0.016
+            });
+          });
+          
+          networkRef.current!.edges = newEdges;
+          
+          // 计算相干度
+          let boundaryPhaseSum = { cos: 0, sin: 0 };
+          let boundaryCount = 0;
+          
+          newEdges.forEach(e => {
+            if (e.intensity > params.threshold) {
+              boundaryPhaseSum.cos += Math.cos(e.phase) * e.intensity;
+              boundaryPhaseSum.sin += Math.sin(e.phase) * e.intensity;
+              boundaryCount++;
+            }
+          });
+          
+          const coherence = boundaryCount > 0
+            ? Math.sqrt(boundaryPhaseSum.cos ** 2 + boundaryPhaseSum.sin ** 2) / boundaryCount
+            : 0;
+          
+          coherenceSum += coherence;
+          patternSum += coherence * (boundaryCount / newEdges.size);
+          if (coherence > 0.5) stableCount++;
+          
+          currentStep++;
+          setStep(currentStep);
+          
+          if (currentStep >= maxSteps) {
+            resolve({
+              coherence: coherenceSum / maxSteps,
+              patternStrength: patternSum / maxSteps,
+              stableSteps: stableCount
+            });
+          } else {
+            requestAnimationFrame(testStep);
+          }
+        };
+        
+        setTimeout(() => {
+          requestAnimationFrame(testStep);
+        }, 10);
+      });
+    };
+    
+    // 运行搜索
+    const runSearch = async () => {
+      for (let i = 0; i < totalTests; i++) {
+        if (!autoSearchRef.current.isRunning) break;
+        
+        const params = paramCombinations[i];
+        const result = await testParams(params);
+        
+        const newResult = {
+          params,
+          ...result
+        };
+        
+        setSearchResults(prev => [...prev, newResult].sort((a, b) => b.coherence - a.coherence).slice(0, 10));
+        
+        if (result.coherence > autoSearchRef.current.bestCoherence) {
+          autoSearchRef.current.bestCoherence = result.coherence;
+          autoSearchRef.current.bestParams = params;
+        }
+        
+        autoSearchRef.current.testCount++;
+        setSearchProgress({
+          current: i + 1,
+          total: totalTests,
+          bestCoherence: autoSearchRef.current.bestCoherence
+        });
+      }
+      
+      // 搜索完成，应用最佳参数
+      setIsAutoSearching(false);
+      autoSearchRef.current.isRunning = false;
+      
+      if (autoSearchRef.current.bestParams) {
+        setBoundaryParams(autoSearchRef.current.bestParams);
+        boundaryParamsRef.current = autoSearchRef.current.bestParams;
+        
+        // 用最佳参数运行一次
+        setTimeout(() => {
+          initNetworks(4);
+          injectInfo('seven');
+          drawBoundaryNetwork();
+          drawNodeNetwork();
+          isRunningRef.current = true;
+          setIsRunning(true);
+          animationRef.current = requestAnimationFrame(animateStep);
+        }, 100);
+      }
+    };
+    
+    runSearch();
+  }, [isAutoSearching, initNetworks, injectInfo, drawBoundaryNetwork, drawNodeNetwork, animateStep]);
+  
+  // 停止自动搜索
+  const stopAutoSearch = useCallback(() => {
+    autoSearchRef.current.isRunning = false;
+    setIsAutoSearching(false);
+    cancelAnimationFrame(animationRef.current);
+    isRunningRef.current = false;
+  }, []);
+  
   // 运行预设实验
   const runRecipe = useCallback((recipe: IntelligenceRecipe) => {
     const config = recipe.conditions.config;
@@ -1127,7 +1350,7 @@ export default function ExperimentPage() {
               {/* 网络可视化 */}
               <div className="lg:col-span-3 space-y-4">
                 {/* 控制栏 */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Button onClick={toggleRun} variant={isRunning ? 'destructive' : 'default'}>
                     {isRunning ? <Pause className="w-4 h-4 mr-1" /> : <Play className="w-4 h-4 mr-1" />}
                     {isRunning ? '暂停' : '开始'}
@@ -1141,10 +1364,108 @@ export default function ExperimentPage() {
                   <Button onClick={saveExperiment} variant="outline" size="sm">
                     <Download className="w-4 h-4 mr-1" /> 保存
                   </Button>
+                  
+                  {/* 自动搜索按钮 */}
+                  {isAutoSearching ? (
+                    <Button onClick={stopAutoSearch} variant="destructive" size="sm">
+                      <Activity className="w-4 h-4 mr-1 animate-pulse" /> 停止搜索
+                    </Button>
+                  ) : (
+                    <Button onClick={startAutoSearch} variant="default" size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                      <Brain className="w-4 h-4 mr-1" /> AI自动寻参
+                    </Button>
+                  )}
+                  
                   <Badge variant="outline" className="ml-auto">
                     步数: {step}
                   </Badge>
                 </div>
+                
+                {/* 自动搜索进度 */}
+                {isAutoSearching && (
+                  <Card className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border-emerald-500/30">
+                    <CardContent className="py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-emerald-400">正在搜索最优参数...</span>
+                        <span className="text-xs text-gray-400">
+                          {searchProgress.current} / {searchProgress.total}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-800 rounded-full h-2 mb-2">
+                        <div 
+                          className="bg-emerald-500 h-2 rounded-full transition-all"
+                          style={{ width: `${(searchProgress.current / searchProgress.total) * 100}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">当前最佳相干度:</span>
+                        <span className={`font-mono ${searchProgress.bestCoherence >= 0.8 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                          {searchProgress.bestCoherence.toFixed(3)}
+                          {searchProgress.bestCoherence >= 0.8 ? ' ✓ 达标!' : ''}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* 搜索结果 */}
+                {searchResults.length > 0 && !isAutoSearching && (
+                  <Card className="bg-gray-900/50 border-emerald-500/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-emerald-400 text-sm flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        AI搜索结果 (Top 10)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-gray-400 border-b border-gray-700">
+                              <th className="text-left py-1 px-2">#</th>
+                              <th className="text-left py-1 px-2">相干度</th>
+                              <th className="text-left py-1 px-2">模式强度</th>
+                              <th className="text-left py-1 px-2">稳定步数</th>
+                              <th className="text-left py-1 px-2">自激励</th>
+                              <th className="text-left py-1 px-2">邻居激励</th>
+                              <th className="text-left py-1 px-2">衰减率</th>
+                              <th className="text-left py-1 px-2">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {searchResults.slice(0, 5).map((result, i) => (
+                              <tr key={i} className={`border-b border-gray-800 ${i === 0 ? 'bg-emerald-500/10' : ''}`}>
+                                <td className="py-1 px-2 text-gray-300">{i + 1}</td>
+                                <td className={`py-1 px-2 font-mono ${result.coherence >= 0.8 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                                  {result.coherence.toFixed(3)}
+                                </td>
+                                <td className="py-1 px-2 font-mono text-cyan-300">{result.patternStrength.toFixed(3)}</td>
+                                <td className="py-1 px-2 font-mono text-gray-300">{result.stableSteps}/50</td>
+                                <td className="py-1 px-2 font-mono text-gray-400">{result.params.selfExcitation.toFixed(2)}</td>
+                                <td className="py-1 px-2 font-mono text-gray-400">{result.params.neighborExcitation.toFixed(2)}</td>
+                                <td className="py-1 px-2 font-mono text-gray-400">{result.params.decayRate.toFixed(3)}</td>
+                                <td className="py-1 px-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-6 text-xs text-cyan-400 hover:text-cyan-300"
+                                    onClick={() => {
+                                      setBoundaryParams(result.params);
+                                      boundaryParamsRef.current = result.params;
+                                      reset();
+                                    }}
+                                  >
+                                    应用
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
                 
                 {/* 双网络对比 */}
                 <div className="grid md:grid-cols-2 gap-4">
