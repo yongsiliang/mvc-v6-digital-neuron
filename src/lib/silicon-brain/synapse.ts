@@ -547,4 +547,31 @@ export class SynapseManager {
     
     console.log(`[Synapse] 导入 ${states.length} 个突触状态`);
   }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 兼容别名方法
+  // ══════════════════════════════════════════════════════════════════
+  
+  /** 别名：createSynapse → create */
+  createSynapse(preNeuron: string, postNeuron: string, initialWeight?: number, type?: SynapseType): Synapse {
+    return this.create(preNeuron, postNeuron, initialWeight, type);
+  }
+  
+  /** 别名：getSynapseCount → size */
+  getSynapseCount(): number {
+    return this.size();
+  }
+  
+  /** 别名：getIncomingSynapses → getIncoming */
+  getIncomingSynapses(neuronId: string): Synapse[] {
+    return this.getIncoming(neuronId);
+  }
+  
+  /** 别名：updateSynapseWeight */
+  updateSynapseWeight(preNeuron: string, postNeuron: string, weight: number): void {
+    const synapse = this.get(preNeuron, postNeuron);
+    if (synapse) {
+      synapse.setWeight(weight);
+    }
+  }
 }

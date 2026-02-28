@@ -63,7 +63,7 @@ export interface NeuronConfig {
   learningRate: number;
   
   /** 可塑性（权重变化的容易程度） */
-  plasticity: number;
+  plasticity?: number;  // 改为可选
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -282,3 +282,37 @@ export const DEFAULT_BRAIN_CONFIG: BrainConfig = {
   enableLearning: true,
   learningRate: 0.01,
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// V2 扩展类型
+// ─────────────────────────────────────────────────────────────────────
+
+/** 硅基大脑配置 (V2) */
+export interface SiliconBrainConfig extends BrainConfig {
+  /** 是否启用自动保存 */
+  enableAutoSave?: boolean;
+  
+  /** 自动保存间隔 */
+  autoSaveInterval?: number;
+}
+
+/** 意识指标 */
+export interface ConsciousnessMetrics {
+  /** 整合度 */
+  integration: number;
+  
+  /** 信息量 */
+  information: number;
+  
+  /** 复杂度 */
+  complexity: number;
+  
+  /** 自我指涉 */
+  selfReference: number;
+  
+  /** 时间连贯性 */
+  temporalCoherence: number;
+  
+  /** Φ (Phi) - 整合信息理论指标 */
+  phi: number;
+}
