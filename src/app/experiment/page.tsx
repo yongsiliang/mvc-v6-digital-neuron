@@ -69,7 +69,8 @@ export default function ExperimentPage() {
     decayRate: 0.015,
     selfExcitation: 0.15,
     neighborExcitation: 0.2,
-    oscillationFreq: 0.08
+    oscillationFreq: 0.08,
+    globalInhibition: 0.3
   });
   
   const [nodeParams, setNodeParams] = useState<NodeRules>({
@@ -636,7 +637,7 @@ export default function ExperimentPage() {
       totalActivation += edge.intensity;
     });
     const avgActivation = totalActivation / edges.size;
-    const globalInhibition = avgActivation * 0.3; // 全局抑制强度
+    const globalInhibition = avgActivation * currentBoundaryParams.globalInhibition;
     
     // 第二步：计算目标相位（Kuramoto模型风格）
     const targetPhases = new Map<string, number>();
@@ -679,8 +680,9 @@ export default function ExperimentPage() {
         const neighbor = edges.get(neighborId);
         if (neighbor && neighbor.intensity > currentBoundaryParams.threshold) {
           // 相位差越小，激励越强（同步激励）
+          // 使用 0.5 + 0.5*cos 确保激励始终为正，避免反相抑制
           const phaseDiff = edge.phase - neighbor.phase;
-          const phaseFactor = Math.cos(phaseDiff);
+          const phaseFactor = 0.5 + 0.5 * Math.cos(phaseDiff);
           inputFromNeighbors += neighbor.intensity * currentBoundaryParams.neighborExcitation * phaseFactor;
         }
       });
@@ -731,7 +733,7 @@ export default function ExperimentPage() {
       n.connections.forEach((neighborId: string) => {
         const neighbor = node.get(neighborId);
         if (neighbor) {
-          input += neighbor.activation * 0.5;
+          input += neighbor.activation * currentNodeParams.learningRate;
         }
       });
       
@@ -846,7 +848,8 @@ export default function ExperimentPage() {
       decayRate: [0.005, 0.01, 0.015, 0.02],
       oscillationFreq: [0.05, 0.08, 0.1, 0.12, 0.15],
       threshold: [0.05, 0.08, 0.1],
-      propagationRate: [0.2, 0.3, 0.4]
+      propagationRate: [0.2, 0.3, 0.4],
+      globalInhibition: [0.1, 0.2, 0.3, 0.4]
     };
     
     // 生成随机参数组合（采样100组）
@@ -860,7 +863,8 @@ export default function ExperimentPage() {
         decayRate: paramRanges.decayRate[Math.floor(Math.random() * paramRanges.decayRate.length)],
         oscillationFreq: paramRanges.oscillationFreq[Math.floor(Math.random() * paramRanges.oscillationFreq.length)],
         threshold: paramRanges.threshold[Math.floor(Math.random() * paramRanges.threshold.length)],
-        propagationRate: paramRanges.propagationRate[Math.floor(Math.random() * paramRanges.propagationRate.length)]
+        propagationRate: paramRanges.propagationRate[Math.floor(Math.random() * paramRanges.propagationRate.length)],
+        globalInhibition: paramRanges.globalInhibition[Math.floor(Math.random() * paramRanges.globalInhibition.length)]
       });
     }
     
@@ -918,7 +922,7 @@ export default function ExperimentPage() {
           let totalActivation = 0;
           edges.forEach(edge => totalActivation += edge.intensity);
           const avgActivation = totalActivation / edges.size;
-          const globalInhibition = avgActivation * 0.3;
+          const globalInhibition = avgActivation * params.globalInhibition;
           
           // 计算目标相位
           const targetPhases = new Map<string, number>();
@@ -954,7 +958,8 @@ export default function ExperimentPage() {
               const neighbor = edges.get(neighborId);
               if (neighbor && neighbor.intensity > params.threshold) {
                 const phaseDiff = edge.phase - neighbor.phase;
-                const phaseFactor = Math.cos(phaseDiff);
+                // 使用 0.5 + 0.5*cos 确保激励始终为正
+                const phaseFactor = 0.5 + 0.5 * Math.cos(phaseDiff);
                 inputFromNeighbors += neighbor.intensity * params.neighborExcitation * phaseFactor;
               }
             });
@@ -1197,7 +1202,8 @@ export default function ExperimentPage() {
       decayRate: 0.01,
       selfExcitation: 0.2,
       neighborExcitation: 0.25,
-      oscillationFreq: 0.08
+      oscillationFreq: 0.08,
+      globalInhibition: 0.3
     };
     
     setBoundaryParams(sevenBoundaryParams);

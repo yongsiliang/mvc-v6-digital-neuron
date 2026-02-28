@@ -60,7 +60,8 @@ const defaultConfig: ExperimentConfig = {
     decayRate: 0.015,
     selfExcitation: 0.15,
     neighborExcitation: 0.2,
-    oscillationFreq: 0.08
+    oscillationFreq: 0.08,
+    globalInhibition: 0.3
   },
   nodeRules: {
     learningRate: 0.1,

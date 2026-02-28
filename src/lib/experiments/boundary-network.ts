@@ -140,6 +140,8 @@ export interface BoundaryNetworkRules {
   neighborExcitation: number;
   // 波动频率
   oscillationFreq: number;
+  // 全局抑制系数
+  globalInhibition: number;
 }
 
 const defaultRules: BoundaryNetworkRules = {
@@ -148,7 +150,8 @@ const defaultRules: BoundaryNetworkRules = {
   decayRate: 0.02,
   selfExcitation: 0.1,
   neighborExcitation: 0.15,
-  oscillationFreq: 0.1
+  oscillationFreq: 0.1,
+  globalInhibition: 0.3
 };
 
 /**

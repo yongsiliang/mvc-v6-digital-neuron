@@ -77,6 +77,7 @@ export interface BoundaryRules {
   selfExcitation: number;
   neighborExcitation: number;
   oscillationFreq: number;
+  globalInhibition: number;  // 全局抑制系数
 }
 
 export interface NodeRules {
@@ -128,7 +129,8 @@ export const presetRecipes: IntelligenceRecipe[] = [
           decayRate: 0.015,
           selfExcitation: 0.15,
           neighborExcitation: 0.2,
-          oscillationFreq: 0.06  // 接近θ波
+          oscillationFreq: 0.06,  // 接近θ波
+          globalInhibition: 0.3
         },
         nodeRules: {
           learningRate: 0.1,
@@ -171,7 +173,8 @@ export const presetRecipes: IntelligenceRecipe[] = [
           decayRate: 0.01,
           selfExcitation: 0.2,
           neighborExcitation: 0.25,
-          oscillationFreq: 0.08
+          oscillationFreq: 0.08,
+          globalInhibition: 0.3
         },
         nodeRules: {
           learningRate: 0.15,
@@ -211,7 +214,8 @@ export const presetRecipes: IntelligenceRecipe[] = [
           decayRate: 0.02,
           selfExcitation: 0.02,  // 与衰减率相等
           neighborExcitation: 0.15,
-          oscillationFreq: 0.1
+          oscillationFreq: 0.1,
+          globalInhibition: 0.3
         },
         nodeRules: {
           learningRate: 0.1,
