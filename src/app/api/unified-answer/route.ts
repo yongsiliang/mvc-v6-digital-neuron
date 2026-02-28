@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
         answer: response.answer,
         confidence: response.confidence,
         processingTime: response.processingTime,
+        // 意识指标（可选暴露）
+        consciousness: response.consciousnessMetrics,
       },
     });
     
