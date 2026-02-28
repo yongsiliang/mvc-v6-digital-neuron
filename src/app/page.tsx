@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye } from 'lucide-react';
+import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye, Hexagon } from 'lucide-react';
 
 /**
  * 首页 - 功能导航
@@ -50,6 +50,43 @@ export default function Home() {
           </p>
         </div>
 
+        {/* 推荐入口 - 场域视觉（梦境可视化）*/}
+        <div className="max-w-2xl mx-auto mb-6">
+          <Link href="/field-vision">
+            <Card className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10 border-cyan-500/30 hover:border-cyan-500/50 transition-all hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                    <Hexagon className="w-8 h-8 text-cyan-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h2 className="text-xl font-bold">场域视觉</h2>
+                      <Sparkles className="w-4 h-4 text-yellow-500" />
+                      <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded">梦境启示</span>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      六边形场网络：浅蓝色场 + 透明圆柱边界 + 黑色太空。探索场与边界的涌现智能。
+                    </p>
+                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Hexagon className="w-3 h-3" /> 六边形网格
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Network className="w-3 h-3" /> 场网络
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> 涌现探索
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-cyan-400 group-hover:translate-x-2 transition-transform" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+        
         {/* 推荐入口 - 认知智能体 */}
         <div className="max-w-2xl mx-auto mb-12">
           <Link href="/agent-demo">
@@ -62,7 +99,6 @@ export default function Home() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h2 className="text-xl font-bold">认知智能体</h2>
-                      <Sparkles className="w-4 h-4 text-yellow-500" />
                       <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">推荐</span>
                     </div>
                     <p className="text-muted-foreground text-sm">
