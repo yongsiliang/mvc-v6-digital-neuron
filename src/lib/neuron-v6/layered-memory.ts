@@ -1225,4 +1225,73 @@ export class LayeredMemorySystem {
     
     return ids;
   }
+  
+  /**
+   * 获取所有情景记忆（用于结晶）
+   */
+  getAllEpisodicMemories(): EpisodicMemory[] {
+    return Array.from(this.episodic.values());
+  }
+  
+  /**
+   * 获取所有巩固记忆（用于结晶）
+   */
+  getAllConsolidatedMemories(): ConsolidatedMemory[] {
+    return Array.from(this.consolidated.values());
+  }
+  
+  /**
+   * 标记记忆为已结晶（可选择性移除）
+   */
+  markAsCrystallized(memoryIds: string[], crystalId: string): void {
+    for (const id of memoryIds) {
+      // 给记忆添加结晶标记
+      const episodic = this.episodic.get(id);
+      if (episodic) {
+        episodic.tags.push(`结晶:${crystalId.slice(0, 8)}`);
+        // 降低重要性，因为已提炼为智慧
+        episodic.importance *= 0.7;
+      }
+      
+      const consolidated = this.consolidated.get(id);
+      if (consolidated) {
+        consolidated.tags.push(`结晶:${crystalId.slice(0, 8)}`);
+        consolidated.importance *= 0.7;
+      }
+    }
+    
+    console.log(`[分层记忆] 已标记 ${memoryIds.length} 条记忆为结晶源`);
+  }
+  
+  /**
+   * 移除已结晶的记忆（释放空间）
+   */
+  removeCrystallizedMemories(crystalId: string): number {
+    const tag = `结晶:${crystalId.slice(0, 8)}`;
+    let removed = 0;
+    
+    // 从情景层移除
+    for (const [id, memory] of this.episodic) {
+      if (memory.tags.includes(tag) && memory.importance < 0.3) {
+        this.episodic.delete(id);
+        this.removeFromIndex(memory);
+        removed++;
+      }
+    }
+    
+    // 从巩固层移除（更谨慎）
+    for (const [id, memory] of this.consolidated) {
+      if (memory.tags.includes(tag) && memory.importance < 0.25) {
+        this.consolidated.delete(id);
+        this.removeFromIndex(memory);
+        removed++;
+      }
+    }
+    
+    if (removed > 0) {
+      console.log(`[分层记忆] 已移除 ${removed} 条已结晶的低价值记忆`);
+    }
+    
+    return removed;
+  }
 }
