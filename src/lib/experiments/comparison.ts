@@ -64,9 +64,13 @@ const defaultConfig: ExperimentConfig = {
     globalInhibition: 0.3
   },
   nodeRules: {
-    learningRate: 0.1,
-    decayRate: 0.02,
-    threshold: 0.1,
+    learningRate: 0.3,
+    decayRate: 0.015,
+    threshold: 0.08,
+    globalInhibition: 0.3,
+    selfExcitation: 0.15,
+    neighborExcitation: 0.2,
+    oscillationFreq: 0.08,
     activationFunction: 'sigmoid'
   }
 };
