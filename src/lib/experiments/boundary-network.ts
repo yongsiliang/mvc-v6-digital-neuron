@@ -164,6 +164,14 @@ export function evolveBoundaryNetwork(
 ): HexGrid {
   const newEdges = new Map<string, EdgeState>();
   
+  // 计算全局抑制
+  let totalActivation = 0;
+  grid.edges.forEach(edge => {
+    totalActivation += edge.intensity;
+  });
+  const avgActivation = totalActivation / grid.edges.size;
+  const globalInhibition = avgActivation * rules.globalInhibition;
+  
   grid.edges.forEach((edge, edgeId) => {
     // 计算来自邻接边的输入
     const neighbors = grid.adjacency.get(edgeId) || [];
@@ -173,8 +181,9 @@ export function evolveBoundaryNetwork(
       const neighbor = grid.edges.get(neighborId);
       if (neighbor && neighbor.intensity > rules.threshold) {
         // 邻接边的影响（考虑相位差）
+        // 使用 0.5 + 0.5*cos 确保激励始终为正，避免反相抑制
         const phaseDiff = Math.abs(edge.phase - neighbor.phase);
-        const phaseFactor = Math.cos(phaseDiff);
+        const phaseFactor = 0.5 + 0.5 * Math.cos(phaseDiff);
         inputFromNeighbors += neighbor.intensity * rules.neighborExcitation * phaseFactor;
       }
     });
@@ -185,15 +194,15 @@ export function evolveBoundaryNetwork(
     // 波动（模拟吸引子动力学的振荡）
     const oscillation = Math.sin(edge.age * rules.oscillationFreq + edge.phase) * 0.05;
     
-    // 衰减
-    const decay = edge.intensity * rules.decayRate;
+    // 全局抑制 + 衰减
+    const inhibition = globalInhibition + edge.intensity * rules.decayRate;
     
     // 更新强度
     let newIntensity = edge.intensity 
       + inputFromNeighbors 
       + selfInput 
       + oscillation 
-      - decay;
+      - inhibition;
     
     // 限制在 [0, 1]
     newIntensity = Math.max(0, Math.min(1, newIntensity));
@@ -237,7 +246,7 @@ export function injectIntoBoundary(
           newEdges.set(edgeId, {
             ...edge,
             intensity: Math.max(edge.intensity, intensity),
-            phase: Math.random() * Math.PI * 2
+            phase: 0  // 注入时统一相位为0，便于同步
           });
         }
       });
