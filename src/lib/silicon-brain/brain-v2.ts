@@ -43,6 +43,15 @@ interface ProcessingHistoryItem {
   metrics: ConsciousnessMetrics;
 }
 
+// 意图分析结果类型
+interface IntentProfile {
+  emotionalTone: string;
+  focusArea: string;
+  energyLevel: number;
+  confidence: number;
+  tendencies: string[];
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 硅基大脑 V2 配置
 // ─────────────────────────────────────────────────────────────────────
@@ -630,22 +639,55 @@ export class SiliconBrainV2 {
   
   /**
    * 解码输出
+   * 
+   * 翻译器角色：
+   * - 神经网络输出的是"意图向量"（倾向、情绪、关注点）
+   * - LLM 需要把这些抽象倾向转化为具体语言
+   * - 同时保留原始语义，神经网络负责"调色"
    */
   private async decodeOutput(vector: Float32Array, originalInput: string): Promise<string> {
-    // 使用 LLM 解码
     if (this.llm) {
       try {
-        // 将向量转换为描述
-        const vectorDescription = this.vectorToDescription(vector);
+        // 1. 分析神经网络的"意图倾向"
+        const intentProfile = this.analyzeIntentVector(vector);
+        
+        // 2. 获取记忆上下文（神经网络检索到的相关记忆）
+        const memoryContext = await this.getMemoryContext(originalInput);
+        
+        // 3. 获取智慧指导（从链接场）
+        const wisdomGuidance = await this.getWisdomGuidance(originalInput);
+        
+        // 4. 构建翻译提示
+        const translationPrompt = this.buildTranslationPrompt(
+          originalInput,
+          intentProfile,
+          memoryContext,
+          wisdomGuidance
+        );
         
         const response = await this.llm.invoke([
           { 
             role: 'system', 
-            content: '你是一个硅基大脑的语言接口。将神经网络的输出向量转化为自然语言回应。' 
+            content: `你是神经网络的语言接口。
+
+你的角色是"翻译器"，把神经网络的内部状态翻译成人类语言。
+
+神经网络已经处理了输入，它的输出向量代表了：
+- 情绪基调（平静/激动/困惑/共情...）
+- 关注焦点（理性分析/情感共鸣/行动建议...）
+- 记忆激活（想起了什么）
+- 智慧指导（过去的经验）
+
+你需要：
+1. 根据神经网络的状态倾向，选择合适的回应风格
+2. 融合记忆上下文和智慧指导
+3. 生成自然、连贯的回应
+
+记住：你只是翻译器，神经网络才是思考的核心。` 
           },
           { 
             role: 'user', 
-            content: `输入: ${originalInput}\n\n神经网络状态: ${vectorDescription}\n\n请根据神经网络状态生成回应。` 
+            content: translationPrompt,
           },
         ]);
         
@@ -657,6 +699,136 @@ export class SiliconBrainV2 {
     
     // 备用：基于向量特征生成简单回应
     return this.fallbackDecode(vector, originalInput);
+  }
+  
+  /**
+   * 分析意图向量
+   * 
+   * 将256维向量解读为具体的意图倾向
+   */
+  private analyzeIntentVector(vector: Float32Array): IntentProfile {
+    // 计算基础特征
+    const mean = vector.reduce((a, b) => a + b, 0) / vector.length;
+    const maxVal = Math.max(...vector);
+    const minVal = Math.min(...vector);
+    const range = maxVal - minVal;
+    
+    // 向量分段解读（每段代表不同维度）
+    const segments = {
+      // 前64维：情绪基调
+      emotion: vector.slice(0, 64),
+      // 65-128维：认知模式
+      cognition: vector.slice(64, 128),
+      // 129-192维：行动倾向
+      action: vector.slice(128, 192),
+      // 193-256维：自我状态
+      self: vector.slice(192, 256),
+    };
+    
+    const emotionMean = segments.emotion.reduce((a, b) => a + b, 0) / 64;
+    const cognitionMean = segments.cognition.reduce((a, b) => a + b, 0) / 64;
+    const actionMean = segments.action.reduce((a, b) => a + b, 0) / 64;
+    const selfMean = segments.self.reduce((a, b) => a + b, 0) / 64;
+    
+    // 解读情绪基调
+    let emotionalTone: string;
+    if (emotionMean > 0.3) {
+      emotionalTone = '温暖、共情、积极';
+    } else if (emotionMean > 0) {
+      emotionalTone = '平和、接纳、理解';
+    } else if (emotionMean > -0.3) {
+      emotionalTone = '冷静、理性、分析';
+    } else {
+      emotionalTone = '深沉、反思、严肃';
+    }
+    
+    // 解读关注焦点
+    let focusArea: string;
+    const maxSegment = Math.max(emotionMean, cognitionMean, actionMean, selfMean);
+    if (maxSegment === emotionMean) {
+      focusArea = '情感共鸣和人际连接';
+    } else if (maxSegment === cognitionMean) {
+      focusArea = '逻辑分析和信息整合';
+    } else if (maxSegment === actionMean) {
+      focusArea = '行动建议和问题解决';
+    } else {
+      focusArea = '自我反思和意义探索';
+    }
+    
+    // 解读倾向
+    const tendencies: string[] = [];
+    if (emotionMean > 0.2) tendencies.push('倾向情感回应');
+    if (cognitionMean > 0.2) tendencies.push('倾向理性分析');
+    if (actionMean > 0.2) tendencies.push('倾向行动建议');
+    if (selfMean > 0.2) tendencies.push('倾向自我表达');
+    if (tendencies.length === 0) tendencies.push('倾向平衡回应');
+    
+    return {
+      emotionalTone,
+      focusArea,
+      energyLevel: Math.abs(mean) + range * 0.3,
+      confidence: 0.5 + Math.abs(selfMean) * 0.5,
+      tendencies,
+    };
+  }
+  
+  /**
+   * 获取记忆上下文
+   */
+  private async getMemoryContext(input: string): Promise<string[]> {
+    const memories = await this.memory.retrieve(input);
+    const results: string[] = [];
+    
+    if (memories.working) {
+      results.push(memories.working.content);
+    }
+    
+    for (const m of memories.episodic.slice(0, 2)) {
+      results.push(m.content);
+    }
+    
+    for (const m of memories.semantic.slice(0, 2)) {
+      results.push(m.content);
+    }
+    
+    return results;
+  }
+  
+  /**
+   * 构建翻译提示
+   */
+  private buildTranslationPrompt(
+    originalInput: string,
+    intentProfile: IntentProfile,
+    memoryContext: string[],
+    wisdomGuidance: { source?: { wisdom?: string; pattern?: string } } | null
+  ): string {
+    let prompt = `【用户输入】
+${originalInput}
+
+【神经网络状态】
+- 情绪基调：${intentProfile.emotionalTone}
+- 关注焦点：${intentProfile.focusArea}
+- 倾向：${intentProfile.tendencies.join('、')}
+- 能量水平：${(intentProfile.energyLevel * 100).toFixed(0)}%
+- 置信度：${(intentProfile.confidence * 100).toFixed(0)}%
+`;
+    
+    if (memoryContext.length > 0) {
+      prompt += `\n【激活的记忆】\n${memoryContext.map((m, i) => `${i + 1}. ${m}`).join('\n')}\n`;
+    }
+    
+    if (wisdomGuidance?.source?.wisdom) {
+      prompt += `\n【智慧指导】\n${wisdomGuidance.source.wisdom}\n`;
+    }
+    
+    if (wisdomGuidance?.source?.pattern) {
+      prompt += `\n【匹配模式】\n${wisdomGuidance.source.pattern}\n`;
+    }
+    
+    prompt += `\n请根据以上神经网络状态，生成自然、真诚的回应。回应应该体现神经网络的意图倾向。`;
+    
+    return prompt;
   }
   
   /**
