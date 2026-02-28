@@ -1616,6 +1616,7 @@ export default function ExperimentPage() {
                               <th className="text-left py-1 px-2">自激励</th>
                               <th className="text-left py-1 px-2">邻居激励</th>
                               <th className="text-left py-1 px-2">衰减率</th>
+                              <th className="text-left py-1 px-2">全局抑制</th>
                               <th className="text-left py-1 px-2">操作</th>
                             </tr>
                           </thead>
@@ -1631,6 +1632,7 @@ export default function ExperimentPage() {
                                 <td className="py-1 px-2 font-mono text-gray-400">{result.params.selfExcitation.toFixed(2)}</td>
                                 <td className="py-1 px-2 font-mono text-gray-400">{result.params.neighborExcitation.toFixed(2)}</td>
                                 <td className="py-1 px-2 font-mono text-gray-400">{result.params.decayRate.toFixed(3)}</td>
+                                <td className="py-1 px-2 font-mono text-gray-400">{result.params.globalInhibition.toFixed(2)}</td>
                                 <td className="py-1 px-2">
                                   <Button 
                                     size="sm" 
