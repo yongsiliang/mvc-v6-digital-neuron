@@ -34,6 +34,15 @@ export default function Home() {
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/10',
       borderColor: 'border-orange-500/20'
+    },
+    {
+      title: '对比实验',
+      description: '边界网络 vs 节点网络：验证信息存储假设',
+      href: '/experiment',
+      icon: Zap,
+      color: 'text-yellow-500',
+      bgColor: 'bg-yellow-500/10',
+      borderColor: 'border-yellow-500/20'
     }
   ];
 
