@@ -369,6 +369,7 @@ class LLMGateway {
 // 导出
 // ─────────────────────────────────────────────────────────────────────
 
+export { LLMGateway };
 export const llmGateway = LLMGateway.getInstance();
 
 export function getLLMGateway(): LLMGateway {
