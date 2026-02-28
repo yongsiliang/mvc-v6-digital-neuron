@@ -25,7 +25,9 @@ describe('Result 模式', () => {
       const result = success({ name: 'test' });
       
       expect(result.success).toBe(true);
-      expect(result.value).toEqual({ name: 'test' });
+      if (result.success) {
+        expect(result.value).toEqual({ name: 'test' });
+      }
     });
 
     it('应该支持任意类型的值', () => {
@@ -34,10 +36,18 @@ describe('Result 模式', () => {
       const arrayResult = success([1, 2, 3]);
       const nullResult = success(null);
       
-      expect(stringResult.value).toBe('hello');
-      expect(numberResult.value).toBe(42);
-      expect(arrayResult.value).toEqual([1, 2, 3]);
-      expect(nullResult.value).toBeNull();
+      if (stringResult.success) {
+        expect(stringResult.value).toBe('hello');
+      }
+      if (numberResult.success) {
+        expect(numberResult.value).toBe(42);
+      }
+      if (arrayResult.success) {
+        expect(arrayResult.value).toEqual([1, 2, 3]);
+      }
+      if (nullResult.success) {
+        expect(nullResult.value).toBeNull();
+      }
     });
   });
 
@@ -47,8 +57,10 @@ describe('Result 模式', () => {
       const result = failure(error);
       
       expect(result.success).toBe(false);
-      expect(result.error.message).toBe('测试错误');
-      expect(result.error.code).toBe(AgentErrorCode.UNKNOWN);
+      if (!result.success) {
+        expect(result.error.message).toBe('测试错误');
+        expect(result.error.code).toBe(AgentErrorCode.UNKNOWN);
+      }
     });
   });
 

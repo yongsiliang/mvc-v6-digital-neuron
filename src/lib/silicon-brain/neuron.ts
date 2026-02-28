@@ -147,11 +147,15 @@ export class NeuralNeuron {
     
     try {
       // 尝试使用模型预测
-      outputVector = tf.tidy(() => {
-        const inputTensor = tf.tensor2d([inputVector], [1, this.config.inputDimension]);
+      // 将 Float32Array 转换为普通数组以兼容 TensorFlow.js 类型
+      const inputArray = Array.from(inputVector);
+      const outputData = tf.tidy(() => {
+        const inputTensor = tf.tensor2d([inputArray], [1, this.config.inputDimension]);
         const outputTensor = this.model!.predict(inputTensor) as tf.Tensor;
-        return new Float32Array(outputTensor.dataSync());
+        // 返回普通数组，避免类型问题
+        return Array.from(outputTensor.dataSync() as unknown as number[]);
       });
+      outputVector = new Float32Array(outputData);
     } catch {
       // 备用处理：使用简单的变换
       outputVector = new Float32Array(this.config.outputDimension);

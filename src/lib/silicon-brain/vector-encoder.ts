@@ -187,13 +187,10 @@ export class VectorEncoder {
     }
     
     try {
-      // 调用 Embedding API - 使用字符串数组格式
-      const response = await this.client.embed([text]);
+      // 调用 Embedding API - 使用 embedText 方法
+      const embedding = await this.client.embedText(text);
       
-      // 获取向量
-      const embedding = response?.[0];
-      
-      if (!embedding || !Array.isArray(embedding)) {
+      if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
         throw new Error('Embedding API 返回空向量');
       }
       

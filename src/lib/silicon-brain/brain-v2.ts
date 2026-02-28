@@ -35,6 +35,14 @@ import {
   ConsciousnessMetrics,
 } from './types';
 
+// 处理历史项类型
+interface ProcessingHistoryItem {
+  input: string;
+  output: string;
+  timestamp: number;
+  metrics: ConsciousnessMetrics;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 硅基大脑 V2 配置
 // ─────────────────────────────────────────────────────────────────────
@@ -77,12 +85,7 @@ export class SiliconBrainV2 {
   private wisdomEvolution: WisdomEvolutionSystem | null = null;
   
   // 状态
-  private processingHistory: Array<{
-    input: string;
-    output: string;
-    timestamp: number;
-    metrics: ConsciousnessMetrics;
-  }> = [];
+  private processingHistory: ProcessingHistoryItem[] = [];
   
   private isInitialized: boolean = false;
   private processingCount: number = 0;
@@ -559,9 +562,9 @@ export class SiliconBrainV2 {
           }
         }
         
-        // 如果没有前一层输入，使用当前向量
+        // 如果没有前一层输入，使用当前向量（创建副本以避免类型不匹配）
         if (incomingSynapses.length === 0) {
-          weightedInput = currentVector;
+          weightedInput = new Float32Array(currentVector);
         }
         
         // 处理
@@ -965,7 +968,7 @@ export class SiliconBrainV2 {
     stdpStats: ReturnType<STDPLearner['getStats']>;
     encoderStats: ReturnType<VectorEncoder['getStats']>;
     linkFieldStatus: WisdomSystemStatus | null;
-    recentHistory: typeof this.processingHistory;
+    recentHistory: ProcessingHistoryItem[];
   } {
     return {
       initialized: this.isInitialized,
