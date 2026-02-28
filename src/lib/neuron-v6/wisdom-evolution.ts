@@ -3,14 +3,14 @@
  * 智慧演化系统 (Wisdom Evolution System)
  * 
  * 核心思想：
- * - 完整的闭环：行动 → 模式 → 规律 → 智慧 → 指导 → 行动
+ * - 完整的闭环：链接 → 模式 → 规律 → 智慧 → 指导 → 链接
  * - 双向流动：向上提炼，向下指导
  * - 演化压力：适者生存，保持系统精简
- * - 共振传播：智慧通过软约束影响行动
+ * - 共振传播：智慧通过软约束影响链接
  * 
  * 架构：
  * ┌─────────────────────────────────────────────────────────────┐
- * │                      行动层 (Action Field)                  │
+ * │                      链接层 (Link Field)                    │
  * │                     模式层 (Pattern Attractor)              │
  * │                     规律层 (Law Network)                    │
  * │                     智慧层 (Wisdom Space)                   │
@@ -22,8 +22,8 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import type { ActionRecord, ActionParticle, ActionFieldConfig } from './action-field';
-import { ActionField, createActionField } from './action-field';
+import type { LinkRecord, LinkParticle, LinkFieldConfig } from './link-field';
+import { LinkField, createLinkField } from './link-field';
 import type { PatternAttractor, AttractorPhase } from './pattern-attractor';
 import { AttractorDynamics, createAttractorDynamics } from './pattern-attractor';
 import type { LawEdge, AbstractLaw, LawDiscoveryResult } from './law-network';
@@ -44,8 +44,8 @@ const WISDOM_SUBLIMATION_INTERVAL = 5 * 60 * 1000;
 /** 演化压力周期（毫秒） */
 const EVOLUTION_PRESSURE_INTERVAL = 10 * 60 * 1000;
 
-/** 最小行动数才能触发规律发现 */
-const MIN_ACTIONS_FOR_LAW = 10;
+/** 最小链接数才能触发规律发现 */
+const MIN_LINKS_FOR_LAW = 10;
 
 /** 最小规律数才能触发智慧升华 */
 const MIN_LAWS_FOR_WISDOM = 3;
@@ -59,7 +59,7 @@ const MIN_LAWS_FOR_WISDOM = 3;
  */
 export interface EvolutionResult {
   /** 新粒子 */
-  newParticle: ActionParticle;
+  newParticle: LinkParticle;
   
   /** 吸引结果 */
   attraction: {
@@ -104,7 +104,7 @@ export interface EvolutionConfig {
   lawUpdateInterval: number;
   wisdomSublimationInterval: number;
   evolutionPressureInterval: number;
-  minActionsForLaw: number;
+  minLinksForLaw: number;
   minLawsForWisdom: number;
 }
 
@@ -112,7 +112,7 @@ export interface EvolutionConfig {
  * 系统状态摘要
  */
 export interface SystemStatus {
-  actionField: {
+  linkField: {
     particleCount: number;
     avgCharge: number;
     potentialPeaks: number;
@@ -148,7 +148,7 @@ export class WisdomEvolutionSystem {
   private config: EvolutionConfig;
   
   // 核心组件
-  private actionField: ActionField;
+  private linkField: LinkField;
   private attractorDynamics: AttractorDynamics;
   private lawNetwork: LawNetwork;
   private wisdomSpace: WisdomSpace;
@@ -159,7 +159,7 @@ export class WisdomEvolutionSystem {
   private lastEvolutionPressure: number = 0;
   
   // 统计
-  private actionCount: number = 0;
+  private linkCount: number = 0;
   private patternSequenceBuffer: Array<{ patternIds: string[]; timestamps: number[] }> = [];
   
   constructor(config?: Partial<EvolutionConfig>) {
@@ -167,13 +167,13 @@ export class WisdomEvolutionSystem {
       lawUpdateInterval: config?.lawUpdateInterval || LAW_UPDATE_INTERVAL,
       wisdomSublimationInterval: config?.wisdomSublimationInterval || WISDOM_SUBLIMATION_INTERVAL,
       evolutionPressureInterval: config?.evolutionPressureInterval || EVOLUTION_PRESSURE_INTERVAL,
-      minActionsForLaw: config?.minActionsForLaw || MIN_ACTIONS_FOR_LAW,
+      minLinksForLaw: config?.minLinksForLaw || MIN_LINKS_FOR_LAW,
       minLawsForWisdom: config?.minLawsForWisdom || MIN_LAWS_FOR_WISDOM,
     };
     
     // 初始化组件
-    this.actionField = createActionField();
-    this.attractorDynamics = createAttractorDynamics(this.actionField);
+    this.linkField = createLinkField();
+    this.attractorDynamics = createAttractorDynamics(this.linkField);
     this.lawNetwork = createLawNetwork();
     this.wisdomSpace = createWisdomSpace();
     
@@ -185,15 +185,15 @@ export class WisdomEvolutionSystem {
   // ══════════════════════════════════════════════════════════════════
   
   /**
-   * 记录行动（入口）
+   * 记录链接（入口）
    * 
-   * 每个行动触发整个系统的微调
+   * 每个链接触发整个系统的微调
    */
-  async recordAction(record: ActionRecord): Promise<EvolutionResult> {
-    this.actionCount++;
+  async recordLink(record: LinkRecord): Promise<EvolutionResult> {
+    this.linkCount++;
     
-    // 1. 行动进入场
-    const particle = this.actionField.addParticle(record);
+    // 1. 链接进入场
+    const particle = this.linkField.addParticle(record);
     
     // 2. 处理吸引
     const attraction = this.attractorDynamics.processParticle(particle);
@@ -454,7 +454,7 @@ export class WisdomEvolutionSystem {
     const elapsed = Date.now() - this.lastLawUpdate;
     return (
       elapsed >= this.config.lawUpdateInterval &&
-      this.actionCount >= this.config.minActionsForLaw &&
+      this.linkCount >= this.config.minLinksForLaw &&
       this.patternSequenceBuffer.length >= 3
     );
   }
@@ -481,13 +481,13 @@ export class WisdomEvolutionSystem {
    * 获取系统状态
    */
   getStatus(): SystemStatus {
-    const fieldState = this.actionField.getFieldState();
+    const fieldState = this.linkField.getFieldState();
     const patternStats = this.attractorDynamics.getStats();
     const lawStats = this.lawNetwork.getStats();
     const wisdomStats = this.wisdomSpace.getStats();
     
     return {
-      actionField: {
+      linkField: {
         particleCount: fieldState.particleCount,
         avgCharge: fieldState.avgCharge,
         potentialPeaks: fieldState.potentialPeaks,
@@ -539,12 +539,12 @@ export class WisdomEvolutionSystem {
    */
   exportState(): string {
     return JSON.stringify({
-      actionField: this.actionField.exportState(),
+      linkField: this.linkField.exportState(),
       patterns: this.attractorDynamics.exportState(),
       laws: this.lawNetwork.exportState(),
       wisdoms: this.wisdomSpace.exportState(),
       meta: {
-        actionCount: this.actionCount,
+        linkCount: this.linkCount,
         lastLawUpdate: this.lastLawUpdate,
         lastWisdomSublimation: this.lastWisdomSublimation,
         lastEvolutionPressure: this.lastEvolutionPressure,
@@ -559,8 +559,8 @@ export class WisdomEvolutionSystem {
     try {
       const parsed = JSON.parse(data);
       
-      if (parsed.actionField) {
-        this.actionField.importState(parsed.actionField);
+      if (parsed.linkField) {
+        this.linkField.importState(parsed.linkField);
       }
       if (parsed.patterns) {
         this.attractorDynamics.importState(parsed.patterns);
@@ -573,7 +573,7 @@ export class WisdomEvolutionSystem {
       }
       
       if (parsed.meta) {
-        this.actionCount = parsed.meta.actionCount || 0;
+        this.linkCount = parsed.meta.linkCount || 0;
         this.lastLawUpdate = parsed.meta.lastLawUpdate || 0;
         this.lastWisdomSublimation = parsed.meta.lastWisdomSublimation || 0;
         this.lastEvolutionPressure = parsed.meta.lastEvolutionPressure || 0;
@@ -606,7 +606,7 @@ export function getWisdomEvolutionSystem(): WisdomEvolutionSystem | null {
 }
 
 // 重新导出类型
-export type { ActionRecord, ActionParticle } from './action-field';
+export type { LinkRecord, LinkParticle } from './link-field';
 export type { PatternAttractor, AttractorPhase, PatternType } from './pattern-attractor';
 export type { LawEdge, AbstractLaw, LawEdgeType } from './law-network';
 export type { WisdomVector, WisdomGuidance, WisdomType } from './wisdom-space';

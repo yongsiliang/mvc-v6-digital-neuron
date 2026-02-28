@@ -4,8 +4,8 @@
  * 
  * 核心思想：
  * - 模式是场中的吸引子，自然涌现而非预设
- * - 相似的行动被吸引到同一个模式
- * - 吸引子的强度取决于被吸引的行动数量和质量
+ * - 相似的链接被吸引到同一个模式
+ * - 吸引子的强度取决于被吸引的链接数量和质量
  * - 模式会随时间演化：形成 → 稳定 → 衰退
  * 
  * 灵感来源：
@@ -16,7 +16,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import type { ActionField, ActionParticle, PotentialPeak } from './action-field';
+import type { LinkField, LinkParticle, PotentialPeak } from './link-field';
 
 // ─────────────────────────────────────────────────────────────────────
 // 常量配置
@@ -167,7 +167,7 @@ export interface DynamicsConfig {
  * 吸引子动力学
  */
 export class AttractorDynamics {
-  private actionField: ActionField;
+  private linkField: LinkField;
   private config: DynamicsConfig;
   
   /** 吸引子集合 */
@@ -179,8 +179,8 @@ export class AttractorDynamics {
   /** 按领域索引 */
   private domainIndex: Map<string, Set<string>> = new Map();
   
-  constructor(actionField: ActionField, config?: Partial<DynamicsConfig>) {
-    this.actionField = actionField;
+  constructor(linkField: LinkField, config?: Partial<DynamicsConfig>) {
+    this.linkField = linkField;
     this.config = {
       initialRadius: config?.initialRadius || INITIAL_RADIUS,
       learningRate: config?.learningRate || LEARNING_RATE,
@@ -202,7 +202,7 @@ export class AttractorDynamics {
    * 2. 被最强吸引子吸引，或形成新吸引子
    * 3. 更新吸引子状态
    */
-  processParticle(particle: ActionParticle): AttractionResult {
+  processParticle(particle: LinkParticle): AttractionResult {
     // 1. 计算与所有吸引子的吸引
     const attractions = this.calculateAllAttractions(particle);
     
@@ -241,7 +241,7 @@ export class AttractorDynamics {
    * 计算粒子与所有吸引子的吸引强度
    */
   private calculateAllAttractions(
-    particle: ActionParticle
+    particle: LinkParticle
   ): Array<{ attractorId: string; attraction: number }> {
     const results: Array<{ attractorId: string; attraction: number }> = [];
     
@@ -262,7 +262,7 @@ export class AttractorDynamics {
    * attraction = strength × exp(-distance² / (2 × radius²))
    */
   calculateAttraction(
-    particle: ActionParticle,
+    particle: LinkParticle,
     attractor: PatternAttractor
   ): number {
     const distance = this.euclideanDistance(particle.position, attractor.center);
@@ -288,7 +288,7 @@ export class AttractorDynamics {
    */
   private reinforceAttractor(
     attractor: PatternAttractor,
-    particle: ActionParticle
+    particle: LinkParticle
   ): void {
     const lr = this.config.learningRate;
     
@@ -334,9 +334,9 @@ export class AttractorDynamics {
   /**
    * 检查新吸引子的涌现
    */
-  private checkEmergence(particle: ActionParticle): PatternAttractor | null {
+  private checkEmergence(particle: LinkParticle): PatternAttractor | null {
     // 查找场中的势能峰值
-    const peaks = this.actionField.findPotentialPeaks();
+    const peaks = this.linkField.findPotentialPeaks();
     
     // 检查粒子是否在某个峰值附近
     for (const peak of peaks) {
@@ -357,10 +357,10 @@ export class AttractorDynamics {
   /**
    * 创建新吸引子
    */
-  private createAttractor(peak: PotentialPeak, seedParticle: ActionParticle): PatternAttractor {
+  private createAttractor(peak: PotentialPeak, seedParticle: LinkParticle): PatternAttractor {
     const particles = peak.particleIds
-      .map(id => this.actionField.getParticle(id))
-      .filter(Boolean) as ActionParticle[];
+      .map(id => this.linkField.getParticle(id))
+      .filter(Boolean) as LinkParticle[];
     
     // 推断模式类型
     const patternType = this.inferPatternType(particles);
@@ -407,7 +407,7 @@ export class AttractorDynamics {
   /**
    * 推断模式类型
    */
-  private inferPatternType(particles: ActionParticle[]): PatternType {
+  private inferPatternType(particles: LinkParticle[]): PatternType {
     // 分析行动序列
     const types = particles.map(p => p.type);
     const results = particles.map(p => p.result);
@@ -419,9 +419,9 @@ export class AttractorDynamics {
     }
     
     // 检查降级模式
-    if (results.includes('failed') && types.length > 1) {
-      const failedIndex = results.indexOf('failed');
-      if (failedIndex < types.length - 1 && results[failedIndex + 1] === 'success') {
+    if (results.includes('broken') && types.length > 1) {
+      const failedIndex = results.indexOf('broken');
+      if (failedIndex < types.length - 1 && results[failedIndex + 1] === 'connected') {
         return 'fallback';
       }
     }
@@ -443,7 +443,7 @@ export class AttractorDynamics {
   /**
    * 生成模式描述
    */
-  private generateDescription(particles: ActionParticle[], type: PatternType): string {
+  private generateDescription(particles: LinkParticle[], type: PatternType): string {
     const types = [...new Set(particles.map(p => p.type))];
     const targets = [...new Set(particles.map(p => p.target.toLowerCase()))];
     
@@ -466,7 +466,7 @@ export class AttractorDynamics {
   /**
    * 提取典型序列
    */
-  private extractTypicalSequence(particles: ActionParticle[]): string[] {
+  private extractTypicalSequence(particles: LinkParticle[]): string[] {
     // 按时间排序
     const sorted = [...particles].sort((a, b) => a.timestamp - b.timestamp);
     
@@ -477,7 +477,7 @@ export class AttractorDynamics {
   /**
    * 推断领域
    */
-  private inferDomains(particles: ActionParticle[]): string[] {
+  private inferDomains(particles: LinkParticle[]): string[] {
     const domains = new Set<string>();
     
     for (const particle of particles) {
@@ -510,9 +510,9 @@ export class AttractorDynamics {
   /**
    * 计算统计信息
    */
-  private calculateStatistics(particles: ActionParticle[]): PatternAttractor['statistics'] {
-    const successCount = particles.filter(p => p.result === 'success').length;
-    const failCount = particles.filter(p => p.result === 'failed').length;
+  private calculateStatistics(particles: LinkParticle[]): PatternAttractor['statistics'] {
+    const successCount = particles.filter(p => p.result === 'connected').length;
+    const failCount = particles.filter(p => p.result === 'broken').length;
     
     return {
       totalCount: particles.length,
@@ -529,7 +529,7 @@ export class AttractorDynamics {
    */
   private updateStatistics(
     attractor: PatternAttractor,
-    particle: ActionParticle
+    particle: LinkParticle
   ): void {
     const stats = attractor.statistics;
     const n = stats.totalCount;
@@ -539,9 +539,9 @@ export class AttractorDynamics {
     stats.avgDuration = (stats.avgDuration * n + particle.duration) / (n + 1);
     stats.avgRetries = (stats.avgRetries * n + particle.retryCount) / (n + 1);
     
-    if (particle.result === 'success') {
+    if (particle.result === 'connected') {
       stats.successCount++;
-    } else if (particle.result === 'failed') {
+    } else if (particle.result === 'broken') {
       stats.failCount++;
     }
     
@@ -845,11 +845,11 @@ export class AttractorDynamics {
 let dynamicsInstance: AttractorDynamics | null = null;
 
 export function createAttractorDynamics(
-  actionField: ActionField,
+  linkField: LinkField,
   config?: Partial<DynamicsConfig>
 ): AttractorDynamics {
   if (!dynamicsInstance) {
-    dynamicsInstance = new AttractorDynamics(actionField, config);
+    dynamicsInstance = new AttractorDynamics(linkField, config);
   }
   return dynamicsInstance;
 }

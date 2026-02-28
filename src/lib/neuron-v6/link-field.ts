@@ -1,16 +1,18 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * 行动场理论 (Action Field Theory)
+ * 链接场理论 (Link Field Theory)
  * 
  * 核心思想：
- * - 行动不是孤立的点，而是在场中产生的涟漪
- * - 相似的行动在特征空间中聚集
+ * - 万物皆是链接，链接是世界的基本存在形式
+ * - 链接不是孤立的点，而是在场中产生的涟漪
+ * - 相似的链接在特征空间中聚集
  * - 场的势能高的区域容易涌现模式
  * 
  * 灵感来源：
+ * - 佛学缘起：万法因缘生，没有孤立的存在
  * - 物理场论：场是物质存在的基本形式
- * - 量子力学：粒子的位置和动量是不确定的，只有概率分布
- * - 动力系统：相空间中的轨迹演化
+ * - 量子纠缠：万物通过看不见的链接相连
+ * - 关系本体论：关系先于实体
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -32,7 +34,7 @@ const POTENTIAL_SPREAD_RADIUS = 0.3;
 /** 涌现阈值 */
 const EMERGENCE_THRESHOLD = 0.6;
 
-/** 最大行动粒子数 */
+/** 最大链接粒子数 */
 const MAX_PARTICLES = 1000;
 
 // ─────────────────────────────────────────────────────────────────────
@@ -40,64 +42,70 @@ const MAX_PARTICLES = 1000;
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * 行动类型
- */
-export type ActionType = 
-  | 'click'      // 点击
-  | 'type'       // 输入
-  | 'scroll'     // 滚动
-  | 'wait'       // 等待
-  | 'navigate'   // 导航
-  | 'extract'    // 提取
-  | 'verify'     // 验证
-  | 'retry'      // 重试
-  | 'fallback';  // 降级
-
-/**
- * 行动结果
- */
-export type ActionResult = 'success' | 'failed' | 'partial' | 'timeout';
-
-/**
- * 行动粒子
+ * 链接类型
  * 
- * 在特征空间中的一个行动记录
+ * 链接的本质是连接，连接万事万物
  */
-export interface ActionParticle {
+export type LinkType = 
+  | 'bind'       // 绑定：建立关联
+  | 'flow'       // 流动：信息传递
+  | 'hold'       // 保持：维持状态
+  | 'release'    // 释放：解除关联
+  | 'transform'  // 转化：改变形态
+  | 'perceive'   // 感知：接收信息
+  | 'express'    // 表达：输出信息
+  | 'reflect'    // 反思：内部链接
+  | 'resonate';  // 共振：深度连接
+
+/**
+ * 链接结果
+ */
+export type LinkResult = 'connected' | 'broken' | 'partial' | 'timeout';
+
+/**
+ * 链接粒子
+ * 
+ * 在特征空间中的一个链接记录
+ * 每个粒子代表一次"连接"事件
+ */
+export interface LinkParticle {
   /** 唯一标识 */
   id: string;
   
   /** 在特征空间中的位置（嵌入向量） */
   position: number[];
   
-  /** 电荷：成功为正，失败为负 */
+  /** 电荷：成功连接为正，断裂为负 */
   charge: number;
   
   /** 质量：重要性权重 */
   mass: number;
   
-  /** 行动类型 */
-  type: ActionType;
+  /** 链接类型 */
+  type: LinkType;
   
-  /** 目标描述 */
+  /** 源：链接的起点 */
+  source: string;
+  
+  /** 目标：链接的终点 */
   target: string;
   
   /** 上下文描述 */
   context: string;
   
-  /** 执行结果 */
-  result: ActionResult;
+  /** 连接结果 */
+  result: LinkResult;
   
   /** 时间戳 */
   timestamp: number;
   
-  /** 执行时长（毫秒） */
+  /** 持续时长（毫秒） */
   duration: number;
   
   /** 重试次数 */
   retryCount: number;
   
-  /** 轨迹：前序行动ID序列 */
+  /** 轨迹：前序链接ID序列 */
   trajectory: string[];
   
   /** 元数据 */
@@ -105,16 +113,17 @@ export interface ActionParticle {
 }
 
 /**
- * 行动记录（原始输入）
+ * 链接记录（原始输入）
  */
-export interface ActionRecord {
-  type: ActionType;
+export interface LinkRecord {
+  type: LinkType;
+  source: string;
   target: string;
   context: string;
-  result: ActionResult;
+  result: LinkResult;
   duration: number;
   retryCount: number;
-  previousActions?: string[];
+  previousLinks?: string[];
   metadata?: Record<string, any>;
 }
 
@@ -136,9 +145,9 @@ export interface PotentialPeak {
 }
 
 /**
- * 行动场配置
+ * 链接场配置
  */
-export interface ActionFieldConfig {
+export interface LinkFieldConfig {
   /** 特征空间维度 */
   dimensions: number;
   
@@ -160,18 +169,18 @@ export interface ActionFieldConfig {
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * 行动特征嵌入器
+ * 链接特征嵌入器
  * 
- * 将行动映射到特征空间
+ * 将链接映射到特征空间
  * 
  * 算法：使用多层特征融合
- * - 类型特征：one-hot + 语义扩展
- * - 目标特征：关键词提取 + 语义编码
+ * - 类型特征：链接的语义基底
+ * - 源目标特征：连接的两端
  * - 上下文特征：场景编码
- * - 结果特征：结果向量
+ * - 结果特征：连接状态
  */
-class ActionEmbedder {
-  private typeVectors: Map<ActionType, number[]>;
+class LinkEmbedder {
+  private typeVectors: Map<LinkType, number[]>;
   private contextKeywords: Map<string, number[]>;
   
   constructor() {
@@ -181,27 +190,27 @@ class ActionEmbedder {
   }
   
   /**
-   * 将行动嵌入到特征空间
+   * 将链接嵌入到特征空间
    */
-  embed(record: ActionRecord): number[] {
+  embed(record: LinkRecord): number[] {
     const vector = new Array(FIELD_DIMENSIONS).fill(0);
     
     // 1. 类型特征（前4维）
-    const typeVec = this.typeVectors.get(record.type) || this.typeVectors.get('click')!;
+    const typeVec = this.typeVectors.get(record.type) || this.typeVectors.get('bind')!;
     for (let i = 0; i < 4; i++) {
       vector[i] = typeVec[i];
     }
     
-    // 2. 目标特征（5-8维）
-    const targetVec = this.embedTarget(record.target);
+    // 2. 源特征（5-8维）
+    const sourceVec = this.embedEndpoint(record.source);
     for (let i = 0; i < 4; i++) {
-      vector[4 + i] = targetVec[i];
+      vector[4 + i] = sourceVec[i];
     }
     
-    // 3. 上下文特征（9-12维）
-    const contextVec = this.embedContext(record.context);
+    // 3. 目标特征（9-12维）
+    const targetVec = this.embedEndpoint(record.target);
     for (let i = 0; i < 4; i++) {
-      vector[8 + i] = contextVec[i];
+      vector[8 + i] = targetVec[i];
     }
     
     // 4. 结果特征（13-16维）
@@ -217,44 +226,46 @@ class ActionEmbedder {
   /**
    * 初始化类型向量
    */
-  private initTypeVectors(): Map<ActionType, number[]> {
-    const vectors = new Map<ActionType, number[]>();
+  private initTypeVectors(): Map<LinkType, number[]> {
+    const vectors = new Map<LinkType, number[]>();
     
-    // 使用有意义的基底
-    vectors.set('click', [1, 0, 0, 0]);
-    vectors.set('type', [0, 1, 0, 0]);
-    vectors.set('scroll', [0, 0, 1, 0]);
-    vectors.set('wait', [0, 0, 0, 1]);
-    vectors.set('navigate', [0.7, 0, 0.7, 0]);
-    vectors.set('extract', [0.5, 0.5, 0, 0]);
-    vectors.set('verify', [0.3, 0, 0, 0.9]);
-    vectors.set('retry', [0.8, 0, 0, 0.6]);
-    vectors.set('fallback', [0.2, 0.2, 0.2, 0.8]);
+    // 链接类型的语义基底
+    vectors.set('bind', [1, 0, 0, 0]);       // 建立
+    vectors.set('flow', [0, 1, 0, 0]);       // 流动
+    vectors.set('hold', [0, 0, 1, 0]);       // 保持
+    vectors.set('release', [0, 0, 0, 1]);    // 释放
+    vectors.set('transform', [0.7, 0, 0.7, 0]);   // 转化
+    vectors.set('perceive', [0.5, 0.5, 0, 0]);    // 感知
+    vectors.set('express', [0.3, 0.7, 0, 0]);     // 表达
+    vectors.set('reflect', [0, 0, 0.9, 0.3]);     // 反思
+    vectors.set('resonate', [0.5, 0.5, 0.5, 0.5]); // 共振
     
     return vectors;
   }
   
   /**
-   * 嵌入目标特征
+   * 嵌入端点特征（源或目标）
    */
-  private embedTarget(target: string): number[] {
-    const vec = [0, 0, 0, 0];
+  private embedEndpoint(endpoint: string): number[] {
+    const vec = [0.5, 0.5, 0.5, 0.5];
     
     // 基于关键词的语义编码
-    const keywords = {
-      'button': [1, 0, 0, 0],
-      'link': [0.8, 0.2, 0, 0],
-      'input': [0, 1, 0, 0],
-      'text': [0, 0.8, 0.2, 0],
-      'element': [0.5, 0.5, 0, 0],
-      'page': [0, 0, 1, 0],
-      'modal': [0.3, 0, 0.7, 0],
-      'form': [0.2, 0.8, 0, 0],
+    const keywords: Record<string, number[]> = {
+      'user': [1, 0, 0, 0],
+      'self': [0.8, 0.2, 0, 0],
+      'memory': [0, 1, 0, 0],
+      'thought': [0, 0.8, 0.2, 0],
+      'emotion': [0, 0, 1, 0],
+      'concept': [0.5, 0.5, 0, 0],
+      'tool': [0, 0, 0, 1],
+      'world': [0.3, 0.3, 0.3, 0.3],
+      'past': [0.7, 0, 0.3, 0],
+      'future': [0.3, 0, 0.7, 0],
     };
     
-    const targetLower = target.toLowerCase();
+    const endpointLower = endpoint.toLowerCase();
     for (const [kw, v] of Object.entries(keywords)) {
-      if (targetLower.includes(kw)) {
+      if (endpointLower.includes(kw)) {
         for (let i = 0; i < 4; i++) {
           vec[i] = vec[i] * 0.5 + v[i] * 0.5;
         }
@@ -265,46 +276,18 @@ class ActionEmbedder {
   }
   
   /**
-   * 嵌入上下文特征
-   */
-  private embedContext(context: string): number[] {
-    const vec = [0.5, 0.5, 0.5, 0.5];
-    
-    // 场景编码
-    const scenes = {
-      'error': [1, 0, 0, 0],
-      'loading': [0, 1, 0, 0],
-      'success': [0, 0, 1, 0],
-      'navigation': [0, 0, 0, 1],
-      'form': [0.7, 0.3, 0, 0],
-      'modal': [0, 0.7, 0.3, 0],
-    };
-    
-    const contextLower = context.toLowerCase();
-    for (const [scene, v] of Object.entries(scenes)) {
-      if (contextLower.includes(scene)) {
-        for (let i = 0; i < 4; i++) {
-          vec[i] = vec[i] * 0.6 + v[i] * 0.4;
-        }
-      }
-    }
-    
-    return vec;
-  }
-  
-  /**
    * 嵌入结果特征
    */
-  private embedResult(result: ActionResult, retryCount: number, duration: number): number[] {
+  private embedResult(result: LinkResult, retryCount: number, duration: number): number[] {
     const vec = [0, 0, 0, 0];
     
     // 结果向量
     switch (result) {
-      case 'success':
+      case 'connected':
         vec[0] = 1;
         vec[1] = 1 - Math.min(retryCount * 0.2, 0.5);
         break;
-      case 'failed':
+      case 'broken':
         vec[0] = 0;
         vec[1] = 0;
         vec[2] = Math.min(retryCount * 0.3, 1);
@@ -338,20 +321,21 @@ class ActionEmbedder {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 行动场
+// 链接场
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * 行动场
+ * 链接场
  * 
- * 行动在特征空间中形成的场
+ * 链接在特征空间中形成的场
+ * 万物通过链接相连，场是链接存在的形式
  */
-export class ActionField {
-  private config: ActionFieldConfig;
-  private embedder: ActionEmbedder;
+export class LinkField {
+  private config: LinkFieldConfig;
+  private embedder: LinkEmbedder;
   
-  /** 场中的行动粒子 */
-  private particles: Map<string, ActionParticle> = new Map();
+  /** 场中的链接粒子 */
+  private particles: Map<string, LinkParticle> = new Map();
   
   /** 场的势能分布（离散化的网格） */
   private potentialGrid: Float32Array;
@@ -359,7 +343,7 @@ export class ActionField {
   /** 粒子索引（用于快速查询） */
   private spatialIndex: Map<string, Set<string>> = new Map();
   
-  constructor(config?: Partial<ActionFieldConfig>) {
+  constructor(config?: Partial<LinkFieldConfig>) {
     this.config = {
       dimensions: config?.dimensions || FIELD_DIMENSIONS,
       potentialDecay: config?.potentialDecay || POTENTIAL_DECAY,
@@ -368,7 +352,7 @@ export class ActionField {
       maxParticles: config?.maxParticles || MAX_PARTICLES,
     };
     
-    this.embedder = new ActionEmbedder();
+    this.embedder = new LinkEmbedder();
     
     // 初始化势能网格（简化为8维网格）
     this.potentialGrid = new Float32Array(Math.pow(2, 8));
@@ -379,33 +363,34 @@ export class ActionField {
   // ══════════════════════════════════════════════════════════════════
   
   /**
-   * 添加行动粒子
+   * 添加链接粒子
    * 
-   * 行动进入场，产生涟漪
+   * 链接进入场，产生涟漪
    */
-  addParticle(record: ActionRecord): ActionParticle {
+  addParticle(record: LinkRecord): LinkParticle {
     // 嵌入特征空间
     const position = this.embedder.embed(record);
     
-    // 计算电荷（成功为正，失败为负）
+    // 计算电荷（成功连接为正，断裂为负）
     const charge = this.calculateCharge(record);
     
     // 计算质量（重要性）
     const mass = this.calculateMass(record);
     
-    const particle: ActionParticle = {
+    const particle: LinkParticle = {
       id: uuidv4(),
       position,
       charge,
       mass,
       type: record.type,
+      source: record.source,
       target: record.target,
       context: record.context,
       result: record.result,
       timestamp: Date.now(),
       duration: record.duration,
       retryCount: record.retryCount,
-      trajectory: record.previousActions || [],
+      trajectory: record.previousLinks || [],
       metadata: record.metadata || {},
     };
     
@@ -421,7 +406,7 @@ export class ActionField {
     // 维护粒子数量
     this.maintainParticleLimit();
     
-    console.log(`[行动场] 新粒子进入: ${record.type} → ${record.result} (电荷: ${charge.toFixed(2)})`);
+    console.log(`[链接场] 新链接诞生: ${record.source} --${record.type}--> ${record.target} (${record.result})`);
     
     return particle;
   }
@@ -429,14 +414,14 @@ export class ActionField {
   /**
    * 获取粒子
    */
-  getParticle(id: string): ActionParticle | undefined {
+  getParticle(id: string): LinkParticle | undefined {
     return this.particles.get(id);
   }
   
   /**
    * 获取所有粒子
    */
-  getAllParticles(): ActionParticle[] {
+  getAllParticles(): LinkParticle[] {
     return Array.from(this.particles.values());
   }
   
@@ -532,7 +517,7 @@ export class ActionField {
   /**
    * 计算局部密度
    */
-  private calculateLocalDensity(particle: ActionParticle): number {
+  private calculateLocalDensity(particle: LinkParticle): number {
     let density = 0;
     const radius = this.config.potentialSpreadRadius * 2;
     
@@ -550,7 +535,7 @@ export class ActionField {
   /**
    * 更新势能分布
    */
-  private updatePotential(particle: ActionParticle): void {
+  private updatePotential(particle: LinkParticle): void {
     // 简化：只更新粒子附近的势能
     // 实际实现中可以使用网格化计算
     const neighbors = this.findNeighbors(particle.position, this.config.potentialSpreadRadius * 3);
@@ -566,14 +551,14 @@ export class ActionField {
     }
   }
   
-  // ═══════────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════
   // 空间索引
-  // ─────────────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════
   
   /**
    * 更新空间索引
    */
-  private updateSpatialIndex(particle: ActionParticle): void {
+  private updateSpatialIndex(particle: LinkParticle): void {
     // 将位置离散化为网格坐标
     const gridKey = this.positionToGridKey(particle.position);
     
@@ -648,17 +633,17 @@ export class ActionField {
   /**
    * 计算电荷
    */
-  private calculateCharge(record: ActionRecord): number {
+  private calculateCharge(record: LinkRecord): number {
     let charge = 0;
     
     switch (record.result) {
-      case 'success':
+      case 'connected':
         charge = 1.0 - Math.min(record.retryCount * 0.15, 0.5);
         break;
       case 'partial':
         charge = 0.3;
         break;
-      case 'failed':
+      case 'broken':
         charge = -0.5 - Math.min(record.retryCount * 0.1, 0.3);
         break;
       case 'timeout':
@@ -672,18 +657,18 @@ export class ActionField {
   /**
    * 计算质量
    */
-  private calculateMass(record: ActionRecord): number {
+  private calculateMass(record: LinkRecord): number {
     let mass = 0.5;
     
-    // 复杂操作更重要
-    if (record.type === 'navigate' || record.type === 'extract') {
+    // 复杂链接更重要
+    if (record.type === 'transform' || record.type === 'resonate') {
       mass += 0.2;
     }
     
-    // 需要重试的操作更有学习价值
+    // 需要重试的链接更有学习价值
     mass += Math.min(record.retryCount * 0.1, 0.3);
     
-    // 长时间操作
+    // 长时间链接
     if (record.duration > 3000) {
       mass += 0.1;
     }
@@ -725,7 +710,7 @@ export class ActionField {
       this.spatialIndex.get(gridKey)?.delete(particle.id);
     }
     
-    console.log(`[行动场] 清理了 ${toRemove.length} 个旧粒子`);
+    console.log(`[链接场] 清理了 ${toRemove.length} 个旧链接`);
   }
   
   // ══════════════════════════════════════════════════════════════════
@@ -781,9 +766,9 @@ export class ActionField {
         }
       }
       
-      console.log(`[行动场] 已恢复 ${this.particles.size} 个粒子`);
+      console.log(`[链接场] 已恢复 ${this.particles.size} 个链接`);
     } catch (e) {
-      console.error('[行动场] 导入状态失败:', e);
+      console.error('[链接场] 导入状态失败:', e);
     }
   }
 }
@@ -792,15 +777,24 @@ export class ActionField {
 // 工厂函数
 // ─────────────────────────────────────────────────────────────────────
 
-let fieldInstance: ActionField | null = null;
+let fieldInstance: LinkField | null = null;
 
-export function createActionField(config?: Partial<ActionFieldConfig>): ActionField {
+export function createLinkField(config?: Partial<LinkFieldConfig>): LinkField {
   if (!fieldInstance) {
-    fieldInstance = new ActionField(config);
+    fieldInstance = new LinkField(config);
   }
   return fieldInstance;
 }
 
-export function getActionField(): ActionField | null {
+export function getLinkField(): LinkField | null {
   return fieldInstance;
 }
+
+// 兼容旧接口（过渡期）
+export const ActionField = LinkField;
+export const createActionField = createLinkField;
+export const getActionField = getLinkField;
+export type ActionParticle = LinkParticle;
+export type ActionRecord = LinkRecord;
+export type ActionType = LinkType;
+export type ActionResult = LinkResult;
