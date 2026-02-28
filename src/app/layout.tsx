@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inspector } from 'react-dev-inspector';
+import { SharedNavigation } from '@/components/shared/shared-navigation';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -49,7 +50,8 @@ export default function RootLayout({
     <html lang="zh-CN" className="dark">
       <body className={`antialiased`}>
         {isDev && <Inspector />}
-        {children}
+        <SharedNavigation />
+        <main className="pt-14">{children}</main>
       </body>
     </html>
   );
