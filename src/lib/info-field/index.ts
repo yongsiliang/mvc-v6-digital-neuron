@@ -2,37 +2,53 @@
  * 信息结构场 - 统一导出
  * 
  * 核心思想：
- * - 信息结构的变化 = 神经递质的传输
+ * - 信息结构 = 经不同算法编码的不同表示
+ * - 变换的目的：让信息能被感受器接收
  * - 感受器是隐性黑盒子
- * - LLM 变换 = 神经传递
  */
 
-// 信息场
-export { InformationField, createInformationField } from './field';
+// 信息结构（类已自动导出）
+export {
+  InformationStructure,
+  SparseVectorStructure,
+  DenseVectorStructure,
+  AttentionStructure,
+  KeyValueStructure,
+  SequenceStructure,
+  GraphStructure
+} from './structures';
+
+// 编码器
+export type { Encoder, EncodingContext } from './encoders';
+export {
+  TermFrequencyEncoder,
+  HashEncoder,
+  AttentionEncoder,
+  RandomProjectionEncoder,
+  KeyValueEncoder,
+  SequenceEncoder,
+  GraphEncoder,
+  EncoderRegistry,
+  encoderRegistry
+} from './encoders';
 
 // 感受器
+export type { Receptor, ReceptorState, ReceptorConfig } from './receptors';
 export {
-  Receptor,
-  PerceptionReceptor,
-  ThoughtReceptor,
-  MemoryReceptor,
-  EmotionReceptor,
-  ExpressionReceptor,
-  createReceptor
-} from './receptor';
+  RetrievalReceptor,
+  SemanticReceptor,
+  AssociationReceptor,
+  StructureReceptor,
+  SequenceReceptor,
+  GraphReceptor,
+  MultimodalReceptor,
+  ReceptorRegistry,
+  receptorRegistry
+} from './receptors';
 
-// 类型
-export type {
-  InformationStructure,
-  InformationType,
-  InformationTransformation,
-  TransformationType,
-  ReceptorType,
-  ReceptorState,
-  ReceptorConfig,
-  TransmissionChannel,
-  TransmissionResult,
-  InformationFieldState,
-  InformationFieldConfig
-} from './types';
-export { DEFAULT_FIELD_CONFIG } from './types';
+// 信息场
+export type { InformationFieldConfig } from './field-v2';
+export {
+  InformationField,
+  createInformationField
+} from './field-v2';
