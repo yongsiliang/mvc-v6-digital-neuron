@@ -1,13 +1,13 @@
 /**
  * Agent API - 真实浏览器版本
  * 
- * 使用 LightweightBrowserExecutor 访问真实网页
+ * 使用 ExecutorManager 自动选择执行器
  */
 
 import { NextRequest } from 'next/server';
 import { createAgent, Agent, CognitiveEvent } from '@/lib/agent';
 import { LightweightBrowserExecutor, MockExecutor } from '@/lib/action';
-import { ExecutorManager } from '@/lib/action/executor';
+import { getExecutorManager } from '@/lib/action/executor-manager';
 import { HeaderUtils } from 'coze-coding-dev-sdk';
 
 export const dynamic = 'force-dynamic';
@@ -22,20 +22,8 @@ export async function POST(request: NextRequest) {
     });
   }
   
-  // 创建执行器管理器
-  const executorManager = new ExecutorManager();
-  
-  if (useRealBrowser) {
-    // 使用真实浏览器执行器
-    const browserExecutor = new LightweightBrowserExecutor({
-      timeout: 30000
-    });
-    executorManager.register(browserExecutor, true);
-  } else {
-    // 使用模拟执行器
-    const mockExecutor = new MockExecutor();
-    executorManager.register(mockExecutor, true);
-  }
+  // 获取执行器管理器
+  const executorManager = getExecutorManager();
   
   // 创建 Agent（自定义执行器）
   const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
@@ -69,16 +57,18 @@ export async function POST(request: NextRequest) {
               send('act', { 
                 action: action.action, 
                 target: action.target, 
-                value: action.value 
+                value: action.value,
+                executor: action.executor
               });
               
-              // 使用执行器执行
+              // 使用执行器管理器执行
               const actionResult = await executorManager.execute(action);
               
               send('observe', {
                 status: actionResult.status,
                 content: actionResult.content,
-                extracted: actionResult.extracted ? Object.fromEntries(actionResult.extracted) : undefined
+                extracted: actionResult.extracted ? Object.fromEntries(actionResult.extracted) : undefined,
+                executor: actionResult.executor
               });
               
               if (actionResult.completed) {

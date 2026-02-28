@@ -1,18 +1,26 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Brain, Send, RotateCcw, Activity, Eye, Lightbulb, Target, CheckCircle, XCircle, Loader2, Globe, Monitor } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Brain, Send, RotateCcw, Activity, Eye, Lightbulb, Target, CheckCircle, XCircle, Loader2, Globe, Monitor, FileText, Zap, Image, Cpu, Info } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
 // ─────────────────────────────────────────────────────────────────────
+
+interface ExecutorInfo {
+  type: string;
+  name: string;
+  description: string;
+  supportedActions: string[];
+}
 
 interface CognitiveEvent {
   type: 'perceive' | 'understand' | 'decide' | 'act' | 'observe' | 'complete' | 'error' | 'result';
@@ -24,12 +32,18 @@ interface ActionData {
   action: string;
   target: string;
   value?: string;
+  executor?: string;
 }
 
 interface ObservationData {
   status: string;
   content: string;
   extracted?: Record<string, unknown>;
+  executor?: {
+    type: string;
+    name: string;
+    confidence: number;
+  };
 }
 
 interface AgentResult {
@@ -49,6 +63,11 @@ interface LogEntry {
   content: string;
   timestamp: number;
   extracted?: Record<string, unknown>;
+  executor?: {
+    type: string;
+    name: string;
+    confidence: number;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -61,10 +80,33 @@ export default function AgentDemoPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [result, setResult] = useState<AgentResult | null>(null);
   const [useRealBrowser, setUseRealBrowser] = useState(true);
+  const [executors, setExecutors] = useState<ExecutorInfo[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   
+  // 加载执行器信息
+  useEffect(() => {
+    const fetchExecutors = async () => {
+      try {
+        const response = await fetch('/api/agent/executors');
+        if (response.ok) {
+          const data = await response.json();
+          setExecutors(data.executors || []);
+        }
+      } catch {
+        // 使用默认执行器列表
+        setExecutors([
+          { type: 'browser', name: 'Browser Executor', description: '网页浏览执行器', supportedActions: ['navigate', 'click', 'type', 'extract', 'search'] },
+          { type: 'multimodal', name: 'Multimodal Executor', description: '多模态执行器', supportedActions: ['vision-analyze', 'ocr-extract'] },
+          { type: 'file', name: 'File Executor', description: '文件操作执行器', supportedActions: ['file-read', 'file-write', 'file-list'] },
+          { type: 'api', name: 'API Executor', description: 'API调用执行器', supportedActions: ['api-get', 'api-post', 'api-put', 'api-delete'] }
+        ]);
+      }
+    };
+    fetchExecutors();
+  }, []);
+  
   // 添加日志
-  const addLog = useCallback((type: CognitiveEvent['type'], title: string, content: string, extracted?: Record<string, unknown>) => {
+  const addLog = useCallback((type: CognitiveEvent['type'], title: string, content: string, extracted?: Record<string, unknown>, executor?: LogEntry['executor']) => {
     const iconMap: Record<CognitiveEvent['type'], React.ReactNode> = {
       perceive: <Eye className="w-4 h-4" />,
       understand: <Brain className="w-4 h-4" />,
@@ -83,7 +125,8 @@ export default function AgentDemoPage() {
       title,
       content,
       timestamp: Date.now(),
-      extracted
+      extracted,
+      executor
     }]);
     
     setTimeout(() => {
@@ -149,11 +192,11 @@ export default function AgentDemoPage() {
                   break;
                 case 'act':
                   const actData = event.data as ActionData;
-                  addLog('act', `执行: ${actData.action}`, `目标: ${actData.target}${actData.value ? `, 值: ${actData.value}` : ''}`);
+                  addLog('act', `执行: ${actData.action}`, `目标: ${actData.target}${actData.value ? `, 值: ${actData.value}` : ''}${actData.executor ? ` | 执行器: ${actData.executor}` : ''}`);
                   break;
                 case 'observe':
                   const obsData = event.data as ObservationData;
-                  addLog('observe', `观察: ${obsData.status}`, obsData.content, obsData.extracted);
+                  addLog('observe', `观察: ${obsData.status}`, obsData.content, obsData.extracted, obsData.executor);
                   break;
                 case 'complete':
                   const completeData = event.data as { success: boolean; output?: string; stats?: { cycles: number } };
@@ -311,6 +354,12 @@ export default function AgentDemoPage() {
                         <Badge variant="outline" className="ml-auto text-xs">
                           {log.type}
                         </Badge>
+                        {log.executor && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Cpu className="w-3 h-3 mr-1" />
+                            {log.executor.type} ({(log.executor.confidence * 100).toFixed(0)}%)
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm opacity-80 whitespace-pre-wrap">{log.content}</p>
                       
@@ -365,6 +414,59 @@ export default function AgentDemoPage() {
             </CardContent>
           </Card>
         )}
+        
+        {/* 可用执行器 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Cpu className="w-5 h-5" />
+              可用执行器
+            </CardTitle>
+            <CardDescription>
+              根据意图类型自动选择合适的执行器
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {executors.map((executor) => {
+                const iconMap: Record<string, React.ReactNode> = {
+                  browser: <Globe className="w-4 h-4" />,
+                  multimodal: <Image className="w-4 h-4" />,
+                  file: <FileText className="w-4 h-4" />,
+                  api: <Zap className="w-4 h-4" />
+                };
+                const colorMap: Record<string, string> = {
+                  browser: 'border-green-500/30 bg-green-500/10',
+                  multimodal: 'border-purple-500/30 bg-purple-500/10',
+                  file: 'border-blue-500/30 bg-blue-500/10',
+                  api: 'border-yellow-500/30 bg-yellow-500/10'
+                };
+                
+                return (
+                  <div key={executor.type} className={`p-3 rounded-lg border ${colorMap[executor.type] || 'border-border'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {iconMap[executor.type] || <Info className="w-4 h-4" />}
+                      <span className="font-medium text-sm">{executor.name}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{executor.description}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {executor.supportedActions.slice(0, 3).map((action) => (
+                        <Badge key={action} variant="outline" className="text-xs">
+                          {action}
+                        </Badge>
+                      ))}
+                      {executor.supportedActions.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{executor.supportedActions.length - 3}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
         
         {/* 架构说明 */}
         <Card>

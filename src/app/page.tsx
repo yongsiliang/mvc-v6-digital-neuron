@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, Network, Code, Bot, ArrowRight } from 'lucide-react';
+import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye } from 'lucide-react';
 
 /**
  * 首页 - 功能导航
@@ -16,15 +16,6 @@ export default function Home() {
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',
       borderColor: 'border-purple-500/20'
-    },
-    {
-      title: '认知智能体',
-      description: '三层架构：信息层 + 智能层 + 行动层，认知循环',
-      href: '/agent-demo',
-      icon: Bot,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10',
-      borderColor: 'border-green-500/20'
     },
     {
       title: '代码演化',
@@ -48,8 +39,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
       <div className="container mx-auto px-4 py-16">
+        {/* Hero Section */}
         <div className="text-center space-y-4 mb-12">
           <h1 className="text-4xl font-bold tracking-tight">
             认知智能系统
@@ -59,26 +50,63 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Feature Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
+        {/* 推荐入口 - 认知智能体 */}
+        <div className="max-w-2xl mx-auto mb-12">
+          <Link href="/agent-demo">
+            <Card className="bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-teal-500/10 border-green-500/30 hover:border-green-500/50 transition-all hover:shadow-xl hover:shadow-green-500/10 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-8 h-8 text-green-500" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h2 className="text-xl font-bold">认知智能体</h2>
+                      <Sparkles className="w-4 h-4 text-yellow-500" />
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">推荐</span>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      三层架构：信息层 + 智能层 + 行动层。支持真实浏览器操作、多模态理解、记忆存储。
+                    </p>
+                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Globe className="w-3 h-3" /> 网页访问
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Eye className="w-3 h-3" /> 图片理解
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Zap className="w-3 h-3" /> 认知循环
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-green-500 group-hover:translate-x-2 transition-transform" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* 其他功能入口 */}
+        <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto mb-12">
           {features.map((feature) => {
             const Icon = feature.icon;
             return (
               <Link key={feature.href} href={feature.href}>
                 <Card className={`h-full transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer ${feature.borderColor}`}>
                   <CardHeader>
-                    <div className={`w-12 h-12 rounded-lg ${feature.bgColor} flex items-center justify-center mb-2`}>
-                      <Icon className={`w-6 h-6 ${feature.color}`} />
+                    <div className={`w-10 h-10 rounded-lg ${feature.bgColor} flex items-center justify-center mb-2`}>
+                      <Icon className={`w-5 h-5 ${feature.color}`} />
                     </div>
-                    <CardTitle className="text-lg">{feature.title}</CardTitle>
-                    <CardDescription className="text-sm">
+                    <CardTitle className="text-base">{feature.title}</CardTitle>
+                    <CardDescription className="text-xs">
                       {feature.description}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Button variant="ghost" className={`w-full group ${feature.color}`}>
+                    <Button variant="ghost" size="sm" className={`w-full group ${feature.color}`}>
                       进入
-                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      <ArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </CardContent>
                 </Card>
@@ -88,7 +116,7 @@ export default function Home() {
         </div>
 
         {/* Architecture Overview */}
-        <div className="mt-16 max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
               <CardTitle>架构演进</CardTitle>
@@ -97,30 +125,33 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4 text-sm text-muted-foreground">
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-purple-500 mt-1.5" />
-                  <div>
-                    <span className="font-medium text-foreground">V6 意识系统</span>
-                    <span className="mx-2">→</span>
-                    <span>链接驱动，统一答案模式</span>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-purple-500" />
+                    <span className="font-medium">V6 意识系统</span>
                   </div>
+                  <p className="text-sm text-muted-foreground pl-5">
+                    链接驱动，统一答案模式
+                  </p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5" />
-                  <div>
-                    <span className="font-medium text-foreground">SNN 三体系统</span>
-                    <span className="mx-2">→</span>
-                    <span>涌现驱动，神经元/突触/信号</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-orange-500" />
+                    <span className="font-medium">SNN 三体系统</span>
                   </div>
+                  <p className="text-sm text-muted-foreground pl-5">
+                    涌现驱动，神经元/突触/信号
+                  </p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5" />
-                  <div>
-                    <span className="font-medium text-foreground">信息结构场</span>
-                    <span className="mx-2">→</span>
-                    <span>信息驱动，编码/感受器/认知循环</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <span className="font-medium">信息结构场</span>
                   </div>
+                  <p className="text-sm text-muted-foreground pl-5">
+                    信息驱动，编码/感受器/认知循环
+                  </p>
                 </div>
               </div>
             </CardContent>

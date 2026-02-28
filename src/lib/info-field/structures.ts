@@ -371,6 +371,23 @@ export class GraphStructure extends InformationStructure {
 // 智能体专用信息结构
 // ─────────────────────────────────────────────────────────────────────
 
+/** 意图类型 */
+export type IntentType = 
+  | 'browser'    // 网页浏览
+  | 'navigate'   // 导航
+  | 'search'     // 搜索
+  | 'click'      // 点击
+  | 'vision'     // 图片理解
+  | 'image'      // 图片操作
+  | 'ocr'        // OCR
+  | 'file'       // 文件操作
+  | 'read'       // 读取
+  | 'write'      // 写入
+  | 'api'        // API 调用
+  | 'request'    // 请求
+  | 'general'    // 通用
+  | 'unknown';   // 未知
+
 /**
  * 意图结构
  * 
@@ -380,10 +397,13 @@ export class GraphStructure extends InformationStructure {
 export class IntentStructure extends InformationStructure {
   readonly type = 'intent';
   
+  /** 相关信息（可选） */
+  related: Map<string, unknown> = new Map();
+  
   constructor(
     readonly id: string,
     readonly source: string,
-    readonly primary: string,           // 主意图: "search" | "summarize" | "navigate" | "operate" | ...
+    readonly primary: IntentType | string,  // 主意图
     readonly parameters: Map<string, unknown>,  // 参数
     readonly constraints: Map<string, unknown>, // 约束条件
     readonly confidence: number,         // 可信度 0-1
@@ -445,6 +465,12 @@ export class IntentStructure extends InformationStructure {
  */
 export class ActionStructure extends InformationStructure {
   readonly type = 'action';
+  
+  /** 执行器类型（可选，由决策层指定或执行器管理器自动选择） */
+  executor?: string;
+  
+  /** 上下文信息（可选） */
+  context?: Record<string, unknown>;
   
   constructor(
     readonly id: string,

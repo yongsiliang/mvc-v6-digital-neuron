@@ -29,6 +29,13 @@ export interface ActionResult {
   screenshot?: string;
   /** 整体任务是否完成 */
   completed: boolean;
+  /** 执行器信息 */
+  executor?: {
+    type: string;
+    name: string;
+    confidence: number;
+    reason: string;
+  };
 }
 
 /** 执行器能力 */

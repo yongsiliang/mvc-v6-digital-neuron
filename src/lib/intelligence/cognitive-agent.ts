@@ -21,9 +21,11 @@ import {
   DenseVectorStructure,
   KeyValueStructure,
   isObservation,
-  isIntent
+  isIntent,
+  IntentType
 } from '../info-field/structures';
 import { MemoryStore, MemoryEntry } from './memory';
+import { getExecutorManager, ExecutionPlan } from '../action/executor-manager';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -220,31 +222,54 @@ export class CognitiveAgent {
   /**
    * 理解阶段
    * 
-   * 使用 LLM 解析意图
+   * 使用 LLM 解析意图，识别意图类型和参数
    */
   private async understand(structures: InformationStructure[]): Promise<IntentStructure> {
     this.state.phase = 'understand';
     
-    // 构建 LLM 提示
+    // 构建上下文
     const contextStr = structures
       .map(s => `- ${s.source}`)
       .join('\n');
+    
+    // 获取可用执行器信息
+    const executorManager = getExecutorManager();
+    const executors = executorManager.getExecutors();
+    const executorInfo = executors.map(e => 
+      `${e.type}: ${e.capabilities.name} - ${e.capabilities.supportedActions.join(', ')}`
+    ).join('\n');
     
     const prompt = `分析用户意图：
 
 用户目标：${this.state.currentGoal}
 
 上下文信息：
-${contextStr}
+${contextStr || '无'}
+
+可用执行器：
+${executorInfo}
 
 请以 JSON 格式输出意图分析：
 {
-  "primary": "主意图类型",
+  "primary": "意图类型",
   "parameters": { 参数对象 },
   "constraints": { 约束条件 },
   "confidence": 0.0-1.0,
-  "thought": "思考过程"
-}`;
+  "thought": "思考过程",
+  "recommendedExecutor": "推荐的执行器类型"
+}
+
+意图类型说明：
+- browser: 网页浏览、导航、搜索
+- navigate: 导航到特定页面
+- search: 搜索信息
+- click: 点击操作
+- vision: 图片理解、OCR
+- image: 图片相关操作
+- file: 文件读写操作
+- api: API 调用
+- general: 通用操作
+- unknown: 无法识别`;
 
     const response = await this.llm.invoke([
       { role: 'system', content: this.systemPrompt },
@@ -254,7 +279,6 @@ ${contextStr}
     // 解析 LLM 响应
     let parsed;
     try {
-      // 尝试提取 JSON
       const jsonMatch = response.content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsed = JSON.parse(jsonMatch[0]);
@@ -279,12 +303,22 @@ ${contextStr}
     const intent = new IntentStructure(
       `intent-${Date.now()}`,
       this.state.currentGoal || '',
-      parsed.primary,
+      parsed.primary as IntentType,
       new Map(Object.entries(parsed.parameters || {})),
       new Map(Object.entries(parsed.constraints || {})),
       parsed.confidence || 0.5,
       new Map()
     );
+    
+    // 存储推荐的执行器
+    if (parsed.recommendedExecutor) {
+      intent.related.set('recommendedExecutor', parsed.recommendedExecutor);
+    }
+    
+    // 存储思考过程
+    if (parsed.thought) {
+      intent.related.set('thought', parsed.thought);
+    }
     
     return intent;
   }
@@ -292,7 +326,7 @@ ${contextStr}
   /**
    * 决策阶段
    * 
-   * 使用 LLM 生成行动计划
+   * 使用 LLM 生成行动计划，并选择合适的执行器
    */
   private async decide(intent: IntentStructure): Promise<{
     actions: ActionStructure[];
@@ -301,12 +335,24 @@ ${contextStr}
   }> {
     this.state.phase = 'decide';
     
+    // 获取执行器管理器
+    const executorManager = getExecutorManager();
+    const executors = executorManager.getExecutors();
+    
+    // 构建执行器能力描述
+    const executorDesc = executors.map(e => 
+      `${e.type}: [${e.capabilities.supportedActions.join(', ')}]`
+    ).join('\n');
+    
     // 构建 LLM 提示
     const prompt = `基于意图制定行动计划：
 
 意图类型：${intent.primary}
 意图参数：${JSON.stringify(Object.fromEntries(intent.parameters))}
 置信度：${intent.confidence}
+
+可用执行器和行动：
+${executorDesc}
 
 历史行动：
 ${this.state.actionHistory.slice(-3).map(h => 
@@ -319,18 +365,25 @@ ${this.state.actionHistory.slice(-3).map(h =>
   "completed": false,
   "actions": [
     {
-      "action": "行动类型(click/type/navigate/extract/think/complete)",
+      "action": "行动类型",
       "target": "目标",
       "value": "值(可选)",
+      "executor": "执行器类型(可选)",
       "expectedOutcome": "预期结果"
     }
   ]
 }
 
+行动类型说明：
+- 浏览器: navigate, click, type, extract, search, scroll, screenshot
+- 文件: file-read, file-write, file-list, file-search
+- API: api-get, api-post, api-put, api-delete
+- 多模态: vision-analyze, ocr-extract
+
 注意：
 - 每次最多输出 3 个行动
 - 如果任务已完成，设置 completed: true
-- action 类型包括：navigate, click, type, extract, think, complete`;
+- 根据意图类型选择合适的行动`;
 
     const response = await this.llm.invoke([
       { role: 'system', content: this.systemPrompt },
@@ -359,8 +412,8 @@ ${this.state.actionHistory.slice(-3).map(h =>
     }
     
     // 转换为行动结构
-    const actions: ActionStructure[] = (parsed.actions || []).map((a: Record<string, unknown>, i: number) => 
-      new ActionStructure(
+    const actions: ActionStructure[] = (parsed.actions || []).map((a: Record<string, unknown>, i: number) => {
+      const action = new ActionStructure(
         `action-${Date.now()}-${i}`,
         intent.source,
         a.action as string,
@@ -370,8 +423,23 @@ ${this.state.actionHistory.slice(-3).map(h =>
         [],
         30000,
         a.expectedOutcome as string | undefined
-      )
-    );
+      );
+      
+      // 设置推荐的执行器
+      if (a.executor) {
+        action.executor = a.executor as string;
+      }
+      
+      return action;
+    });
+    
+    // 为每个行动选择执行器
+    for (const action of actions) {
+      if (!action.executor) {
+        const plan = executorManager.selectExecutor(intent.primary as IntentType, action);
+        action.executor = plan.executorType;
+      }
+    }
     
     // 记录到行动历史
     for (const action of actions) {
