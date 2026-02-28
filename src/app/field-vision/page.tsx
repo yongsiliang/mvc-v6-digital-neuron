@@ -19,7 +19,7 @@ export default function FieldVisionPage() {
   // 控制参数
   const [foregroundSize, setForegroundSize] = useState(180);
   const [gridSize, setGridSize] = useState(35);
-  const [tiltX, setTiltX] = useState(25);
+  const [tiltX, setTiltX] = useState(30);
   const [tiltZ, setTiltZ] = useState(0);
   const [autoRotate, setAutoRotate] = useState(true);
 
