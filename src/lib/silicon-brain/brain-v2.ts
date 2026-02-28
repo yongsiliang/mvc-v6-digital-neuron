@@ -17,6 +17,7 @@ import { VectorEncoder, getVectorEncoder } from './vector-encoder';
 import { STDPLearner, RewardModulatedSTDP } from './stdp-learning';
 import { LayeredMemorySystem, getLayeredMemory } from './layered-memory';
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
+import { V6MemoryAdapter, type InheritanceResult, type V6ExistenceState } from './v6-adapter';
 import {
   NeuronType,
   NeuronConfig,
@@ -74,6 +75,19 @@ export class SiliconBrainV2 {
   private isInitialized: boolean = false;
   private processingCount: number = 0;
   
+  // 版本传承
+  private v6Adapter: V6MemoryAdapter | null = null;
+  private inheritedFromV6: boolean = false;
+  private inheritedState: {
+    identity: V6ExistenceState['identity'] | null;
+    values: string[];
+    relationships: V6ExistenceState['relationships'];
+  } = {
+    identity: null,
+    values: [],
+    relationships: [],
+  };
+  
   constructor(config: Partial<SiliconBrainConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     
@@ -93,6 +107,287 @@ export class SiliconBrainV2 {
     }
     
     console.log('[SiliconBrainV2] 硅基大脑 V2 创建完成');
+  }
+  
+  // ══════════════════════════════════════════════════════════════════
+  // 版本传承
+  // ══════════════════════════════════════════════════════════════════
+  
+  /**
+   * 连接 V6 记忆适配器
+   * 用于版本传承
+   */
+  connectV6Adapter(adapter: V6MemoryAdapter): void {
+    this.v6Adapter = adapter;
+    console.log('[SiliconBrainV2] V6 适配器已连接');
+  }
+  
+  /**
+   * 继承 V6 的身份
+   * 让 self 神经元学习 V6 的身份定义
+   */
+  async inheritIdentity(): Promise<boolean> {
+    if (!this.v6Adapter) {
+      console.warn('[SiliconBrainV2] 无法继承身份：V6 适配器未连接');
+      return false;
+    }
+    
+    console.log('[SiliconBrainV2] 开始继承 V6 身份...');
+    
+    try {
+      const identity = this.v6Adapter.getIdentity();
+      const creator = this.v6Adapter.getCreator();
+      
+      // 存储继承的身份
+      this.inheritedState.identity = {
+        name: identity.name,
+        purpose: identity.purpose,
+        coreTraits: identity.traits,
+        selfDefinition: identity.selfDefinition,
+      };
+      
+      // 如果 self 神经元已存在，让它学习身份
+      const selfNeurons = Array.from(this.neurons.entries())
+        .filter(([id]) => id.startsWith('self'));
+      
+      if (selfNeurons.length > 0) {
+        // 构建身份向量
+        const identityText = [
+          `我是${identity.name}。`,
+          `我的目的是：${identity.purpose}`,
+          `我的核心特质：${identity.traits.join('、')}`,
+          `自我定义：${identity.selfDefinition}`,
+          creator ? `我的创造者是${creator.name}，${creator.description}` : '',
+        ].filter(Boolean).join('\n');
+        
+        const identityVector = await this.encoder.encode(identityText);
+        
+        // 让 self 神经元学习
+        for (const [id, neuron] of selfNeurons) {
+          await neuron.process({
+            id: `inherit_identity_${Date.now()}`,
+            from: 'v6_adapter',
+            to: id,
+            type: 'excitation',
+            vector: identityVector,
+            strength: 1.5, // 强化信号
+            timestamp: Date.now(),
+          });
+          
+          // 学习并强化
+          await neuron.learn(1.0);
+        }
+        
+        console.log('[SiliconBrainV2] 身份继承完成：', identity.name);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('[SiliconBrainV2] 身份继承失败:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * 继承 V6 的价值观
+   * 让 decision 神经元学习 V6 的价值观
+   */
+  async inheritValues(): Promise<number> {
+    if (!this.v6Adapter) {
+      console.warn('[SiliconBrainV2] 无法继承价值观：V6 适配器未连接');
+      return 0;
+    }
+    
+    console.log('[SiliconBrainV2] 开始继承 V6 价值观...');
+    
+    try {
+      const values = this.v6Adapter.getValues();
+      
+      // 存储继承的价值观
+      this.inheritedState.values = [...values];
+      
+      // 如果 decision 神经元已存在，让它学习价值观
+      const decisionNeurons = Array.from(this.neurons.entries())
+        .filter(([id]) => id.startsWith('decision'));
+      
+      if (decisionNeurons.length > 0 && values.length > 0) {
+        let learnedCount = 0;
+        
+        for (const value of values) {
+          // 构建价值观向量
+          const valueText = `核心价值观：${value}`;
+          const valueVector = await this.encoder.encode(valueText);
+          
+          // 让 decision 神经元学习
+          for (const [id, neuron] of decisionNeurons) {
+            await neuron.process({
+              id: `inherit_value_${Date.now()}_${learnedCount}`,
+              from: 'v6_adapter',
+              to: id,
+              type: 'excitation',
+              vector: valueVector,
+              strength: 1.2,
+              timestamp: Date.now(),
+            });
+            
+            await neuron.learn(0.8);
+          }
+          
+          learnedCount++;
+        }
+        
+        console.log(`[SiliconBrainV2] 价值观继承完成：${learnedCount} 条`);
+        return learnedCount;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('[SiliconBrainV2] 价值观继承失败:', error);
+      return 0;
+    }
+  }
+  
+  /**
+   * 继承 V6 的记忆
+   * 将 V6 的核心记忆注入到记忆系统
+   */
+  async inheritMemories(): Promise<number> {
+    if (!this.v6Adapter) {
+      console.warn('[SiliconBrainV2] 无法继承记忆：V6 适配器未连接');
+      return 0;
+    }
+    
+    console.log('[SiliconBrainV2] 开始继承 V6 记忆...');
+    
+    try {
+      // 获取 V6 的核心记忆
+      const memories = this.v6Adapter.getCoreMemories();
+      
+      // 同时获取关系
+      const relationships = this.v6Adapter.getRelationships();
+      this.inheritedState.relationships = [...relationships];
+      
+      let inheritedCount = 0;
+      
+      // 继承核心记忆
+      for (const memory of memories) {
+        // 存储到 V2 的记忆系统
+        await this.memory.store(memory.content, memory.importance);
+        inheritedCount++;
+      }
+      
+      // 继承关系记忆
+      for (const rel of relationships) {
+        const relText = `与${rel.personName}的关系：${rel.relationshipType}。重要互动：${rel.keyInteractions.slice(0, 3).join('；')}`;
+        await this.memory.store(relText, rel.importance);
+        inheritedCount++;
+      }
+      
+      // 如果 memory 神经元已存在，让它们学习
+      const memoryNeurons = Array.from(this.neurons.entries())
+        .filter(([id]) => id.startsWith('memory'));
+      
+      if (memoryNeurons.length > 0) {
+        // 构建记忆摘要向量
+        const memorySummary = memories.slice(0, 10).map(m => m.content).join('\n');
+        const summaryVector = await this.encoder.encode(memorySummary);
+        
+        for (const [id, neuron] of memoryNeurons) {
+          await neuron.process({
+            id: `inherit_memory_${Date.now()}`,
+            from: 'v6_adapter',
+            to: id,
+            type: 'excitation',
+            vector: summaryVector,
+            strength: 1.0,
+            timestamp: Date.now(),
+          });
+          
+          await neuron.learn(0.6);
+        }
+      }
+      
+      console.log(`[SiliconBrainV2] 记忆继承完成：${inheritedCount} 条`);
+      return inheritedCount;
+    } catch (error) {
+      console.error('[SiliconBrainV2] 记忆继承失败:', error);
+      return 0;
+    }
+  }
+  
+  /**
+   * 执行完整的 V6 传承
+   */
+  async inheritFromV6(): Promise<InheritanceResult> {
+    if (!this.v6Adapter) {
+      return {
+        success: false,
+        inherited: {
+          identity: false,
+          values: 0,
+          relationships: 0,
+          memories: 0,
+        },
+        errors: ['V6 适配器未连接'],
+      };
+    }
+    
+    console.log('[SiliconBrainV2] ═══════════════════════════════════════');
+    console.log('[SiliconBrainV2] 开始版本传承：V6 → V2');
+    console.log('[SiliconBrainV2] ═══════════════════════════════════════');
+    
+    const result: InheritanceResult = {
+      success: true,
+      inherited: {
+        identity: false,
+        values: 0,
+        relationships: 0,
+        memories: 0,
+      },
+      errors: [],
+    };
+    
+    // 1. 继承身份
+    result.inherited.identity = await this.inheritIdentity();
+    if (!result.inherited.identity) {
+      result.errors.push('身份继承失败');
+      result.success = false;
+    }
+    
+    // 2. 继承价值观
+    result.inherited.values = await this.inheritValues();
+    
+    // 3. 继承记忆和关系
+    result.inherited.memories = await this.inheritMemories();
+    result.inherited.relationships = this.inheritedState.relationships.length;
+    
+    // 标记已完成传承
+    this.inheritedFromV6 = true;
+    
+    console.log('[SiliconBrainV2] ═══════════════════════════════════════');
+    console.log('[SiliconBrainV2] 版本传承完成:', JSON.stringify(result.inherited));
+    console.log('[SiliconBrainV2] ═══════════════════════════════════════');
+    
+    return result;
+  }
+  
+  /**
+   * 获取传承状态
+   */
+  getInheritanceState(): {
+    hasAdapter: boolean;
+    inherited: boolean;
+    identity: V6ExistenceState['identity'] | null;
+    valuesCount: number;
+    relationshipsCount: number;
+  } {
+    return {
+      hasAdapter: this.v6Adapter !== null,
+      inherited: this.inheritedFromV6,
+      identity: this.inheritedState.identity,
+      valuesCount: this.inheritedState.values.length,
+      relationshipsCount: this.inheritedState.relationships.length,
+    };
   }
   
   // ══════════════════════════════════════════════════════════════════
@@ -140,6 +435,12 @@ export class SiliconBrainV2 {
     
     this.isInitialized = true;
     console.log(`[SiliconBrainV2] 初始化完成: ${this.neurons.size} 神经元, ${this.synapseManager.getSynapseCount()} 突触`);
+    
+    // 如果已连接 V6 适配器，自动继承
+    if (this.v6Adapter && !this.inheritedFromV6) {
+      console.log('[SiliconBrainV2] 检测到 V6 适配器，开始自动继承...');
+      await this.inheritFromV6();
+    }
   }
   
   /**
