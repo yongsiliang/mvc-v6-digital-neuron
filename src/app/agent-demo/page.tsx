@@ -6,7 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, Send, RotateCcw, Activity, Eye, Lightbulb, Target, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Brain, Send, RotateCcw, Activity, Eye, Lightbulb, Target, CheckCircle, XCircle, Loader2, Globe, Monitor } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
@@ -27,17 +29,15 @@ interface ActionData {
 interface ObservationData {
   status: string;
   content: string;
+  extracted?: Record<string, unknown>;
 }
 
 interface AgentResult {
   success: boolean;
   output?: string;
-  stats: {
-    totalCycles: number;
-    totalActions: number;
-    successActions: number;
-    failedActions: number;
-    durationMs: number;
+  stats?: {
+    cycles: number;
+    state?: unknown;
   };
 }
 
@@ -48,6 +48,7 @@ interface LogEntry {
   title: string;
   content: string;
   timestamp: number;
+  extracted?: Record<string, unknown>;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -59,10 +60,11 @@ export default function AgentDemoPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [result, setResult] = useState<AgentResult | null>(null);
+  const [useRealBrowser, setUseRealBrowser] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // 添加日志
-  const addLog = useCallback((type: CognitiveEvent['type'], title: string, content: string) => {
+  const addLog = useCallback((type: CognitiveEvent['type'], title: string, content: string, extracted?: Record<string, unknown>) => {
     const iconMap: Record<CognitiveEvent['type'], React.ReactNode> = {
       perceive: <Eye className="w-4 h-4" />,
       understand: <Brain className="w-4 h-4" />,
@@ -80,10 +82,10 @@ export default function AgentDemoPage() {
       icon: iconMap[type],
       title,
       content,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      extracted
     }]);
     
-    // 自动滚动到底部
     setTimeout(() => {
       if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -101,11 +103,14 @@ export default function AgentDemoPage() {
     
     addLog('perceive', '启动认知循环', `输入: ${input}`);
     
+    // 选择 API 端点
+    const endpoint = useRealBrowser ? '/api/agent/browser' : '/api/agent';
+    
     try {
-      const response = await fetch('/api/agent', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, stream: true })
+        body: JSON.stringify({ input, stream: true, useRealBrowser })
       });
       
       if (!response.ok) {
@@ -148,10 +153,18 @@ export default function AgentDemoPage() {
                   break;
                 case 'observe':
                   const obsData = event.data as ObservationData;
-                  addLog('observe', `观察: ${obsData.status}`, obsData.content);
+                  addLog('observe', `观察: ${obsData.status}`, obsData.content, obsData.extracted);
                   break;
                 case 'complete':
-                  addLog('complete', '认知循环完成', '任务处理完毕');
+                  const completeData = event.data as { success: boolean; output?: string; stats?: { cycles: number } };
+                  addLog('complete', '认知循环完成', completeData.output || '任务处理完毕');
+                  if (completeData.stats) {
+                    setResult({
+                      success: completeData.success,
+                      output: completeData.output,
+                      stats: completeData.stats
+                    });
+                  }
                   break;
                 case 'error':
                   addLog('error', '错误', JSON.stringify(event.data));
@@ -172,7 +185,7 @@ export default function AgentDemoPage() {
     } finally {
       setIsRunning(false);
     }
-  }, [input, isRunning, addLog]);
+  }, [input, isRunning, useRealBrowser, addLog]);
   
   // 重置
   const handleReset = useCallback(() => {
@@ -215,10 +228,12 @@ export default function AgentDemoPage() {
           <CardHeader>
             <CardTitle className="text-lg">输入任务</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Input
-                placeholder="输入任务，例如：帮我搜索最新的AI论文..."
+                placeholder={useRealBrowser 
+                  ? "输入任务，例如：访问 https://example.com 并提取页面内容" 
+                  : "输入任务，例如：帮我搜索最新的AI论文..."}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && runAgent()}
@@ -235,6 +250,36 @@ export default function AgentDemoPage() {
               <Button variant="outline" onClick={handleReset} disabled={isRunning}>
                 <RotateCcw className="w-4 h-4" />
               </Button>
+            </div>
+            
+            {/* 浏览器模式切换 */}
+            <div className="flex items-center gap-4 pt-2">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="browser-mode"
+                  checked={useRealBrowser}
+                  onCheckedChange={setUseRealBrowser}
+                  disabled={isRunning}
+                />
+                <Label htmlFor="browser-mode" className="flex items-center gap-2 cursor-pointer">
+                  {useRealBrowser ? (
+                    <>
+                      <Globe className="w-4 h-4 text-green-500" />
+                      <span>真实浏览器</span>
+                    </>
+                  ) : (
+                    <>
+                      <Monitor className="w-4 h-4 text-blue-500" />
+                      <span>模拟模式</span>
+                    </>
+                  )}
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {useRealBrowser 
+                  ? "使用 fetch + cheerio 访问真实网页" 
+                  : "使用模拟执行器测试认知循环"}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -267,7 +312,16 @@ export default function AgentDemoPage() {
                           {log.type}
                         </Badge>
                       </div>
-                      <p className="text-sm opacity-80">{log.content}</p>
+                      <p className="text-sm opacity-80 whitespace-pre-wrap">{log.content}</p>
+                      
+                      {/* 显示提取的数据 */}
+                      {log.extracted && Object.keys(log.extracted).length > 0 && (
+                        <div className="mt-2 p-2 bg-black/20 rounded text-xs font-mono">
+                          <pre className="whitespace-pre-wrap overflow-auto max-h-40">
+                            {JSON.stringify(log.extracted, null, 2)}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -296,24 +350,18 @@ export default function AgentDemoPage() {
                 </div>
               )}
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{result.stats.totalCycles}</div>
-                  <div className="text-xs text-muted-foreground">认知循环</div>
+              {result.stats && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{result.stats.cycles}</div>
+                    <div className="text-xs text-muted-foreground">认知循环</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{result.success ? '成功' : '失败'}</div>
+                    <div className="text-xs text-muted-foreground">状态</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{result.stats.totalActions}</div>
-                  <div className="text-xs text-muted-foreground">执行行动</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-500">{result.stats.successActions}</div>
-                  <div className="text-xs text-muted-foreground">成功</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{result.stats.durationMs}ms</div>
-                  <div className="text-xs text-muted-foreground">耗时</div>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -349,7 +397,9 @@ export default function AgentDemoPage() {
                   行动层
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  执行操作、观察结果。将信息结构转化为可执行行动。
+                  {useRealBrowser 
+                    ? "使用 LightweightBrowserExecutor 访问真实网页。" 
+                    : "使用 MockExecutor 模拟执行。"}
                 </p>
               </div>
             </div>

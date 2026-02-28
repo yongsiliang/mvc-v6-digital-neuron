@@ -383,11 +383,15 @@ src/lib/
 ├── intelligence/            # 智能层
 │   ├── cognitive-agent.ts   # 认知智能体（核心认知循环）
 │   ├── memory.ts            # 记忆存储
+│   ├── enhanced-memory.ts   # 增强记忆（向量检索、持久化）
+│   ├── llm-cache.ts         # LLM 调用缓存
 │   └── index.ts
 │
 ├── action/                  # 行动层
 │   ├── executor.ts          # 执行器接口和管理器
 │   ├── mock-executor.ts     # 模拟执行器（用于测试）
+│   ├── browser-executor.ts  # 轻量级浏览器执行器（fetch + cheerio）
+│   ├── multimodal-executor.ts # 多模态执行器（图片/视频理解）
 │   └── index.ts
 │
 ├── agent/                   # Agent 入口
@@ -397,9 +401,18 @@ src/lib/
 └── ARCHITECTURE.md          # 本文档
 
 src/app/
-├── api/agent/route.ts       # Agent API（支持流式输出）
+├── api/agent/route.ts       # Agent API（模拟执行器）
+├── api/agent/browser/route.ts # Agent API（浏览器执行器）
 └── agent-demo/page.tsx      # 前端 Demo 页面
 ```
+
+## 执行器列表
+
+| 执行器 | 类型 | 描述 |
+|-------|------|------|
+| MockExecutor | mock | 模拟执行，用于测试认知循环 |
+| LightweightBrowserExecutor | browser-lightweight | 使用 fetch + cheerio 访问网页 |
+| MultimodalExecutor | multimodal | 图片理解、视频分析、OCR |
 
 ## 与原 V6 架构的关系
 
