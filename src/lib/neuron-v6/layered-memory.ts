@@ -1130,22 +1130,46 @@ export class LayeredMemorySystem {
       avgStrength: number;
       candidates: number;
     };
+    // 新增：用于内存监控
+    coreCount: number;
+    consolidatedCount: number;
+    episodicCount: number;
+    avgEpisodicImportance: number;
+    avgConsolidatedImportance: number;
+    avgEpisodicAge: number;
+    avgConsolidatedAge: number;
   } {
     // 计算巩固层统计
     const byType: Record<string, number> = {};
+    let totalConsolidatedImportance = 0;
+    let totalConsolidatedAge = 0;
     for (const memory of this.consolidated.values()) {
       byType[memory.type] = (byType[memory.type] || 0) + 1;
+      totalConsolidatedImportance += memory.importance;
+      totalConsolidatedAge += (Date.now() - memory.consolidatedAt) / (24 * 60 * 60 * 1000);
     }
     
     // 计算情景层统计
     let totalStrength = 0;
     let candidates = 0;
+    let totalEpisodicImportance = 0;
+    let totalEpisodicAge = 0;
     for (const memory of this.episodic.values()) {
       totalStrength += this.calculateStrength(memory);
+      totalEpisodicImportance += memory.importance;
+      totalEpisodicAge += (Date.now() - memory.timestamp) / (24 * 60 * 60 * 1000);
       if (memory.consolidationCandidate && memory.recallCount >= LayeredMemorySystem.CONSOLIDATION_THRESHOLD) {
         candidates++;
       }
     }
+    
+    // 核心层计数
+    const coreCount = 
+      1 + // identity
+      (this.core.creator ? 1 : 0) +
+      this.core.coreValues.length +
+      this.core.coreRelationships.length +
+      this.core.corePreferences.length;
     
     return {
       core: {
@@ -1162,6 +1186,43 @@ export class LayeredMemorySystem {
         avgStrength: this.episodic.size > 0 ? totalStrength / this.episodic.size : 0,
         candidates,
       },
+      // 新增字段
+      coreCount,
+      consolidatedCount: this.consolidated.size,
+      episodicCount: this.episodic.size,
+      avgEpisodicImportance: this.episodic.size > 0 ? totalEpisodicImportance / this.episodic.size : 0,
+      avgConsolidatedImportance: this.consolidated.size > 0 ? totalConsolidatedImportance / this.consolidated.size : 0,
+      avgEpisodicAge: this.episodic.size > 0 ? totalEpisodicAge / this.episodic.size : 0,
+      avgConsolidatedAge: this.consolidated.size > 0 ? totalConsolidatedAge / this.consolidated.size : 0,
     };
+  }
+  
+  /**
+   * 获取低强度的记忆（用于清理）
+   */
+  getLowStrengthMemories(
+    layer: 'episodic' | 'consolidated',
+    threshold: number
+  ): string[] {
+    const ids: string[] = [];
+    
+    if (layer === 'episodic') {
+      for (const [id, memory] of this.episodic) {
+        const strength = this.calculateStrength(memory);
+        if (strength < threshold) {
+          ids.push(id);
+        }
+      }
+    } else {
+      for (const [id, memory] of this.consolidated) {
+        // 巩固记忆用重要性和回忆次数判断
+        const effectiveStrength = memory.importance * (1 + Math.log10(1 + memory.recallCount) * 0.3);
+        if (effectiveStrength < threshold) {
+          ids.push(id);
+        }
+      }
+    }
+    
+    return ids;
   }
 }
