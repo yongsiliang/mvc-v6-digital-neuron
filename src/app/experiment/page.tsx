@@ -264,7 +264,8 @@ export default function ExperimentPage() {
           if (edge) {
             edges.set(edgeId, {
               ...edge,
-              intensity: injectionIntensity
+              intensity: injectionIntensity,
+              phase: 0  // 注入时统一相位，便于同步
             });
           }
         });
@@ -876,7 +877,7 @@ export default function ExperimentPage() {
         // 直接创建测试网络（不使用状态，避免异步问题）
         const testNetwork = createTestNetwork(2);
         
-        // 注入7元素
+        // 注入7元素 - 同时初始化相位为0，便于同步
         const injectPositions = [
           { q: 0, r: 0 },
           { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
@@ -890,7 +891,7 @@ export default function ExperimentPage() {
             node.edges.forEach((edgeId: string) => {
               const edge = testNetwork.edges.get(edgeId);
               if (edge) {
-                testNetwork.edges.set(edgeId, { ...edge, intensity: 0.9 });
+                testNetwork.edges.set(edgeId, { ...edge, intensity: 0.9, phase: 0 });
               }
             });
           }
@@ -1118,9 +1119,9 @@ export default function ExperimentPage() {
         boundaryParamsRef.current = autoSearchRef.current.bestParams;
         setInjectionIntensity(0.9); // 确保注入强度正确
         
-        // 用最佳参数运行一次
+        // 用最佳参数运行一次（使用与搜索相同的网格大小）
         setTimeout(() => {
-          initNetworks(rings);
+          initNetworks(2);  // 与搜索时一致
           setTimeout(() => {
             injectInfo('seven');
             drawBoundaryNetwork();
@@ -1134,7 +1135,7 @@ export default function ExperimentPage() {
     };
     
     runSearch();
-  }, [isAutoSearching, initNetworks, injectInfo, drawBoundaryNetwork, drawNodeNetwork, animateStep]);
+  }, [isAutoSearching, rings, initNetworks, injectInfo, drawBoundaryNetwork, drawNodeNetwork, animateStep]);
   
   // 停止自动搜索
   const stopAutoSearch = useCallback(() => {
