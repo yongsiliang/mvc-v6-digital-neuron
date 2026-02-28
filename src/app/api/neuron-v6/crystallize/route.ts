@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     
     const headers = HeaderUtils.extractForwardHeaders(request.headers);
     const core = await getSharedCore(headers);
-    const memory = (core as any).layeredMemory;
+    let memory = (core as any).layeredMemory;
     
     if (!memory) {
       return NextResponse.json({
