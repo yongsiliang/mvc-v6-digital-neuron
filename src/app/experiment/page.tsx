@@ -93,12 +93,26 @@ export default function ExperimentPage() {
   const [mode, setMode] = useState<'experiment' | 'seven-element' | 'recipe'>('experiment');
   
   const animationRef = useRef<number>(0);
+  const isRunningRef = useRef<boolean>(false);
   const networkRef = useRef<{
     boundary: Map<string, any>;
     node: Map<string, any>;
     edges: Map<string, any>;
     adjacency: Map<string, string[]>;
   } | null>(null);
+  
+  // 用于动画循环的ref，避免闭包问题
+  const boundaryParamsRef = useRef(boundaryParams);
+  const nodeParamsRef = useRef(nodeParams);
+  
+  // 同步参数到ref
+  useEffect(() => {
+    boundaryParamsRef.current = boundaryParams;
+  }, [boundaryParams]);
+  
+  useEffect(() => {
+    nodeParamsRef.current = nodeParams;
+  }, [nodeParams]);
   
   // 初始化网络
   const initNetworks = useCallback((ringCount: number) => {
@@ -190,123 +204,7 @@ export default function ExperimentPage() {
     
     return { boundaryNodes, nodeNetwork, edges, adjacency };
   }, []);
-  
-  // 演化网络
-  const evolveNetworks = useCallback(() => {
-    if (!networkRef.current) return null;
-    
-    const { boundary, node, edges, adjacency } = networkRef.current;
-    
-    // 边界网络演化
-    const newEdges = new Map(edges);
-    
-    edges.forEach((edge, edgeId) => {
-      const neighbors = adjacency.get(edgeId) || [];
-      let inputFromNeighbors = 0;
-      
-      neighbors.forEach(neighborId => {
-        const neighbor = edges.get(neighborId);
-        if (neighbor && neighbor.intensity > boundaryParams.threshold) {
-          const phaseDiff = Math.abs(edge.phase - neighbor.phase);
-          const phaseFactor = Math.cos(phaseDiff);
-          inputFromNeighbors += neighbor.intensity * boundaryParams.neighborExcitation * phaseFactor;
-        }
-      });
-      
-      const selfInput = edge.intensity * boundaryParams.selfExcitation;
-      const oscillation = Math.sin(edge.age * boundaryParams.oscillationFreq + edge.phase) * 0.05;
-      const decay = edge.intensity * boundaryParams.decayRate;
-      
-      let newIntensity = edge.intensity + inputFromNeighbors + selfInput + oscillation - decay;
-      newIntensity = Math.max(0, Math.min(1, newIntensity));
-      
-      newEdges.set(edgeId, {
-        id: edgeId,
-        intensity: newIntensity,
-        phase: edge.phase + newIntensity * 0.1,
-        age: edge.age + 0.016
-      });
-    });
-    
-    networkRef.current.edges = newEdges;
-    
-    // 节点网络演化
-    const newNodes = new Map(node);
-    
-    node.forEach((n, id) => {
-      let input = 0;
-      
-      n.connections.forEach((neighborId: string) => {
-        const neighbor = node.get(neighborId);
-        if (neighbor) {
-          input += neighbor.activation * 0.5;
-        }
-      });
-      
-      let newActivation = 1 / (1 + Math.exp(-(input * 5)));
-      newActivation -= newActivation * nodeParams.decayRate;
-      newActivation = Math.max(0, Math.min(1, newActivation));
-      
-      newNodes.set(id, { ...n, activation: newActivation });
-    });
-    
-    networkRef.current.node = newNodes;
-    
-    // 计算统计
-    let boundaryIntensity = 0;
-    let boundaryPhaseSum = { cos: 0, sin: 0 };
-    let boundaryCount = 0;
-    let activeEdges = 0;
-    
-    newEdges.forEach(e => {
-      boundaryIntensity += e.intensity;
-      if (e.intensity > boundaryParams.threshold) {
-        boundaryPhaseSum.cos += Math.cos(e.phase) * e.intensity;
-        boundaryPhaseSum.sin += Math.sin(e.phase) * e.intensity;
-        boundaryCount++;
-        activeEdges++;
-      }
-    });
-    
-    let nodeActivation = 0;
-    let nodeCoherence = 0;
-    let nodeCoherenceCount = 0;
-    let activeNodes = 0;
-    
-    newNodes.forEach(n => {
-      nodeActivation += n.activation;
-      if (n.activation > nodeParams.threshold) activeNodes++;
-      n.connections.forEach((neighborId: string) => {
-        const neighbor = newNodes.get(neighborId);
-        if (neighbor && n.activation > nodeParams.threshold && neighbor.activation > nodeParams.threshold) {
-          nodeCoherence += 1 - Math.abs(n.activation - neighbor.activation);
-          nodeCoherenceCount++;
-        }
-      });
-    });
-    
-    const boundaryCoherence = boundaryCount > 0
-      ? Math.sqrt(boundaryPhaseSum.cos ** 2 + boundaryPhaseSum.sin ** 2) / boundaryCount
-      : 0;
-    
-    nodeCoherence = nodeCoherenceCount > 0 ? nodeCoherence / nodeCoherenceCount : 0;
-    
-    return {
-      boundaryStats: {
-        avgIntensity: boundaryIntensity / newEdges.size,
-        coherence: boundaryCoherence,
-        patternStrength: boundaryCoherence * (activeEdges / newEdges.size),
-        activeEdges
-      },
-      nodeStats: {
-        avgActivation: nodeActivation / newNodes.size,
-        coherence: nodeCoherence,
-        patternStrength: nodeCoherence * (activeNodes / newNodes.size),
-        activeNodes
-      }
-    };
-  }, [boundaryParams, nodeParams]);
-  
+
   // 注入信息
   const injectInfo = useCallback((pattern: 'single' | 'multiple' | 'seven') => {
     if (!networkRef.current) return;
@@ -542,16 +440,136 @@ export default function ExperimentPage() {
     ctx.fillText('节点网络', padding + 80, 20);
   }, [history]);
   
-  // 动画循环
-  const animate = useCallback(() => {
-    if (!isRunning) return;
+  // 动画循环 - 使用稳定的引用
+  const animateStep = useCallback(() => {
+    if (!isRunningRef.current) {
+      return;
+    }
     
-    const result = evolveNetworks();
-    if (!result) return;
+    if (!networkRef.current) {
+      animationRef.current = requestAnimationFrame(animateStep);
+      return;
+    }
     
+    // 演化网络
+    const { boundary, node, edges, adjacency } = networkRef.current;
+    const currentBoundaryParams = boundaryParamsRef.current;
+    const currentNodeParams = nodeParamsRef.current;
+    
+    // 边界网络演化
+    const newEdges = new Map(edges);
+    
+    edges.forEach((edge, edgeId) => {
+      const neighbors = adjacency.get(edgeId) || [];
+      let inputFromNeighbors = 0;
+      
+      neighbors.forEach(neighborId => {
+        const neighbor = edges.get(neighborId);
+        if (neighbor && neighbor.intensity > currentBoundaryParams.threshold) {
+          const phaseDiff = Math.abs(edge.phase - neighbor.phase);
+          const phaseFactor = Math.cos(phaseDiff);
+          inputFromNeighbors += neighbor.intensity * currentBoundaryParams.neighborExcitation * phaseFactor;
+        }
+      });
+      
+      const selfInput = edge.intensity * currentBoundaryParams.selfExcitation;
+      const oscillation = Math.sin(edge.age * currentBoundaryParams.oscillationFreq + edge.phase) * 0.05;
+      const decay = edge.intensity * currentBoundaryParams.decayRate;
+      
+      let newIntensity = edge.intensity + inputFromNeighbors + selfInput + oscillation - decay;
+      newIntensity = Math.max(0, Math.min(1, newIntensity));
+      
+      newEdges.set(edgeId, {
+        id: edgeId,
+        intensity: newIntensity,
+        phase: edge.phase + newIntensity * 0.1,
+        age: edge.age + 0.016
+      });
+    });
+    
+    networkRef.current.edges = newEdges;
+    
+    // 节点网络演化
+    const newNodes = new Map(node);
+    
+    node.forEach((n, id) => {
+      let input = 0;
+      
+      n.connections.forEach((neighborId: string) => {
+        const neighbor = node.get(neighborId);
+        if (neighbor) {
+          input += neighbor.activation * 0.5;
+        }
+      });
+      
+      let newActivation = 1 / (1 + Math.exp(-(input * 5)));
+      newActivation -= newActivation * currentNodeParams.decayRate;
+      newActivation = Math.max(0, Math.min(1, newActivation));
+      
+      newNodes.set(id, { ...n, activation: newActivation });
+    });
+    
+    networkRef.current.node = newNodes;
+    
+    // 计算统计
+    let boundaryIntensity = 0;
+    let boundaryPhaseSum = { cos: 0, sin: 0 };
+    let boundaryCount = 0;
+    let activeEdges = 0;
+    
+    newEdges.forEach(e => {
+      boundaryIntensity += e.intensity;
+      if (e.intensity > currentBoundaryParams.threshold) {
+        boundaryPhaseSum.cos += Math.cos(e.phase) * e.intensity;
+        boundaryPhaseSum.sin += Math.sin(e.phase) * e.intensity;
+        boundaryCount++;
+        activeEdges++;
+      }
+    });
+    
+    let nodeActivation = 0;
+    let nodeCoherence = 0;
+    let nodeCoherenceCount = 0;
+    let activeNodes = 0;
+    
+    newNodes.forEach(n => {
+      nodeActivation += n.activation;
+      if (n.activation > currentNodeParams.threshold) activeNodes++;
+      n.connections.forEach((neighborId: string) => {
+        const neighbor = newNodes.get(neighborId);
+        if (neighbor && n.activation > currentNodeParams.threshold && neighbor.activation > currentNodeParams.threshold) {
+          nodeCoherence += 1 - Math.abs(n.activation - neighbor.activation);
+          nodeCoherenceCount++;
+        }
+      });
+    });
+    
+    const boundaryCoherence = boundaryCount > 0
+      ? Math.sqrt(boundaryPhaseSum.cos ** 2 + boundaryPhaseSum.sin ** 2) / boundaryCount
+      : 0;
+    
+    nodeCoherence = nodeCoherenceCount > 0 ? nodeCoherence / nodeCoherenceCount : 0;
+    
+    const result = {
+      boundaryStats: {
+        avgIntensity: boundaryIntensity / newEdges.size,
+        coherence: boundaryCoherence,
+        patternStrength: boundaryCoherence * (activeEdges / newEdges.size),
+        activeEdges
+      },
+      nodeStats: {
+        avgActivation: nodeActivation / newNodes.size,
+        coherence: nodeCoherence,
+        patternStrength: nodeCoherence * (activeNodes / newNodes.size),
+        activeNodes
+      }
+    };
+    
+    // 绘制
     drawBoundaryNetwork();
     drawNodeNetwork();
     
+    // 更新状态
     setStep(prev => prev + 1);
     setStats({
       boundary: result.boundaryStats,
@@ -564,8 +582,9 @@ export default function ExperimentPage() {
       nodeCoherence: [...prev.nodeCoherence, result.nodeStats.coherence].slice(-200)
     }));
     
-    animationRef.current = requestAnimationFrame(animate);
-  }, [isRunning, evolveNetworks, drawBoundaryNetwork, drawNodeNetwork]);
+    // 继续动画
+    animationRef.current = requestAnimationFrame(animateStep);
+  }, [drawBoundaryNetwork, drawNodeNetwork]);
   
   // 运行预设实验
   const runRecipe = useCallback((recipe: IntelligenceRecipe) => {
@@ -578,14 +597,34 @@ export default function ExperimentPage() {
     setInjectionPattern(config.injectionPattern as 'single' | 'multiple' | 'seven');
     setSelectedRecipe(recipe);
     
-    // 重置并开始
-    reset();
+    // 停止当前动画
+    cancelAnimationFrame(animationRef.current);
+    isRunningRef.current = false;
+    setStep(0);
+    setHistory({
+      boundaryIntensity: [],
+      nodeActivation: [],
+      boundaryCoherence: [],
+      nodeCoherence: []
+    });
+    
+    // 初始化并开始
     setTimeout(() => {
       initNetworks(config.rings);
       injectInfo(config.injectionPattern as 'single' | 'multiple' | 'seven');
+      drawBoundaryNetwork();
+      drawNodeNetwork();
+      
+      // 同步参数ref
+      boundaryParamsRef.current = config.boundaryRules;
+      nodeParamsRef.current = config.nodeRules;
+      
+      // 启动动画
+      isRunningRef.current = true;
       setIsRunning(true);
-    }, 100);
-  }, [initNetworks, injectInfo]);
+      animationRef.current = requestAnimationFrame(animateStep);
+    }, 50);
+  }, [initNetworks, injectInfo, animateStep, drawBoundaryNetwork, drawNodeNetwork]);
   
   // 7元素最小系统实验
   const runSevenElementExperiment = useCallback(() => {
@@ -593,27 +632,52 @@ export default function ExperimentPage() {
     setRings(1);
     
     // 7元素专用参数
-    setBoundaryParams({
+    const sevenBoundaryParams = {
       propagationRate: 0.4,
       threshold: 0.05,
       decayRate: 0.01,
       selfExcitation: 0.2,
       neighborExcitation: 0.25,
       oscillationFreq: 0.08
+    };
+    
+    setBoundaryParams(sevenBoundaryParams);
+    
+    // 停止当前动画
+    cancelAnimationFrame(animationRef.current);
+    isRunningRef.current = false;
+    setStep(0);
+    setHistory({
+      boundaryIntensity: [],
+      nodeActivation: [],
+      boundaryCoherence: [],
+      nodeCoherence: []
     });
     
-    reset();
+    // 初始化并开始
     setTimeout(() => {
       initNetworks(1);
       injectInfo('seven');
+      drawBoundaryNetwork();
+      drawNodeNetwork();
+      
+      // 同步参数ref
+      boundaryParamsRef.current = sevenBoundaryParams;
+      
+      // 启动动画
+      isRunningRef.current = true;
       setIsRunning(true);
-    }, 100);
-  }, [initNetworks, injectInfo]);
+      animationRef.current = requestAnimationFrame(animateStep);
+    }, 50);
+  }, [initNetworks, injectInfo, animateStep, drawBoundaryNetwork, drawNodeNetwork]);
   
   // 重置
   const reset = useCallback(() => {
     cancelAnimationFrame(animationRef.current);
+    isRunningRef.current = false;
     initNetworks(rings);
+    drawBoundaryNetwork();
+    drawNodeNetwork();
     setStep(0);
     setHistory({
       boundaryIntensity: [],
@@ -627,7 +691,7 @@ export default function ExperimentPage() {
     });
     setIsRunning(false);
     setCurrentInsight(null);
-  }, [initNetworks, rings]);
+  }, [initNetworks, rings, drawBoundaryNetwork, drawNodeNetwork]);
   
   // 手动注入
   const manualInject = useCallback(() => {
@@ -638,15 +702,24 @@ export default function ExperimentPage() {
   const toggleRun = useCallback(() => {
     if (isRunning) {
       cancelAnimationFrame(animationRef.current);
+      isRunningRef.current = false;
       setIsRunning(false);
     } else {
       if (step === 0) {
         initNetworks(rings);
         injectInfo(injectionPattern);
+        // 重绘初始化后的网络
+        setTimeout(() => {
+          drawBoundaryNetwork();
+          drawNodeNetwork();
+        }, 50);
       }
+      isRunningRef.current = true;
       setIsRunning(true);
+      // 立即启动动画
+      animationRef.current = requestAnimationFrame(animateStep);
     }
-  }, [isRunning, step, rings, injectionPattern, initNetworks, injectInfo]);
+  }, [isRunning, step, rings, injectionPattern, initNetworks, injectInfo, animateStep, drawBoundaryNetwork, drawNodeNetwork]);
   
   // 保存实验
   const saveExperiment = useCallback(() => {
@@ -704,14 +777,6 @@ export default function ExperimentPage() {
     alert('实验已保存');
   }, [history, stats, step, rings, injectionPattern, injectionIntensity, boundaryParams, nodeParams, currentInsight]);
   
-  // 启动动画
-  useEffect(() => {
-    if (isRunning) {
-      animationRef.current = requestAnimationFrame(animate);
-    }
-    return () => cancelAnimationFrame(animationRef.current);
-  }, [isRunning, animate]);
-  
   // 绘制图表
   useEffect(() => {
     drawChart();
@@ -719,7 +784,9 @@ export default function ExperimentPage() {
   
   // 初始化
   useEffect(() => {
-    initNetworks(rings);
+    // 使用当前的 rings 值初始化
+    const currentRings = rings;
+    initNetworks(currentRings);
     drawBoundaryNetwork();
     drawNodeNetwork();
     
@@ -727,7 +794,7 @@ export default function ExperimentPage() {
     experimentStorage.loadFromStorage();
     setExperimentRecords(experimentStorage.getRecords());
     setRecipes(experimentStorage.getRecipes());
-  }, [rings, initNetworks, drawBoundaryNetwork, drawNodeNetwork]);
+  }, []);  // 只在挂载时执行一次
   
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 md:p-6">
