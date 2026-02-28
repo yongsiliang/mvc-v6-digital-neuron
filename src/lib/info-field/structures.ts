@@ -368,9 +368,331 @@ export class GraphStructure extends InformationStructure {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 智能体专用信息结构
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * 意图结构
+ * 
+ * LLM 解析出的用户意图
+ * 适合：任务理解、决策
+ */
+export class IntentStructure extends InformationStructure {
+  readonly type = 'intent';
+  
+  constructor(
+    readonly id: string,
+    readonly source: string,
+    readonly primary: string,           // 主意图: "search" | "summarize" | "navigate" | "operate" | ...
+    readonly parameters: Map<string, unknown>,  // 参数
+    readonly constraints: Map<string, unknown>, // 约束条件
+    readonly confidence: number,         // 可信度 0-1
+    readonly context: Map<string, unknown>,     // 上下文
+    readonly timestamp: number = Date.now()
+  ) {
+    super();
+  }
+  
+  get intensity(): number {
+    return this.confidence;
+  }
+  
+  serialize(): string {
+    return JSON.stringify({
+      type: this.type,
+      primary: this.primary,
+      parameters: Object.fromEntries(this.parameters),
+      constraints: Object.fromEntries(this.constraints),
+      confidence: this.confidence,
+      context: Object.fromEntries(this.context)
+    });
+  }
+  
+  /** 获取参数 */
+  getParam(key: string): unknown {
+    return this.parameters.get(key);
+  }
+  
+  /** 检查是否满足约束 */
+  meetsConstraint(key: string, value: unknown): boolean {
+    const constraint = this.constraints.get(key);
+    if (constraint === undefined) return true;
+    return constraint === value;
+  }
+  
+  /** 创建新意图（添加参数） */
+  withParam(key: string, value: unknown): IntentStructure {
+    const newParams = new Map(this.parameters);
+    newParams.set(key, value);
+    return new IntentStructure(
+      this.id,
+      this.source,
+      this.primary,
+      newParams,
+      this.constraints,
+      this.confidence,
+      this.context,
+      this.timestamp
+    );
+  }
+}
+
+/**
+ * 行动结构
+ * 
+ * 可执行的操作定义
+ * 适合：任务执行、浏览器操作
+ */
+export class ActionStructure extends InformationStructure {
+  readonly type = 'action';
+  
+  constructor(
+    readonly id: string,
+    readonly source: string,
+    readonly action: string,             // 行动类型: "click" | "type" | "navigate" | "extract" | "think" | ...
+    readonly target: string,             // 目标: CSS选择器、URL、文件路径...
+    readonly value?: string,             // 值: 输入内容、参数...
+    readonly priority: number = 0,       // 优先级
+    readonly dependencies: string[] = [],// 依赖的其他行动ID
+    readonly timeout: number = 30000,    // 超时时间(ms)
+    readonly expectedOutcome?: string,   // 预期结果
+    readonly timestamp: number = Date.now()
+  ) {
+    super();
+  }
+  
+  get intensity(): number {
+    return 1 / (this.priority + 1); // 优先级越高，强度越大
+  }
+  
+  serialize(): string {
+    return JSON.stringify({
+      type: this.type,
+      action: this.action,
+      target: this.target,
+      value: this.value,
+      priority: this.priority,
+      dependencies: this.dependencies,
+      timeout: this.timeout,
+      expectedOutcome: this.expectedOutcome
+    });
+  }
+  
+  /** 是否可以执行（依赖是否满足） */
+  canExecute(completedActions: Set<string>): boolean {
+    return this.dependencies.every(dep => completedActions.has(dep));
+  }
+  
+  /** 创建带值的行动 */
+  withValue(value: string): ActionStructure {
+    return new ActionStructure(
+      this.id,
+      this.source,
+      this.action,
+      this.target,
+      value,
+      this.priority,
+      this.dependencies,
+      this.timeout,
+      this.expectedOutcome,
+      this.timestamp
+    );
+  }
+}
+
+/**
+ * 观察结构
+ * 
+ * 执行行动后的观察结果
+ * 适合：反馈、学习
+ */
+export class ObservationStructure extends InformationStructure {
+  readonly type = 'observation';
+  
+  constructor(
+    readonly id: string,
+    readonly source: string,             // 来源行动ID
+    readonly content: string,            // 观察到的内容
+    readonly status: 'success' | 'failed' | 'timeout' | 'partial',
+    readonly error?: string,             // 错误信息
+    readonly extracted: Map<string, unknown> = new Map(), // 提取的结构化信息
+    readonly screenshot?: string,        // 截图（base64）
+    readonly timestamp: number = Date.now()
+  ) {
+    super();
+  }
+  
+  get intensity(): number {
+    return this.status === 'success' ? 1 : this.status === 'partial' ? 0.5 : 0;
+  }
+  
+  serialize(): string {
+    return JSON.stringify({
+      type: this.type,
+      source: this.source,
+      content: this.content,
+      status: this.status,
+      error: this.error,
+      extracted: Object.fromEntries(this.extracted),
+      hasScreenshot: !!this.screenshot
+    });
+  }
+  
+  /** 是否成功 */
+  isSuccess(): boolean {
+    return this.status === 'success';
+  }
+  
+  /** 获取提取的信息 */
+  getExtracted(key: string): unknown {
+    return this.extracted.get(key);
+  }
+  
+  /** 创建失败的观察 */
+  static failed(actionId: string, error: string): ObservationStructure {
+    return new ObservationStructure(
+      `obs-${Date.now()}`,
+      actionId,
+      '',
+      'failed',
+      error
+    );
+  }
+  
+  /** 创建成功的观察 */
+  static success(actionId: string, content: string, extracted?: Map<string, unknown>): ObservationStructure {
+    return new ObservationStructure(
+      `obs-${Date.now()}`,
+      actionId,
+      content,
+      'success',
+      undefined,
+      extracted
+    );
+  }
+}
+
+/**
+ * 记忆结构
+ * 
+ * 存储在记忆库中的信息
+ * 适合：长期存储、检索
+ */
+export class MemoryStructure extends InformationStructure {
+  readonly type = 'memory';
+  
+  constructor(
+    readonly id: string,
+    readonly source: string,
+    readonly content: string,            // 记忆内容
+    readonly importance: number,         // 重要性 0-1
+    readonly lastAccessed: number,       // 最后访问时间
+    readonly accessCount: number,        // 访问次数
+    readonly embedding?: number[],       // 语义向量（可选）
+    readonly associations: string[] = [],// 关联的其他记忆ID
+    readonly timestamp: number = Date.now()
+  ) {
+    super();
+  }
+  
+  get intensity(): number {
+    const recency = Math.exp(-((Date.now() - this.lastAccessed) / (1000 * 60 * 60 * 24))); // 一天衰减
+    return this.importance * recency * Math.log(this.accessCount + 1);
+  }
+  
+  serialize(): string {
+    return JSON.stringify({
+      type: this.type,
+      content: this.content,
+      importance: this.importance,
+      lastAccessed: this.lastAccessed,
+      accessCount: this.accessCount,
+      associations: this.associations
+    });
+  }
+  
+  /** 访问记忆（更新访问记录） */
+  access(): MemoryStructure {
+    return new MemoryStructure(
+      this.id,
+      this.source,
+      this.content,
+      this.importance,
+      Date.now(),
+      this.accessCount + 1,
+      this.embedding,
+      this.associations,
+      this.timestamp
+    );
+  }
+  
+  /** 添加关联 */
+  addAssociation(memoryId: string): MemoryStructure {
+    if (this.associations.includes(memoryId)) return this;
+    return new MemoryStructure(
+      this.id,
+      this.source,
+      this.content,
+      this.importance,
+      this.lastAccessed,
+      this.accessCount,
+      this.embedding,
+      [...this.associations, memoryId],
+      this.timestamp
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 类型别名和工具函数
+// ─────────────────────────────────────────────────────────────────────
+
+/** 任意信息结构的联合类型 */
+export type AnyInformationStructure = 
+  | SparseVectorStructure 
+  | DenseVectorStructure 
+  | AttentionStructure 
+  | KeyValueStructure 
+  | SequenceStructure 
+  | GraphStructure
+  | IntentStructure
+  | ActionStructure
+  | ObservationStructure
+  | MemoryStructure;
+
+/** 信息结构类型守卫 */
+export const isSparseVector = (s: InformationStructure): s is SparseVectorStructure => 
+  s.type === 'sparse-vector';
+
+export const isDenseVector = (s: InformationStructure): s is DenseVectorStructure => 
+  s.type === 'dense-vector';
+
+export const isAttention = (s: InformationStructure): s is AttentionStructure => 
+  s.type === 'attention';
+
+export const isKeyValue = (s: InformationStructure): s is KeyValueStructure => 
+  s.type === 'key-value';
+
+export const isSequence = (s: InformationStructure): s is SequenceStructure => 
+  s.type === 'sequence';
+
+export const isGraph = (s: InformationStructure): s is GraphStructure => 
+  s.type === 'graph';
+
+export const isIntent = (s: InformationStructure): s is IntentStructure => 
+  s.type === 'intent';
+
+export const isAction = (s: InformationStructure): s is ActionStructure => 
+  s.type === 'action';
+
+export const isObservation = (s: InformationStructure): s is ObservationStructure => 
+  s.type === 'observation';
+
+export const isMemory = (s: InformationStructure): s is MemoryStructure => 
+  s.type === 'memory';
+
+// ─────────────────────────────────────────────────────────────────────
 // 导出
 // ─────────────────────────────────────────────────────────────────────
 
 // 类定义已经自动导出
-// InformationStructure 是抽象基类
-// SparseVectorStructure, DenseVectorStructure 等是具体实现
