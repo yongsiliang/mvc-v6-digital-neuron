@@ -2,20 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
 
 /**
- * 场域视觉 - 梦境可视化 v2
+ * 场域视觉 - 3D圆筒六边形框架
  * 
- * 基于梦境详细描述：
- * - 六边形内部是黑色（虚空），不是蓝色
- * - 六条圆筒边是淡蓝色，会闪烁变淡
- * - 变淡后能看到边交接处的黑线
- * - 整个六边体在太空微微倾斜
- * - 六边体是单独的
- * - 背景有小的六边形网格，一会出现一会消失
+ * 核心理解：
+ * - 六根3D圆柱管道首尾相接
+ * - 构成立体的六边形框架
+ * - 内部是空的（黑色虚空）
+ * - 圆柱是淡蓝色，会闪烁变淡
+ * - 变淡后能看到交接处的黑线
+ * - 整体在太空中微微倾斜
+ * - 背景有小六边形一闪一闪
  */
 
 export default function FieldVisionPage() {
@@ -23,10 +22,11 @@ export default function FieldVisionPage() {
   const animationRef = useRef<number>(0);
   
   // 控制参数
-  const [tiltAngle, setTiltAngle] = useState(15);
-  const [flickerSpeed, setFlickerSpeed] = useState(0.8);
-  const [edgeThickness, setEdgeThickness] = useState(12);
-  const [backgroundGridDensity, setBackgroundGridDensity] = useState(0.6);
+  const [rotationX, setRotationX] = useState(20);
+  const [rotationZ, setRotationZ] = useState(15);
+  const [cylinderRadius, setCylinderRadius] = useState(15);
+  const [flickerSpeed, setFlickerSpeed] = useState(0.6);
+  const [backgroundDensity, setBackgroundDensity] = useState(0.5);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -42,247 +42,269 @@ export default function FieldVisionPage() {
     
     let time = 0;
     
-    // 生成背景小六边形网格
-    const generateBackgroundHexagons = () => {
-      const hexagons: { x: number; y: number; size: number; phase: number; duration: number }[] = [];
-      const gridSize = 60;
+    // 背景小六边形
+    const backgroundHexagons: { x: number; y: number; size: number; phase: number; duration: number }[] = [];
+    for (let i = 0; i < 50; i++) {
+      backgroundHexagons.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        size: 8 + Math.random() * 12,
+        phase: Math.random() * Math.PI * 2,
+        duration: 1.5 + Math.random() * 2
+      });
+    }
+    
+    // 3D投影函数
+    const project3D = (x: number, y: number, z: number, rotX: number, rotZ: number) => {
+      // 绕Z轴旋转
+      const cosZ = Math.cos(rotZ);
+      const sinZ = Math.sin(rotZ);
+      const x1 = x * cosZ - y * sinZ;
+      const y1 = x * sinZ + y * cosZ;
       
-      for (let x = 0; x < width + gridSize; x += gridSize) {
-        for (let y = 0; y < height + gridSize; y += gridSize) {
-          // 错开排列
-          const offsetX = (Math.floor(y / gridSize) % 2) * (gridSize / 2);
-          if (Math.random() > 0.7) {
-            hexagons.push({
-              x: x + offsetX,
-              y: y,
-              size: 15 + Math.random() * 15,
-              phase: Math.random() * Math.PI * 2,
-              duration: 2 + Math.random() * 3
-            });
-          }
-        }
-      }
-      return hexagons;
+      // 绕X轴旋转
+      const cosX = Math.cos(rotX);
+      const sinX = Math.sin(rotX);
+      const y2 = y1 * cosX - z * sinX;
+      const z2 = y1 * sinX + z * cosX;
+      
+      // 透视投影
+      const perspective = 800;
+      const scale = perspective / (perspective + z2);
+      
+      return {
+        x: centerX + x1 * scale,
+        y: centerY + y2 * scale,
+        z: z2,
+        scale: scale
+      };
     };
     
-    const backgroundHexagons = generateBackgroundHexagons();
+    // 绘制3D圆柱
+    const drawCylinder3D = (
+      ctx: CanvasRenderingContext2D,
+      p1: { x: number; y: number; z: number; scale: number },
+      p2: { x: number; y: number; z: number; scale: number },
+      radius: number,
+      alpha: number,
+      flicker: number
+    ) => {
+      const avgScale = (p1.scale + p2.scale) / 2;
+      const r = radius * avgScale;
+      
+      // 圆柱方向
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+      
+      // 绘制圆柱体
+      ctx.save();
+      ctx.translate(p1.x, p1.y);
+      ctx.rotate(angle);
+      
+      // 圆柱主体（渐变模拟3D）
+      const cylinderGradient = ctx.createLinearGradient(0, -r, 0, r);
+      
+      // 淡蓝色，根据闪烁调整
+      const baseAlpha = alpha * (0.4 + flicker * 0.4);
+      cylinderGradient.addColorStop(0, `rgba(180, 220, 255, ${baseAlpha * 0.3})`);
+      cylinderGradient.addColorStop(0.3, `rgba(120, 180, 240, ${baseAlpha * 0.7})`);
+      cylinderGradient.addColorStop(0.5, `rgba(150, 200, 250, ${baseAlpha})`);
+      cylinderGradient.addColorStop(0.7, `rgba(100, 160, 220, ${baseAlpha * 0.7})`);
+      cylinderGradient.addColorStop(1, `rgba(60, 120, 180, ${baseAlpha * 0.3})`);
+      
+      // 绘制圆柱体
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.3, r, 0, 0, Math.PI * 2);
+      ctx.fillStyle = cylinderGradient;
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.ellipse(length, 0, r * 0.3, r, 0, 0, Math.PI * 2);
+      ctx.fillStyle = cylinderGradient;
+      ctx.fill();
+      
+      // 圆柱侧面
+      ctx.beginPath();
+      ctx.moveTo(0, -r);
+      ctx.lineTo(length, -r);
+      ctx.lineTo(length, r);
+      ctx.lineTo(0, r);
+      ctx.closePath();
+      ctx.fillStyle = cylinderGradient;
+      ctx.fill();
+      
+      // 高光
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.5);
+      ctx.lineTo(length, -r * 0.5);
+      ctx.strokeStyle = `rgba(220, 240, 255, ${baseAlpha * 0.5 * flicker})`;
+      ctx.lineWidth = r * 0.2;
+      ctx.stroke();
+      
+      ctx.restore();
+    };
+    
+    // 绘制端点（交接处）
+    const drawJoint = (
+      ctx: CanvasRenderingContext2D,
+      p: { x: number; y: number; z: number; scale: number },
+      radius: number,
+      alpha: number,
+      flicker: number
+    ) => {
+      const r = radius * p.scale;
+      
+      // 当闪烁变淡时，显示黑线
+      const blackLineAlpha = (1 - flicker) * 0.6;
+      
+      if (blackLineAlpha > 0.1) {
+        // 黑线（底层结构）
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 0.5, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(20, 25, 35, ${blackLineAlpha})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      
+      // 端点发光
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 1.5);
+      glow.addColorStop(0, `rgba(180, 220, 255, ${alpha * flicker * 0.5})`);
+      glow.addColorStop(0.5, `rgba(120, 180, 240, ${alpha * flicker * 0.2})`);
+      glow.addColorStop(1, 'rgba(80, 140, 200, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+      
+      // 中心黑点
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = '#050508';
+      ctx.fill();
+    };
     
     const draw = () => {
       time += 0.016;
       
-      // 清空画布 - 深黑色太空
-      ctx.fillStyle = '#020408';
+      // 清空 - 深黑太空
+      ctx.fillStyle = '#010208';
       ctx.fillRect(0, 0, width, height);
       
-      // 1. 绘制背景小六边形网格（一闪一闪）
+      // 1. 背景小六边形（一闪一闪）
       backgroundHexagons.forEach((hex) => {
         const visibilityCycle = Math.sin(time / hex.duration + hex.phase);
-        const visibility = visibilityCycle > 0.7 ? (visibilityCycle - 0.7) / 0.3 : 0;
+        const visibility = visibilityCycle > 0.8 ? (visibilityCycle - 0.8) / 0.2 : 0;
         
-        if (visibility > 0 && Math.random() < backgroundGridDensity) {
-          drawSmallHexagon(ctx, hex.x, hex.y, hex.size, visibility * 0.3);
+        if (visibility > 0 && Math.random() < backgroundDensity) {
+          drawBackgroundHex(ctx, hex.x, hex.y, hex.size, visibility * 0.25);
         }
       });
       
-      // 2. 绘制星空
-      drawStarfield(ctx, width, height, time);
+      // 2. 星空
+      drawStars(ctx, width, height, time);
       
-      // 3. 绘制主体六边体
-      drawMainHexagon(ctx, centerX, centerY, time);
+      // 3. 3D六边形框架
+      const rotX = (rotationX * Math.PI) / 180 + Math.sin(time * 0.2) * 0.05;
+      const rotZ = (rotationZ * Math.PI) / 180 + time * 0.1;
+      
+      // 六边形的六个顶点（在XY平面）
+      const hexRadius = 180;
+      const vertices3D: { x: number; y: number; z: number }[] = [];
+      
+      for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI * 2) / 6 - Math.PI / 2;
+        vertices3D.push({
+          x: Math.cos(angle) * hexRadius,
+          y: Math.sin(angle) * hexRadius,
+          z: 0
+        });
+      }
+      
+      // 投影到2D
+      const projected = vertices3D.map(v => project3D(v.x, v.y, v.z, rotX, rotZ));
+      
+      // 按深度排序边（远的先画）
+      const edges: { i1: number; i2: number; avgZ: number }[] = [];
+      for (let i = 0; i < 6; i++) {
+        edges.push({
+          i1: i,
+          i2: (i + 1) % 6,
+          avgZ: (projected[i].z + projected[(i + 1) % 6].z) / 2
+        });
+      }
+      edges.sort((a, b) => a.avgZ - b.avgZ);
+      
+      // 绘制边（圆柱）
+      edges.forEach((edge, idx) => {
+        const p1 = projected[edge.i1];
+        const p2 = projected[edge.i2];
+        
+        // 闪烁效果
+        const flickerPhase = time * flickerSpeed + (edge.i1 * Math.PI) / 3;
+        const flicker = Math.sin(flickerPhase) * 0.5 + 0.5;
+        
+        // 深度影响透明度
+        const depthFactor = 0.5 + (p1.scale + p2.scale) / 4;
+        
+        drawCylinder3D(ctx, p1, p2, cylinderRadius, depthFactor, flicker);
+      });
+      
+      // 绘制端点
+      projected.forEach((p, i) => {
+        const flickerPhase = time * flickerSpeed + (i * Math.PI) / 3;
+        const flicker = Math.sin(flickerPhase) * 0.5 + 0.5;
+        
+        drawJoint(ctx, p, cylinderRadius, 0.8, flicker);
+      });
+      
+      // 4. 内部虚空感
+      const voidCenter = project3D(0, 0, 0, rotX, rotZ);
+      const voidGradient = ctx.createRadialGradient(
+        voidCenter.x, voidCenter.y, 0,
+        voidCenter.x, voidCenter.y, 100 * voidCenter.scale
+      );
+      voidGradient.addColorStop(0, 'rgba(5, 8, 15, 0.8)');
+      voidGradient.addColorStop(0.5, 'rgba(3, 5, 10, 0.5)');
+      voidGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = voidGradient;
+      ctx.beginPath();
+      ctx.arc(voidCenter.x, voidCenter.y, 100 * voidCenter.scale, 0, Math.PI * 2);
+      ctx.fill();
       
       animationRef.current = requestAnimationFrame(draw);
     };
     
-    const drawStarfield = (ctx: CanvasRenderingContext2D, width: number, height: number, time: number) => {
-      const starCount = 150;
-      for (let i = 0; i < starCount; i++) {
-        const seed = i * 9973;
-        const x = (seed * 7919) % width;
-        const y = (seed * 104729) % height;
-        const size = 0.3 + (seed % 100) / 200;
-        const twinkle = Math.sin(time + seed * 0.1) * 0.3 + 0.5;
+    const drawStars = (ctx: CanvasRenderingContext2D, width: number, height: number, time: number) => {
+      for (let i = 0; i < 100; i++) {
+        const seed = i * 7919;
+        const x = (seed * 104729) % width;
+        const y = (seed * 3943) % height;
+        const size = 0.3 + (seed % 50) / 100;
+        const twinkle = Math.sin(time * 2 + seed) * 0.2 + 0.3;
         
         ctx.beginPath();
         ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(200, 220, 255, ${0.2 * twinkle})`;
+        ctx.fillStyle = `rgba(180, 200, 230, ${twinkle})`;
         ctx.fill();
       }
     };
     
-    const drawSmallHexagon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number) => {
-      const vertices = [];
+    const drawBackgroundHex = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number) => {
+      ctx.beginPath();
       for (let i = 0; i < 6; i++) {
         const angle = (i * Math.PI * 2) / 6 + Math.PI / 6;
-        vertices.push({
-          x: x + Math.cos(angle) * size,
-          y: y + Math.sin(angle) * size
-        });
-      }
-      
-      ctx.beginPath();
-      ctx.moveTo(vertices[0].x, vertices[0].y);
-      for (let i = 1; i < 6; i++) {
-        ctx.lineTo(vertices[i].x, vertices[i].y);
+        const px = x + Math.cos(angle) * size;
+        const py = y + Math.sin(angle) * size;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
       }
       ctx.closePath();
-      
-      ctx.strokeStyle = `rgba(100, 150, 200, ${alpha})`;
+      ctx.strokeStyle = `rgba(80, 130, 180, ${alpha})`;
       ctx.lineWidth = 1;
       ctx.stroke();
-    };
-    
-    const drawMainHexagon = (ctx: CanvasRenderingContext2D, cx: number, cy: number, time: number) => {
-      const size = 180;
-      const tiltRad = (tiltAngle * Math.PI) / 180;
-      
-      // 倾斜后的六边形顶点
-      const vertices = [];
-      for (let i = 0; i < 6; i++) {
-        const angle = (i * Math.PI * 2) / 6 + Math.PI / 6;
-        const x = Math.cos(angle) * size;
-        const y = Math.sin(angle) * size * Math.cos(tiltRad); // 倾斜压缩
-        const z = Math.sin(angle) * size * Math.sin(tiltRad); // 深度
-        
-        vertices.push({
-          x: cx + x,
-          y: cy + y,
-          z: z
-        });
-      }
-      
-      // 1. 绘制内部（黑色虚空）
-      ctx.beginPath();
-      ctx.moveTo(vertices[0].x, vertices[0].y);
-      for (let i = 1; i < 6; i++) {
-        ctx.lineTo(vertices[i].x, vertices[i].y);
-      }
-      ctx.closePath();
-      ctx.fillStyle = '#050505'; // 深黑色
-      ctx.fill();
-      
-      // 内部微弱的虚空感
-      const voidGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size);
-      voidGradient.addColorStop(0, 'rgba(10, 15, 20, 0.3)');
-      voidGradient.addColorStop(0.7, 'rgba(5, 8, 12, 0.2)');
-      voidGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = voidGradient;
-      ctx.fill();
-      
-      // 2. 绘制六条圆柱边（淡蓝色，闪烁）
-      for (let i = 0; i < 6; i++) {
-        const v1 = vertices[i];
-        const v2 = vertices[(i + 1) % 6];
-        
-        // 闪烁效果 - 周期性变淡
-        const flickerPhase = time * flickerSpeed + (i * Math.PI) / 3;
-        const flicker = Math.sin(flickerPhase) * 0.5 + 0.5; // 0-1
-        const edgeAlpha = 0.3 + flicker * 0.5; // 0.3-0.8
-        
-        // 绘制圆柱边
-        drawCylinderEdge(ctx, v1, v2, edgeThickness, edgeAlpha, flicker, time);
-      }
-      
-      // 3. 变淡时显示黑线（交接线）
-      for (let i = 0; i < 6; i++) {
-        const v = vertices[i];
-        const vPrev = vertices[(i + 5) % 6];
-        const vNext = vertices[(i + 1) % 6];
-        
-        // 计算闪烁相位
-        const flickerPhase1 = time * flickerSpeed + ((i + 5) % 6 * Math.PI) / 3;
-        const flickerPhase2 = time * flickerSpeed + (i * Math.PI) / 3;
-        const avgFlicker = (Math.sin(flickerPhase1) + Math.sin(flickerPhase2)) / 4 + 0.5;
-        
-        // 当边变淡时，黑线更明显
-        const lineAlpha = (1 - avgFlicker) * 0.8;
-        
-        if (lineAlpha > 0.1) {
-          // 绘制交接处的黑线
-          ctx.beginPath();
-          ctx.moveTo(v.x, v.y);
-          ctx.lineTo(vPrev.x, vPrev.y);
-          ctx.strokeStyle = `rgba(20, 25, 30, ${lineAlpha})`;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(v.x, v.y);
-          ctx.lineTo(vNext.x, vNext.y);
-          ctx.strokeStyle = `rgba(20, 25, 30, ${lineAlpha})`;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-        
-        // 顶点处的小黑点
-        ctx.beginPath();
-        ctx.arc(v.x, v.y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = '#0a0a0a';
-        ctx.fill();
-      }
-      
-      // 4. 微弱的整体发光
-      const glowAlpha = 0.05 + Math.sin(time * 0.5) * 0.02;
-      const outerGlow = ctx.createRadialGradient(cx, cy, size * 0.8, cx, cy, size * 1.3);
-      outerGlow.addColorStop(0, 'rgba(100, 160, 220, 0)');
-      outerGlow.addColorStop(0.5, `rgba(100, 160, 220, ${glowAlpha})`);
-      outerGlow.addColorStop(1, 'rgba(100, 160, 220, 0)');
-      
-      ctx.beginPath();
-      ctx.arc(cx, cy, size * 1.3, 0, Math.PI * 2);
-      ctx.fillStyle = outerGlow;
-      ctx.fill();
-    };
-    
-    const drawCylinderEdge = (
-      ctx: CanvasRenderingContext2D, 
-      v1: { x: number; y: number; z: number }, 
-      v2: { x: number; y: number; z: number }, 
-      thickness: number,
-      alpha: number,
-      flicker: number,
-      time: number
-    ) => {
-      // 圆柱效果 - 多层渐变
-      const layers = 5;
-      for (let l = layers - 1; l >= 0; l--) {
-        const layerThickness = thickness * (1 + l * 0.3);
-        const layerAlpha = alpha * (1 - l * 0.15);
-        
-        // 淡蓝色 - 根据闪烁调整
-        const blue = 180 + flicker * 40;
-        const green = 160 + flicker * 30;
-        
-        ctx.beginPath();
-        ctx.moveTo(v1.x, v1.y);
-        ctx.lineTo(v2.x, v2.y);
-        ctx.strokeStyle = `rgba(${100 + flicker * 50}, ${green}, ${blue}, ${layerAlpha * 0.6})`;
-        ctx.lineWidth = layerThickness;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-      }
-      
-      // 高光
-      ctx.beginPath();
-      ctx.moveTo(v1.x, v1.y);
-      ctx.lineTo(v2.x, v2.y);
-      ctx.strokeStyle = `rgba(200, 230, 255, ${alpha * 0.4 * flicker})`;
-      ctx.lineWidth = thickness * 0.3;
-      ctx.stroke();
-      
-      // 圆柱两端（顶点处的圆）
-      const endRadius = thickness / 2;
-      
-      [v1, v2].forEach(v => {
-        const endGradient = ctx.createRadialGradient(v.x, v.y, 0, v.x, v.y, endRadius * 1.5);
-        endGradient.addColorStop(0, `rgba(150, 200, 240, ${alpha * 0.6})`);
-        endGradient.addColorStop(0.5, `rgba(100, 170, 220, ${alpha * 0.3})`);
-        endGradient.addColorStop(1, 'rgba(80, 140, 200, 0)');
-        
-        ctx.beginPath();
-        ctx.arc(v.x, v.y, endRadius * 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = endGradient;
-        ctx.fill();
-      });
     };
     
     draw();
@@ -290,11 +312,10 @@ export default function FieldVisionPage() {
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [tiltAngle, flickerSpeed, edgeThickness, backgroundGridDensity]);
+  }, [rotationX, rotationZ, cylinderRadius, flickerSpeed, backgroundDensity]);
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* 画布 */}
       <canvas
         ref={canvasRef}
         width={1200}
@@ -302,25 +323,48 @@ export default function FieldVisionPage() {
         className="w-full h-auto rounded-xl"
       />
       
-      {/* 控制面板 */}
       <div className="container mx-auto px-4 py-8">
         <div className="grid md:grid-cols-2 gap-6">
-          {/* 左侧：参数控制 */}
+          {/* 参数控制 */}
           <Card className="bg-gray-900/50 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-cyan-400">视觉参数</CardTitle>
+              <CardTitle className="text-cyan-400">3D视角调整</CardTitle>
               <CardDescription className="text-gray-400">
-                调整参数，尽量还原梦境
+                调整参数还原梦境
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <label className="text-sm text-gray-300">倾斜角度: {tiltAngle}°</label>
+                <label className="text-sm text-gray-300">倾斜角度: {rotationX}°</label>
                 <Slider
-                  value={[tiltAngle]}
-                  onValueChange={(v) => setTiltAngle(v[0])}
+                  value={[rotationX]}
+                  onValueChange={(v) => setRotationX(v[0])}
                   min={0}
-                  max={45}
+                  max={60}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm text-gray-300">旋转速度</label>
+                <Slider
+                  value={[rotationZ]}
+                  onValueChange={(v) => setRotationZ(v[0])}
+                  min={0}
+                  max={30}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm text-gray-300">圆筒粗细: {cylinderRadius}</label>
+                <Slider
+                  value={[cylinderRadius]}
+                  onValueChange={(v) => setCylinderRadius(v[0])}
+                  min={5}
+                  max={30}
                   step={1}
                   className="w-full"
                 />
@@ -331,32 +375,8 @@ export default function FieldVisionPage() {
                 <Slider
                   value={[flickerSpeed]}
                   onValueChange={(v) => setFlickerSpeed(v[0])}
-                  min={0.2}
-                  max={2}
-                  step={0.1}
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm text-gray-300">圆柱厚度</label>
-                <Slider
-                  value={[edgeThickness]}
-                  onValueChange={(v) => setEdgeThickness(v[0])}
-                  min={4}
-                  max={24}
-                  step={1}
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm text-gray-300">背景网格密度</label>
-                <Slider
-                  value={[backgroundGridDensity]}
-                  onValueChange={(v) => setBackgroundGridDensity(v[0])}
-                  min={0}
-                  max={1}
+                  min={0.1}
+                  max={1.5}
                   step={0.1}
                   className="w-full"
                 />
@@ -364,81 +384,82 @@ export default function FieldVisionPage() {
             </CardContent>
           </Card>
           
-          {/* 右侧：梦境解读 */}
+          {/* 结构解读 */}
           <Card className="bg-gray-900/50 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-cyan-400">修正后的理解</CardTitle>
+              <CardTitle className="text-cyan-400">3D圆筒框架</CardTitle>
               <CardDescription className="text-gray-400">
-                边才是信息所在，内部是虚空
+                六根圆柱管道首尾相接
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 rounded-lg bg-gray-800/50 border border-cyan-900/30">
-                <h4 className="font-medium text-cyan-300 mb-2">六边形内部 = 黑色虚空</h4>
+                <h4 className="font-medium text-cyan-300 mb-2">立体圆柱管道</h4>
                 <p className="text-xs text-gray-400">
-                  内部是"空"的。不是信息存在的场所，而是潜能的虚空。
-                  这意味着：信息不在"内部"，而在"边界"。
+                  不是平面的"边"，而是立体的圆柱管道。
+                  有粗细、有体积、是3D的。
                 </p>
               </div>
               
               <div className="p-4 rounded-lg bg-gray-800/50 border border-cyan-900/30">
-                <h4 className="font-medium text-cyan-300 mb-2">六条圆柱边 = 淡蓝色，闪烁</h4>
+                <h4 className="font-medium text-cyan-300 mb-2">内部是虚空</h4>
                 <p className="text-xs text-gray-400">
-                  边是淡蓝色的，会闪烁变淡。这暗示：信息在边界上流动。
-                  闪烁 = 信息在变化/流动？
+                  框架内部没有东西，只有黑色虚空。
+                  这是个"空架子"，不是"填充的场"。
                 </p>
               </div>
               
               <div className="p-4 rounded-lg bg-gray-800/50 border border-cyan-900/30">
-                <h4 className="font-medium text-cyan-300 mb-2">变淡后能看到黑线</h4>
+                <h4 className="font-medium text-cyan-300 mb-2">管道 = 信息通道？</h4>
                 <p className="text-xs text-gray-400">
-                  边交接处有黑线。闪烁变淡时能看到。
-                  这暗示：边界下面有更深层的结构。
-                </p>
-              </div>
-              
-              <div className="p-4 rounded-lg bg-gray-800/50 border border-cyan-900/30">
-                <h4 className="font-medium text-cyan-300 mb-2">背景小六边形一闪一闪</h4>
-                <p className="text-xs text-gray-400">
-                  背景有隐藏的六边形网格，一会出现一会消失。
-                  这暗示：虚空中有隐藏的结构，时隐时现。
+                  如果圆柱是管道，那内部可以流动东西。
+                  也许信息在管道内部流动，而不是在"场"中。
                 </p>
               </div>
             </CardContent>
           </Card>
         </div>
         
-        {/* 新的科学理解 */}
+        {/* 核心洞察 */}
         <Card className="mt-6 bg-gray-900/50 border-cyan-900/30">
           <CardHeader>
-            <CardTitle className="text-cyan-400">这与"全息原理"完全吻合</CardTitle>
+            <CardTitle className="text-cyan-400">新理解：管道网络</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h4 className="font-medium text-white">全息宇宙</h4>
-                <div className="text-sm text-gray-400 space-y-2">
-                  <p>• 信息编码在<strong className="text-cyan-300">边界</strong>上</p>
-                  <p>• <strong className="text-cyan-300">内部</strong>是空的（投影）</p>
-                  <p>• 边界才是"真实"的</p>
-                  <p>• 你梦到的正是这个：边界有信息（蓝色），内部是虚空（黑色）</p>
-                </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                <h4 className="font-medium text-white mb-2">传统模型</h4>
+                <p className="text-xs text-gray-400">
+                  节点 + 线<br/>
+                  节点处理信息<br/>
+                  线只是连接
+                </p>
               </div>
               
-              <div className="space-y-4">
-                <h4 className="font-medium text-white">智能的新理解</h4>
-                <div className="text-sm text-gray-400 space-y-2">
-                  <p>• 不是"节点处理信息"</p>
-                  <p>• 而是<strong className="text-cyan-300">边界承载信息</strong></p>
-                  <p>• 内部是"虚空/空间"</p>
-                  <p>• 智能从边界的互动中涌现</p>
-                </div>
+              <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                <h4 className="font-medium text-white mb-2">之前的理解</h4>
+                <p className="text-xs text-gray-400">
+                  场 + 边界<br/>
+                  信息在场中<br/>
+                  边界塑造场
+                </p>
+              </div>
+              
+              <div className="p-4 rounded-lg bg-cyan-950/50 border border-cyan-800/50">
+                <h4 className="font-medium text-cyan-300 mb-2">现在理解</h4>
+                <p className="text-xs text-gray-400">
+                  <strong className="text-cyan-300">管道网络</strong><br/>
+                  <strong className="text-cyan-300">管道内部流动信息</strong><br/>
+                  <strong className="text-cyan-300">框架内部是虚空</strong>
+                </p>
               </div>
             </div>
             
             <div className="mt-6 p-4 rounded-lg bg-cyan-950/30 border border-cyan-800/30">
               <p className="text-cyan-200 text-sm">
-                <strong>核心洞察：</strong>你的梦在告诉你：边界才是关键。不是"场里有信息"，而是"边界上有信息"。这完全颠覆了传统AI的"节点+连接"范式。也许智能的本质是：边界的几何结构 + 边界上的信息流动。
+                <strong>关键洞察：</strong>你梦到的不是"填充的场"，而是"管道框架"。
+                信息可能不是在"场"中存在，而是在"管道"中流动。
+                这更像是一个输送系统，而不是一个处理系统。
               </p>
             </div>
           </CardContent>
