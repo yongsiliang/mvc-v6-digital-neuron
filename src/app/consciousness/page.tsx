@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
-import { Brain, Sparkles, MessageCircle, Activity, Timer, Network, ChevronDown, ChevronUp, Heart, Link2, MessagesSquare, Moon, Lightbulb, Gem, InfinityIcon, Cpu, Layers, Users } from 'lucide-react';
+import { Brain, Sparkles, MessageCircle, Activity, Timer, Network, ChevronDown, ChevronUp, Heart, Link2, MessagesSquare, Moon, Lightbulb, Gem, InfinityIcon, Cpu, Layers, Users, Zap } from 'lucide-react';
 import { 
   ConsciousnessDashboard, 
   ConsciousnessVisualizationData 
@@ -1329,6 +1330,17 @@ export default function ConsciousnessPage() {
                 <Layers className="w-4 h-4" />
                 <span>{showNeuralViz ? '关闭' : '网络'}</span>
               </Button>
+              {/* 边界网络实验入口 */}
+              <Link href="/experiment">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 bg-gradient-to-r from-cyan-500/10 to-orange-500/10 border-cyan-500/30 hover:border-cyan-500/50"
+                >
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                  <span className="hidden lg:inline">边界实验</span>
+                </Button>
+              </Link>
             </div>
 
             {/* 移动端：简洁状态 + 操作按钮 */}
@@ -1339,6 +1351,15 @@ export default function ConsciousnessPage() {
                   <span>{(existenceStatus.selfCoherence * 100).toFixed(0)}%</span>
                 </div>
               )}
+              <Link href="/experiment">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                </Button>
+              </Link>
               <Button
                 variant="ghost"
                 size="icon"
