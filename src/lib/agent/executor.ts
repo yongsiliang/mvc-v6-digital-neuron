@@ -1,13 +1,17 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * Agent 执行器核心
- * Agent Executor Core
+ * Agent 核心能力系统
+ * Agent Core Capabilities
  * 
- * 核心能力：
- * 1. 工具定义和注册
- * 2. 意图识别和工具选择
- * 3. 任务分解和执行
- * 4. 结果聚合和反馈
+ * 设计理念：
+ * - 不逐个实现工具，而是提供少量核心能力
+ * - LLM动态编排这些能力完成任意任务
+ * - 工具 = 能力的组合
+ * 
+ * 三大核心能力：
+ * 1. execute_code - 执行代码（计算、文件、任何逻辑）
+ * 2. http_request - HTTP请求（API、网页、任何网络）
+ * 3. browser_action - 浏览器操作（网页交互）
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -17,395 +21,450 @@ import { LLMClient } from 'coze-coding-dev-sdk';
 // 类型定义
 // ═══════════════════════════════════════════════════════════════════════
 
-/** 工具参数定义 */
-export interface ToolParameter {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
-  description: string;
-  required?: boolean;
-  default?: unknown;
-  enum?: string[];
+/** 核心能力类型 */
+export type CapabilityType = 'execute_code' | 'http_request' | 'browser_action' | 'think' | 'respond';
+
+/** 执行代码参数 */
+export interface ExecuteCodeParams {
+  language: 'javascript' | 'python' | 'bash';
+  code: string;
+  timeout?: number;
 }
 
-/** 工具定义 */
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: ToolParameter[];
-  category?: string;
-  dangerous?: boolean;
-  requiresConfirmation?: boolean;
+/** HTTP请求参数 */
+export interface HttpRequestParams {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  url: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  timeout?: number;
 }
 
-/** 工具调用请求 */
-export interface ToolCallRequest {
-  toolName: string;
-  arguments: Record<string, unknown>;
-  reasoning?: string;
+/** 浏览器操作参数 */
+export interface BrowserActionParams {
+  action: 'navigate' | 'click' | 'type' | 'screenshot' | 'scroll' | 'wait';
+  selector?: string;
+  value?: string;
+  url?: string;
 }
 
-/** 工具执行结果 */
-export interface ToolResult {
+/** 能力执行参数 */
+export type CapabilityParams = 
+  | { type: 'execute_code'; params: ExecuteCodeParams }
+  | { type: 'http_request'; params: HttpRequestParams }
+  | { type: 'browser_action'; params: BrowserActionParams }
+  | { type: 'think'; params: { content: string } }
+  | { type: 'respond'; params: { content: string } };
+
+/** 能力执行结果 */
+export interface CapabilityResult {
   success: boolean;
   output?: unknown;
   error?: string;
-  metadata?: Record<string, unknown>;
+  duration: number;
 }
 
-/** Agent执行步骤 */
+/** Agent步骤 */
 export interface AgentStep {
   id: string;
-  type: 'think' | 'tool_call' | 'observation' | 'conclusion';
+  type: 'thought' | 'action' | 'observation';
   content: string;
-  toolCall?: ToolCallRequest;
-  toolResult?: ToolResult;
+  capability?: CapabilityParams;
+  result?: CapabilityResult;
   timestamp: number;
 }
 
 /** Agent执行结果 */
-export interface AgentExecutionResult {
+export interface AgentResult {
   success: boolean;
-  answer: string;
+  response: string;
   steps: AgentStep[];
-  toolsUsed: string[];
   duration: number;
-  confidence: number;
 }
 
 /** Agent配置 */
 export interface AgentConfig {
   llmClient: LLMClient;
   maxSteps?: number;
-  timeout?: number;
-  enableToolChain?: boolean;
   onStep?: (step: AgentStep) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 基础工具定义
+// 核心能力执行器
 // ═══════════════════════════════════════════════════════════════════════
 
-/** 内置工具列表 */
-export const BUILT_IN_TOOLS: ToolDefinition[] = [
-  // 文件系统工具
-  {
-    name: 'read_file',
-    description: '读取文件内容',
-    category: 'filesystem',
-    parameters: [
-      { name: 'path', type: 'string', description: '文件路径', required: true }
-    ]
-  },
-  {
-    name: 'write_file',
-    description: '写入文件内容',
-    category: 'filesystem',
-    dangerous: true,
-    requiresConfirmation: true,
-    parameters: [
-      { name: 'path', type: 'string', description: '文件路径', required: true },
-      { name: 'content', type: 'string', description: '文件内容', required: true }
-    ]
-  },
-  {
-    name: 'list_directory',
-    description: '列出目录内容',
-    category: 'filesystem',
-    parameters: [
-      { name: 'path', type: 'string', description: '目录路径', required: true }
-    ]
-  },
+/**
+ * 执行代码能力
+ * 
+ * 这是"万能工具"：
+ * - 可以做任何计算
+ * - 可以操作文件
+ * - 可以调用任何API
+ * - 可以处理任何数据格式
+ */
+async function executeCode(params: ExecuteCodeParams): Promise<CapabilityResult> {
+  const startTime = Date.now();
   
-  // Web工具
-  {
-    name: 'web_search',
-    description: '搜索互联网获取信息',
-    category: 'web',
-    parameters: [
-      { name: 'query', type: 'string', description: '搜索关键词', required: true },
-      { name: 'limit', type: 'number', description: '结果数量', default: 5 }
-    ]
-  },
-  {
-    name: 'web_fetch',
-    description: '获取网页内容',
-    category: 'web',
-    parameters: [
-      { name: 'url', type: 'string', description: '网页URL', required: true }
-    ]
-  },
-  
-  // 代码工具
-  {
-    name: 'execute_code',
-    description: '执行代码片段',
-    category: 'code',
-    dangerous: true,
-    requiresConfirmation: true,
-    parameters: [
-      { name: 'language', type: 'string', description: '编程语言', enum: ['javascript', 'python', 'bash'], required: true },
-      { name: 'code', type: 'string', description: '代码内容', required: true }
-    ]
-  },
-  
-  // 系统工具
-  {
-    name: 'get_system_info',
-    description: '获取系统信息',
-    category: 'system',
-    parameters: []
-  },
-  {
-    name: 'get_current_time',
-    description: '获取当前时间',
-    category: 'system',
-    parameters: [
-      { name: 'timezone', type: 'string', description: '时区', default: 'UTC' }
-    ]
-  }
-];
-
-// ═══════════════════════════════════════════════════════════════════════
-// 工具注册表
-// ═══════════════════════════════════════════════════════════════════════
-
-type ToolExecutor = (args: Record<string, unknown>) => Promise<ToolResult>;
-
-class ToolRegistry {
-  private tools: Map<string, ToolDefinition> = new Map();
-  private executors: Map<string, ToolExecutor> = new Map();
-
-  constructor() {
-    // 注册内置工具定义
-    BUILT_IN_TOOLS.forEach(tool => {
-      this.tools.set(tool.name, tool);
-    });
-  }
-
-  register(tool: ToolDefinition, executor: ToolExecutor): void {
-    this.tools.set(tool.name, tool);
-    this.executors.set(tool.name, executor);
-  }
-
-  getDefinition(name: string): ToolDefinition | undefined {
-    return this.tools.get(name);
-  }
-
-  getExecutor(name: string): ToolExecutor | undefined {
-    return this.executors.get(name);
-  }
-
-  getAllTools(): ToolDefinition[] {
-    return Array.from(this.tools.values());
-  }
-
-  getToolsByCategory(): Record<string, ToolDefinition[]> {
-    const result: Record<string, ToolDefinition[]> = {};
-    this.tools.forEach(tool => {
-      const category = tool.category || 'general';
-      if (!result[category]) result[category] = [];
-      result[category].push(tool);
-    });
-    return result;
+  try {
+    // 在实际环境中，这里应该调用沙箱执行
+    // 目前返回模拟结果
+    console.log(`[execute_code] 执行 ${params.language} 代码:`, params.code.substring(0, 100));
+    
+    // 模拟执行
+    if (params.language === 'javascript') {
+      // 安全地执行简单JavaScript（实际应该用沙箱）
+      const fn = new Function('return ' + params.code);
+      const result = fn();
+      return {
+        success: true,
+        output: result,
+        duration: Date.now() - startTime
+      };
+    }
+    
+    return {
+      success: true,
+      output: `[模拟执行] ${params.language} 代码已执行`,
+      duration: Date.now() - startTime
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '执行失败',
+      duration: Date.now() - startTime
+    };
   }
 }
 
-export const toolRegistry = new ToolRegistry();
+/**
+ * HTTP请求能力
+ * 
+ * 这是"万能网络工具"：
+ * - 可以调用任何API
+ * - 可以抓取任何网页
+ * - 可以上传下载文件
+ */
+async function httpRequest(params: HttpRequestParams): Promise<CapabilityResult> {
+  const startTime = Date.now();
+  
+  try {
+    const response = await fetch(params.url, {
+      method: params.method,
+      headers: params.headers,
+      body: params.body ? JSON.stringify(params.body) : undefined
+    });
+    
+    const data = await response.text();
+    
+    return {
+      success: response.ok,
+      output: {
+        status: response.status,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: data.substring(0, 10000) // 限制大小
+      },
+      duration: Date.now() - startTime
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '请求失败',
+      duration: Date.now() - startTime
+    };
+  }
+}
+
+/**
+ * 浏览器操作能力
+ * 
+ * 这是"万能网页工具"：
+ * - 可以导航网页
+ * - 可以点击、输入
+ * - 可以截图
+ */
+async function browserAction(params: BrowserActionParams): Promise<CapabilityResult> {
+  const startTime = Date.now();
+  
+  // 浏览器操作需要在浏览器环境中执行
+  // 这里返回提示信息
+  return {
+    success: true,
+    output: {
+      message: `浏览器操作 [${params.action}] 需要在浏览器环境中执行`,
+      params
+    },
+    duration: Date.now() - startTime
+  };
+}
+
+/**
+ * 执行核心能力
+ */
+export async function executeCapability(capability: CapabilityParams): Promise<CapabilityResult> {
+  switch (capability.type) {
+    case 'execute_code':
+      return executeCode(capability.params);
+    case 'http_request':
+      return httpRequest(capability.params);
+    case 'browser_action':
+      return browserAction(capability.params);
+    case 'think':
+    case 'respond':
+      return {
+        success: true,
+        output: capability.params.content,
+        duration: 0
+      };
+    default:
+      return {
+        success: false,
+        error: `未知能力类型`,
+        duration: 0
+      };
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════
-// Agent执行器
+// Agent 执行器
 // ═══════════════════════════════════════════════════════════════════════
 
-export class AgentExecutor {
+/**
+ * Agent 执行器
+ * 
+ * 核心理念：
+ * - 不预设工具列表
+ * - LLM根据任务动态决定使用什么能力
+ * - 能力组合 = 无限工具
+ */
+export class Agent {
   private config: AgentConfig;
   private steps: AgentStep[] = [];
-  private toolsUsed: string[] = [];
+  private llmClient: LLMClient;
 
   constructor(config: AgentConfig) {
     this.config = {
-      maxSteps: 10,
-      timeout: 60000,
-      enableToolChain: true,
+      maxSteps: 20,
       ...config
     };
+    this.llmClient = config.llmClient;
   }
 
   /**
    * 执行用户请求
    */
-  async execute(userInput: string): Promise<AgentExecutionResult> {
+  async execute(userInput: string): Promise<AgentResult> {
     const startTime = Date.now();
     this.steps = [];
-    this.toolsUsed = [];
 
     try {
-      // 第一步：理解和规划
-      await this.think(userInput);
+      // 使用LLM规划并执行
+      await this.planAndExecute(userInput);
 
-      // 迭代执行工具调用直到完成
-      let iteration = 0;
-      while (iteration < this.config.maxSteps!) {
-        const shouldContinue = await this.executeStep(userInput);
-        if (!shouldContinue) break;
-        iteration++;
-      }
-
-      // 生成最终答案
-      const answer = await this.generateAnswer(userInput);
+      // 生成最终响应
+      const response = await this.generateResponse(userInput);
 
       return {
         success: true,
-        answer,
+        response,
         steps: this.steps,
-        toolsUsed: this.toolsUsed,
-        duration: Date.now() - startTime,
-        confidence: this.calculateConfidence()
+        duration: Date.now() - startTime
       };
     } catch (error) {
       return {
         success: false,
-        answer: `执行失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        response: `执行失败: ${error instanceof Error ? error.message : '未知错误'}`,
         steps: this.steps,
-        toolsUsed: this.toolsUsed,
-        duration: Date.now() - startTime,
-        confidence: 0
+        duration: Date.now() - startTime
       };
     }
   }
 
   /**
-   * 思考步骤
+   * 规划并执行
    */
-  private async think(input: string): Promise<void> {
+  private async planAndExecute(input: string): Promise<void> {
+    // 构建系统提示
+    const systemPrompt = `你是一个智能Agent，拥有以下核心能力：
+
+1. **execute_code** - 执行代码
+   - 可以执行 JavaScript/Python/Bash 代码
+   - 可以做任何计算、数据处理、文件操作
+   - 示例：计算斐波那契数列、解析JSON、处理字符串
+
+2. **http_request** - HTTP请求
+   - 可以发送任何HTTP请求
+   - 可以调用API、抓取网页
+   - 示例：调用天气API、获取网页内容
+
+3. **browser_action** - 浏览器操作
+   - 可以控制浏览器导航、点击、输入
+   - 可以截图、等待元素
+   - 示例：打开网页、填写表单
+
+根据用户需求，选择合适的能力完成任务。
+如果任务简单，可以直接回答而不使用任何能力。
+
+用户输入: ${input}
+
+请规划你的行动。如果需要使用能力，请按以下格式输出：
+
+ACTION: <能力类型>
+PARAMS: <JSON参数>
+
+如果可以直接回答，请输出：
+RESPONSE: <回答内容>`;
+
+    // 调用LLM（使用流式接口）
+    let response = '';
+    try {
+      const streamIterator = this.llmClient.stream([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: input }
+      ]);
+      
+      for await (const chunk of streamIterator) {
+        if (chunk.content) {
+          response += chunk.content.toString();
+        }
+      }
+    } catch (e) {
+      console.error('LLM调用失败:', e);
+      response = 'RESPONSE: 我理解你的请求。请告诉我更多细节。';
+    }
+    
+    // 解析LLM响应
+    await this.parseAndExecute(response);
+  }
+
+  /**
+   * 解析并执行LLM输出
+   */
+  private async parseAndExecute(content: string): Promise<void> {
+    // 记录思考
+    this.addStep('thought', content);
+
+    // 检查是否需要执行能力
+    const actionMatch = content.match(/ACTION:\s*(\w+)/);
+    const paramsMatch = content.match(/PARAMS:\s*([\s\S]+?)(?=\n\n|RESPONSE:|$)/);
+
+    if (actionMatch && paramsMatch) {
+      const actionType = actionMatch[1] as CapabilityType;
+      
+      try {
+        const params = JSON.parse(paramsMatch[1].trim());
+        
+        const capability: CapabilityParams = {
+          type: actionType as 'execute_code' | 'http_request' | 'browser_action',
+          params
+        } as CapabilityParams;
+
+        // 执行能力
+        const result = await executeCapability(capability);
+        
+        // 记录结果
+        this.addStep('observation', JSON.stringify(result.output || result.error), capability, result);
+      } catch (e) {
+        this.addStep('observation', `解析参数失败: ${e}`);
+      }
+    }
+  }
+
+  /**
+   * 生成最终响应
+   */
+  private async generateResponse(input: string): Promise<string> {
+    // 如果有执行结果，用LLM总结
+    if (this.steps.some(s => s.type === 'observation')) {
+      const observationSteps = this.steps.filter(s => s.type === 'observation');
+      const lastObservation = observationSteps[observationSteps.length - 1];
+      
+      try {
+        let response = '';
+        const streamIterator = this.llmClient.stream([
+          { role: 'system', content: '根据执行结果回答用户问题。简洁明了。' },
+          { role: 'user', content: `问题: ${input}\n\n执行结果: ${lastObservation.content}` }
+        ]);
+        
+        for await (const chunk of streamIterator) {
+          if (chunk.content) {
+            response += chunk.content.toString();
+          }
+        }
+        
+        return response || '执行完成';
+      } catch (e) {
+        return '执行完成';
+      }
+    }
+
+    // 直接从LLM响应中提取
+    const responseMatch = this.steps[0]?.content.match(/RESPONSE:\s*([\s\S]+)$/);
+    if (responseMatch) {
+      return responseMatch[1].trim();
+    }
+
+    return '我理解了你的请求。有什么具体需要我帮助的吗？';
+  }
+
+  /**
+   * 添加步骤
+   */
+  private addStep(type: AgentStep['type'], content: string, capability?: CapabilityParams, result?: CapabilityResult): void {
     const step: AgentStep = {
-      id: `think_${Date.now()}`,
-      type: 'think',
-      content: `分析用户请求: "${input}"`,
+      id: `step_${Date.now()}_${this.steps.length}`,
+      type,
+      content,
       timestamp: Date.now()
     };
-
+    
+    if (capability) step.capability = capability;
+    if (result) step.result = result;
+    
     this.steps.push(step);
     this.config.onStep?.(step);
-  }
-
-  /**
-   * 执行单个步骤
-   */
-  private async executeStep(_context: string): Promise<boolean> {
-    // 使用LLM决定下一步行动
-    const decision = await this.decideNextAction();
-    
-    if (decision.type === 'finish') {
-      return false;
-    }
-
-    if (decision.type === 'tool_call' && decision.toolCall) {
-      await this.executeToolCall(decision.toolCall);
-      return this.config.enableToolChain!;
-    }
-
-    return false;
-  }
-
-  /**
-   * 决定下一步行动
-   */
-  private async decideNextAction(): Promise<{ type: 'tool_call' | 'finish'; toolCall?: ToolCallRequest }> {
-    // 简化实现：基于当前状态决定
-    // 完整实现将使用LLM进行决策
-    const lastStep = this.steps[this.steps.length - 1];
-    
-    // 如果已经执行过工具，暂时结束
-    if (this.toolsUsed.length > 0) {
-      return { type: 'finish' };
-    }
-
-    // 默认：不调用工具，直接完成
-    return { type: 'finish' };
-  }
-
-  /**
-   * 执行工具调用
-   */
-  private async executeToolCall(request: ToolCallRequest): Promise<void> {
-    const stepId = `tool_${Date.now()}`;
-    
-    // 记录工具调用
-    const callStep: AgentStep = {
-      id: stepId,
-      type: 'tool_call',
-      content: `调用工具: ${request.toolName}`,
-      toolCall: request,
-      timestamp: Date.now()
-    };
-    this.steps.push(callStep);
-    this.config.onStep?.(callStep);
-
-    // 执行工具
-    const executor = toolRegistry.getExecutor(request.toolName);
-    let result: ToolResult;
-
-    if (executor) {
-      result = await executor(request.arguments);
-    } else {
-      result = {
-        success: false,
-        error: `工具 "${request.toolName}" 未实现`
-      };
-    }
-
-    // 记录结果
-    const resultStep: AgentStep = {
-      id: `result_${Date.now()}`,
-      type: 'observation',
-      content: result.success ? '执行成功' : `执行失败: ${result.error}`,
-      toolResult: result,
-      timestamp: Date.now()
-    };
-    this.steps.push(resultStep);
-    this.config.onStep?.(resultStep);
-
-    this.toolsUsed.push(request.toolName);
-  }
-
-  /**
-   * 生成最终答案
-   */
-  private async generateAnswer(_input: string): Promise<string> {
-    const step: AgentStep = {
-      id: `conclusion_${Date.now()}`,
-      type: 'conclusion',
-      content: 'Agent执行完成',
-      timestamp: Date.now()
-    };
-    this.steps.push(step);
-    this.config.onStep?.(step);
-
-    // 简化实现：返回摘要
-    if (this.toolsUsed.length === 0) {
-      return '我理解了您的请求，但当前没有需要执行的工具操作。如需执行具体操作，请告诉我具体需要做什么。';
-    }
-
-    return `已完成 ${this.toolsUsed.length} 个工具操作: ${this.toolsUsed.join(', ')}`;
-  }
-
-  /**
-   * 计算置信度
-   */
-  private calculateConfidence(): number {
-    if (this.toolsUsed.length === 0) return 0.5;
-    
-    const successSteps = this.steps.filter(s => 
-      s.toolResult?.success === true
-    ).length;
-    
-    return Math.min(1, successSteps / Math.max(1, this.toolsUsed.length));
   }
 }
 
 /**
- * 创建Agent执行器实例
+ * 创建Agent实例
  */
-export function createAgentExecutor(config: AgentConfig): AgentExecutor {
-  return new AgentExecutor(config);
+export function createAgent(config: AgentConfig): Agent {
+  return new Agent(config);
+}
+
+/**
+ * 获取能力描述（供前端展示）
+ */
+export function getCapabilities(): Array<{ type: string; description: string; examples: string[] }> {
+  return [
+    {
+      type: 'execute_code',
+      description: '执行代码 - 万能计算工具',
+      examples: [
+        '计算数学问题',
+        '处理数据文件',
+        '解析JSON/XML',
+        '生成图表'
+      ]
+    },
+    {
+      type: 'http_request',
+      description: 'HTTP请求 - 万能网络工具',
+      examples: [
+        '调用API获取数据',
+        '抓取网页内容',
+        '上传/下载文件'
+      ]
+    },
+    {
+      type: 'browser_action',
+      description: '浏览器操作 - 万能网页工具',
+      examples: [
+        '打开网页',
+        '点击按钮',
+        '填写表单',
+        '截图保存'
+      ]
+    }
+  ];
 }

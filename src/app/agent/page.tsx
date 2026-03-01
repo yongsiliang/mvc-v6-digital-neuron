@@ -3,7 +3,10 @@
  * Agent 演示页面
  * Agent Demo Page
  * 
- * 展示Agent执行能力的交互界面
+ * 核心理念：
+ * - 不预设工具列表
+ * - LLM动态编排能力
+ * - 3个核心能力覆盖所有场景
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -17,20 +20,21 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  Bot, Send, Loader2, Wrench, CheckCircle, XCircle, 
-  Lightbulb, ArrowRight, Clock, Zap, Brain
+  Bot, Send, Loader2, Code, Globe, Monitor, 
+  Lightbulb, ArrowRight, Clock, Zap, Brain,
+  CheckCircle, XCircle, Sparkles
 } from 'lucide-react';
 
 // 类型定义
 interface AgentStep {
   id: string;
-  type: 'think' | 'tool_call' | 'observation' | 'conclusion';
+  type: 'thought' | 'action' | 'observation';
   content: string;
-  toolCall?: {
-    toolName: string;
-    arguments: Record<string, unknown>;
+  capability?: {
+    type: string;
+    params: Record<string, unknown>;
   };
-  toolResult?: {
+  result?: {
     success: boolean;
     output?: unknown;
     error?: string;
@@ -40,26 +44,22 @@ interface AgentStep {
 
 interface AgentResult {
   success: boolean;
-  answer: string;
+  response: string;
   steps: AgentStep[];
-  toolsUsed: string[];
   duration: number;
-  confidence: number;
 }
 
-interface ToolDefinition {
-  name: string;
+interface Capability {
+  type: string;
   description: string;
-  category?: string;
-  dangerous?: boolean;
+  examples: string[];
 }
 
-// 示例任务
+// 示例任务 - 展示3个核心能力
 const EXAMPLE_TASKS = [
-  '帮我搜索一下今天的天气',
-  '读取项目中的README文件',
-  '执行一段JavaScript代码计算斐波那契数列',
-  '获取当前系统信息'
+  { label: '计算斐波那契', input: '用JavaScript计算斐波那契数列前10项', capability: 'execute_code' },
+  { label: '获取网页', input: '获取 https://example.com 的内容', capability: 'http_request' },
+  { label: '直接回答', input: '什么是量子计算？', capability: 'none' },
 ];
 
 export default function AgentPage() {
@@ -67,17 +67,17 @@ export default function AgentPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AgentResult | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
-  const [tools, setTools] = useState<ToolDefinition[]>([]);
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 加载可用工具
+  // 加载核心能力
   useEffect(() => {
     fetch('/api/agent')
       .then(res => res.json())
-      .then(data => setTools(data.tools || []))
-      .catch(err => console.error('加载工具失败:', err));
+      .then(data => setCapabilities(data.capabilities || []))
+      .catch(err => console.error('加载能力失败:', err));
   }, []);
 
   // 滚动到底部
@@ -152,13 +152,22 @@ export default function AgentPage() {
     executeTask(input);
   };
 
+  // 获取能力图标
+  const getCapabilityIcon = (type: string) => {
+    switch (type) {
+      case 'execute_code': return <Code className="w-5 h-5 text-blue-400" />;
+      case 'http_request': return <Globe className="w-5 h-5 text-green-400" />;
+      case 'browser_action': return <Monitor className="w-5 h-5 text-orange-400" />;
+      default: return <Sparkles className="w-5 h-5 text-purple-400" />;
+    }
+  };
+
   // 获取步骤图标
   const getStepIcon = (type: string) => {
     switch (type) {
-      case 'think': return <Brain className="w-4 h-4 text-purple-400" />;
-      case 'tool_call': return <Wrench className="w-4 h-4 text-blue-400" />;
+      case 'thought': return <Brain className="w-4 h-4 text-purple-400" />;
+      case 'action': return <Zap className="w-4 h-4 text-blue-400" />;
       case 'observation': return <Lightbulb className="w-4 h-4 text-yellow-400" />;
-      case 'conclusion': return <CheckCircle className="w-4 h-4 text-green-400" />;
       default: return <ArrowRight className="w-4 h-4" />;
     }
   };
@@ -169,12 +178,12 @@ export default function AgentPage() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
               <Bot className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold">Agent 执行器</h1>
-              <p className="text-sm text-muted-foreground">会思考的AI助手</p>
+              <p className="text-sm text-muted-foreground">3个核心能力，无限可能</p>
             </div>
           </div>
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
@@ -185,39 +194,46 @@ export default function AgentPage() {
 
       <main className="max-w-6xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左侧：工具列表 */}
+          {/* 左侧：核心能力说明 */}
           <Card className="lg:col-span-1 bg-card/50 border-border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Wrench className="w-5 h-5" />
-                可用工具
+                <Sparkles className="w-5 h-5 text-yellow-400" />
+                核心能力
               </CardTitle>
               <CardDescription>
-                Agent 可以调用的工具 ({tools.length})
+                无需预设工具，LLM动态编排
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[400px]">
-                <div className="space-y-2">
-                  {tools.map(tool => (
-                    <div 
-                      key={tool.name}
-                      className="p-3 rounded-lg bg-muted/50 border border-border hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">{tool.name}</span>
-                        {tool.dangerous && (
-                          <Badge variant="destructive" className="text-xs">危险</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">{tool.description}</p>
-                      {tool.category && (
-                        <Badge variant="outline" className="text-xs mt-2">{tool.category}</Badge>
-                      )}
+              <div className="space-y-4">
+                {capabilities.map(cap => (
+                  <div 
+                    key={cap.type}
+                    className="p-4 rounded-lg bg-muted/50 border border-border"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {getCapabilityIcon(cap.type)}
+                      <span className="font-medium">{cap.description}</span>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {cap.examples.map((ex, i) => (
+                        <Badge key={i} variant="outline" className="text-xs">
+                          {ex}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <p className="text-sm text-green-400">
+                  <strong>设计理念：</strong><br/>
+                  世界上的工具有无数个，不可能逐个实现。<br/>
+                  但所有工具都可以用这3个核心能力组合实现！
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -228,7 +244,7 @@ export default function AgentPage() {
               <CardHeader>
                 <CardTitle>执行任务</CardTitle>
                 <CardDescription>
-                  输入任务，Agent将自动分解并执行
+                  输入任何任务，Agent会自动选择合适的能力
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -237,7 +253,7 @@ export default function AgentPage() {
                     <Input
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      placeholder="输入任务，例如：帮我搜索今天的新闻..."
+                      placeholder="输入任何任务..."
                       className="flex-1"
                       disabled={isLoading}
                     />
@@ -261,12 +277,14 @@ export default function AgentPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setInput(task);
-                          executeTask(task);
+                          setInput(task.input);
+                          executeTask(task.input);
                         }}
                         disabled={isLoading}
+                        className="gap-1"
                       >
-                        {task}
+                        {task.capability !== 'none' && getCapabilityIcon(task.capability)}
+                        {task.label}
                       </Button>
                     ))}
                   </div>
@@ -297,35 +315,17 @@ export default function AgentPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-sm capitalize">
-                                {step.type.replace('_', ' ')}
+                                {step.type === 'thought' ? '思考' : 
+                                 step.type === 'action' ? '行动' : '观察'}
                               </span>
                               <span className="text-xs text-muted-foreground">
                                 #{index + 1}
                               </span>
                             </div>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {step.content}
-                            </p>
-                            {step.toolCall && (
-                              <div className="mt-2 p-2 rounded bg-blue-500/10 text-xs">
-                                <span className="text-blue-400">{step.toolCall.toolName}</span>
-                                <pre className="mt-1 text-muted-foreground overflow-x-auto">
-                                  {JSON.stringify(step.toolCall.arguments, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                            {step.toolResult && (
-                              <div className={`mt-2 p-2 rounded text-xs ${
-                                step.toolResult.success ? 'bg-green-500/10' : 'bg-red-500/10'
-                              }`}>
-                                {step.toolResult.success ? (
-                                  <CheckCircle className="w-3 h-3 text-green-400 inline mr-1" />
-                                ) : (
-                                  <XCircle className="w-3 h-3 text-red-400 inline mr-1" />
-                                )}
-                                {step.toolResult.success ? '成功' : step.toolResult.error}
-                              </div>
-                            )}
+                            <pre className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words overflow-x-auto max-h-40">
+                              {step.content.substring(0, 500)}
+                              {step.content.length > 500 && '...'}
+                            </pre>
                           </div>
                         </div>
                       ))}
@@ -349,7 +349,7 @@ export default function AgentPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-foreground">{result.answer}</p>
+                  <p className="text-foreground whitespace-pre-wrap">{result.response}</p>
                   
                   <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
@@ -357,12 +357,8 @@ export default function AgentPage() {
                       {result.duration}ms
                     </div>
                     <div className="flex items-center gap-1">
-                      <Wrench className="w-4 h-4" />
-                      {result.toolsUsed.length} 工具
-                    </div>
-                    <div className="flex items-center gap-1">
                       <Zap className="w-4 h-4" />
-                      置信度: {(result.confidence * 100).toFixed(0)}%
+                      {result.steps.length} 步骤
                     </div>
                   </div>
                 </CardContent>

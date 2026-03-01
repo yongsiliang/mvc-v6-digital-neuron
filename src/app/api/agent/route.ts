@@ -2,14 +2,21 @@
  * ═══════════════════════════════════════════════════════════════════════
  * Agent API 端点
  * Agent API Endpoint
+ * 
+ * 核心理念：
+ * - 不预设工具列表
+ * - LLM动态编排能力
+ * - 3个核心能力覆盖所有场景
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMClient } from 'coze-coding-dev-sdk';
 import { 
-  createAgentExecutor, 
-  toolRegistry,
+  createAgent, 
+  getCapabilities,
+  executeCapability,
+  type CapabilityParams,
   type AgentStep
 } from '@/lib/agent/executor';
 
@@ -23,7 +30,13 @@ const encoder = new TextEncoder();
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { input, stream = false } = body;
+    const { input, stream = false, capability } = body;
+
+    // 如果直接指定能力执行
+    if (capability) {
+      const result = await executeCapability(capability as CapabilityParams);
+      return NextResponse.json(result);
+    }
 
     if (!input) {
       return NextResponse.json(
@@ -39,7 +52,7 @@ export async function POST(request: NextRequest) {
       // 流式响应
       const stream = new ReadableStream({
         async start(controller) {
-          const agent = createAgentExecutor({
+          const agent = createAgent({
             llmClient,
             onStep: (step: AgentStep) => {
               const data = JSON.stringify({ type: 'step', step });
@@ -72,7 +85,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // 非流式响应
-      const agent = createAgentExecutor({ llmClient });
+      const agent = createAgent({ llmClient });
       const result = await agent.execute(input);
 
       return NextResponse.json(result);
@@ -88,15 +101,19 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/agent
- * 获取可用工具列表
+ * 获取核心能力列表
  */
 export async function GET() {
-  const tools = toolRegistry.getAllTools();
-  const categories = toolRegistry.getToolsByCategory();
+  const capabilities = getCapabilities();
 
   return NextResponse.json({
-    tools,
-    categories,
-    count: tools.length
+    message: 'Agent 核心能力系统',
+    philosophy: '3个核心能力覆盖所有场景，无需预设工具列表',
+    capabilities,
+    usage: {
+      endpoint: '/api/agent',
+      method: 'POST',
+      body: { input: '你的任务描述', stream: true }
+    }
   });
 }
