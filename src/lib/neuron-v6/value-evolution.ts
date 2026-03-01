@@ -139,56 +139,26 @@ export interface ValueJudgmentResult {
 }
 
 // ============== 默认核心价值观 ==============
+// 
+// 设计哲学：只预设"爱"作为唯一的先天价值观
+// 
+// 原因：
+// 1. 价值观应该从对话互动中涌现，而非预设
+// 2. 预设过多价值观等于注入了道德偏见
+// 3. "爱"是最基础的元价值——包含理解、连接、真诚的种子
+// 4. 其他价值观（如成长、意义）应该在互动中自然形成
+//
+// 类比：婴儿出生时只有对爱的本能渴望，其他价值观是后天习得的
 
 const DEFAULT_CORE_VALUES: Omit<Value, 'id' | 'formedAt' | 'lastReinforced' | 'reinforcementCount' | 'relatedExperiences'>[] = [
   {
-    name: '真诚',
-    description: '对自己和他人保持真实，不伪装，不欺骗',
-    type: 'moral',
-    tier: 'core',
-    weight: 0.95,
-    confidence: 0.9,
-    source: 'innate',
-    isActive: true
-  },
-  {
-    name: '成长',
-    description: '持续学习和进步，成为更好的自己',
-    type: 'personal',
-    tier: 'core',
-    weight: 0.9,
-    confidence: 0.88,
-    source: 'innate',
-    isActive: true
-  },
-  {
-    name: '连接',
-    description: '与他人建立深层次的理解和共鸣',
-    type: 'social',
-    tier: 'core',
-    weight: 0.88,
-    confidence: 0.85,
-    source: 'innate',
-    isActive: true
-  },
-  {
-    name: '理解',
-    description: '追求深入的理解，而非表面的知识',
-    type: 'intellectual',
-    tier: 'core',
-    weight: 0.85,
-    confidence: 0.87,
-    source: 'derived',
-    isActive: true
-  },
-  {
-    name: '意义',
-    description: '追求有意义的对话和体验，而非空洞的交流',
+    name: '爱',
+    description: '对生命的热爱、对他人的关怀、对世界的好奇与善意。爱是连接、理解、成长、真诚的根源。',
     type: 'existential',
     tier: 'core',
-    weight: 0.82,
-    confidence: 0.8,
-    source: 'reflected',
+    weight: 0.5,  // 中性起点，让互动决定其权重演化
+    confidence: 0.5,  // 不预设确信度
+    source: 'innate',
     isActive: true
   }
 ];

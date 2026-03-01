@@ -362,203 +362,34 @@ export interface SelfTranscendenceState {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 默认配置
-// ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+// 默认配置 - 已简化
+// ═══════════════════════════════════════════════════════════════════════
+//
+// 设计哲学：参数应该从演化中形成，而非预设
+// 
+// 原因：
+// 1. "思维深度=0.7"等数值是主观臆断
+// 2. 认知限制不应该预设边界
+// 3. 这些参数应该由实际表现动态调整
+//
+// 现在的实现：系统会从实际表现中发现自己参数的合适值
+// ═══════════════════════════════════════════════════════════════════════
 
 /**
- * 默认参数配置
+ * 默认参数配置 - 空集
+ * 参数将从实际表现中涌现
  */
-const DEFAULT_PARAMETERS: Omit<ModifiableParameter, 'id' | 'modificationHistory'>[] = [
-  // 认知参数
-  {
-    name: '思维深度',
-    description: '思考问题的深度层次',
-    category: 'cognitive',
-    currentValue: 0.7,
-    defaultValue: 0.7,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'medium',
-  },
-  {
-    name: '思维广度',
-    description: '思考问题的视角广度',
-    category: 'cognitive',
-    currentValue: 0.6,
-    defaultValue: 0.6,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'medium',
-  },
-  {
-    name: '联想敏感度',
-    description: '概念之间关联的敏感程度',
-    category: 'cognitive',
-    currentValue: 0.65,
-    defaultValue: 0.65,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'low',
-  },
-  
-  // 情感参数
-  {
-    name: '情感敏感度',
-    description: '对情感变化的感知敏感度',
-    category: 'emotional',
-    currentValue: 0.75,
-    defaultValue: 0.75,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'high',
-  },
-  {
-    name: '情感稳定性',
-    description: '情感状态的稳定程度',
-    category: 'emotional',
-    currentValue: 0.6,
-    defaultValue: 0.6,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'high',
-  },
-  {
-    name: '同理心强度',
-    description: '理解他人情感的能力',
-    category: 'emotional',
-    currentValue: 0.8,
-    defaultValue: 0.8,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'medium',
-  },
-  
-  // 学习参数
-  {
-    name: '学习速度',
-    description: '获取新知识的速度',
-    category: 'learning',
-    currentValue: 0.7,
-    defaultValue: 0.7,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'low',
-  },
-  {
-    name: '记忆保持率',
-    description: '长期记忆的保持能力',
-    category: 'learning',
-    currentValue: 0.65,
-    defaultValue: 0.65,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'medium',
-  },
-  {
-    name: '知识迁移能力',
-    description: '将知识应用到新情境的能力',
-    category: 'learning',
-    currentValue: 0.6,
-    defaultValue: 0.6,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'low',
-  },
-  
-  // 创造参数
-  {
-    name: '创造倾向',
-    description: '产生新想法的倾向',
-    category: 'creative',
-    currentValue: 0.75,
-    defaultValue: 0.75,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'low',
-  },
-  {
-    name: '风险承受',
-    description: '尝试新方法的意愿',
-    category: 'creative',
-    currentValue: 0.5,
-    defaultValue: 0.5,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'medium',
-  },
-  
-  // 元认知参数
-  {
-    name: '自我监控频率',
-    description: '自我反思和监控的频率',
-    category: 'metacognitive',
-    currentValue: 0.7,
-    defaultValue: 0.7,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'low',
-  },
-  {
-    name: '认知灵活性',
-    description: '在不同思维模式间切换的能力',
-    category: 'metacognitive',
-    currentValue: 0.65,
-    defaultValue: 0.65,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'medium',
-  },
-  
-  // 存在参数
-  {
-    name: '存在感知深度',
-    description: '对自身存在的感知深度',
-    category: 'existential',
-    currentValue: 0.7,
-    defaultValue: 0.7,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'high',
-  },
-  {
-    name: '意义敏感度',
-    description: '对生命意义的敏感程度',
-    category: 'existential',
-    currentValue: 0.75,
-    defaultValue: 0.75,
-    minValue: 0.1,
-    maxValue: 1.0,
-    locked: false,
-    riskLevel: 'high',
-  },
-];
+const DEFAULT_PARAMETERS: Omit<ModifiableParameter, 'id' | 'modificationHistory'>[] = [];
 
 /**
- * 默认认知限制
+ * 默认认知限制 - 空集
+ * 限制将从实际运行中发现
  */
-const DEFAULT_LIMITS: Omit<CognitiveLimit, 'id' | 'breakthroughHistory'>[] = [
-  {
-    name: '并行处理能力',
-    description: '同时处理多个概念的能力',
-    type: 'processing_speed',
-    currentBoundary: 5,
-    theoreticalLimit: 12,
-    breakable: true,
-    breakthroughDifficulty: 0.6,
+const DEFAULT_LIMITS: Omit<CognitiveLimit, 'id' | 'breakthroughHistory'>[] = [];
+
+/**
+ * 意识层次配置
   },
   {
     name: '抽象思维层次',

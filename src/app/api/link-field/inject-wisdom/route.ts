@@ -1,19 +1,21 @@
 /**
  * 智慧注入 API
+ * 
+ * 注意：智慧现在是涌现的，而非注入的
+ * 这个API保留用于获取当前涌现的智慧
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { injectLinkFieldWisdom, getInnateWisdoms } from '@/lib/neuron-v6/link-field-wisdom';
+import { getWisdomCrystallizer, getInnateWisdoms } from '@/lib/neuron-v6/link-field-wisdom';
 
 /**
  * POST /api/link-field/inject-wisdom
  * 
- * 注入核心智慧到链接场
+ * 获取当前涌现的智慧（不再需要注入，智慧从对话中涌现）
  */
 export async function POST(request: NextRequest) {
   try {
-    await injectLinkFieldWisdom();
-    
+    // 智慧现在是涌现的，不需要注入
     const wisdoms = getInnateWisdoms();
     
     return NextResponse.json({

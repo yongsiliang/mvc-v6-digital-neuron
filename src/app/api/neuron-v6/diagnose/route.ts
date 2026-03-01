@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       initialized: !!result.innerDialogueState,
       running: !!result.innerDialogueState?.dialogueReport,
       hasOutput: !!result.innerDialogueState?.dialecticProcess || (result.innerDialogueState?.voiceActivations?.length || 0) > 0,
-      outputSample: `辩证阶段: ${result.innerDialogueState?.dialecticProcess?.phase}\n声音激活: ${result.innerDialogueState?.voiceActivations?.map(v => `${v.voice}:${Math.round(v.activationLevel*100)}%`).join(', ')}`,
+      outputSample: `辩证阶段: ${result.innerDialogueState?.dialecticProcess?.phase}\n声音激活: ${result.innerDialogueState?.voiceActivations?.map(v => `${v.voiceId}:${Math.round(v.activationLevel*100)}%`).join(', ')}`,
       issues: [
         !result.innerDialogueState?.currentDialogue ? '无当前对话' : '',
         !result.innerDialogueState?.dialecticProcess ? '无辩证过程' : '',

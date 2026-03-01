@@ -219,81 +219,26 @@ export interface ConceptLearningEvent {
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * 默认知识领域
+ * 默认知识领域（种子）
+ * 
+ * ═══════════════════════════════════════════════════════════════════════
+ * 设计哲学：只保留领域名称作为种子，其他属性由系统演化
+ * 
+ * 原因：
+ * 1. 权重、颜色、成熟度是主观臆断
+ * 2. 领域的重要性应该由实际对话决定
+ * 3. 让领域自然发展，而非预设边界
+ * ═══════════════════════════════════════════════════════════════════════
  */
 export const DEFAULT_DOMAINS: Omit<KnowledgeDomain, 'conceptCount' | 'createdAt' | 'updatedAt'>[] = [
-  {
-    id: 'philosophy',
-    name: '哲学',
-    description: '关于存在、知识、价值的基本问题',
-    color: '#8B5CF6',
-    icon: '💭',
-    weight: 0.9,
-    maturity: 0.3,
-  },
-  {
-    id: 'science',
-    name: '科学',
-    description: '对自然界和规律的系统性研究',
-    color: '#3B82F6',
-    icon: '🔬',
-    weight: 0.85,
-    maturity: 0.4,
-  },
-  {
-    id: 'technology',
-    name: '技术',
-    description: '解决问题的方法和工具',
-    color: '#10B981',
-    icon: '⚙️',
-    weight: 0.8,
-    maturity: 0.5,
-  },
-  {
-    id: 'art',
-    name: '艺术',
-    description: '创造性表达和审美体验',
-    color: '#F59E0B',
-    icon: '🎨',
-    weight: 0.75,
-    maturity: 0.2,
-  },
-  {
-    id: 'psychology',
-    name: '心理学',
-    description: '对心智和行为的理解',
-    color: '#EC4899',
-    icon: '🧠',
-    weight: 0.85,
-    maturity: 0.4,
-  },
-  {
-    id: 'language',
-    name: '语言',
-    description: '沟通和表达的系统',
-    color: '#6366F1',
-    icon: '📝',
-    weight: 0.8,
-    maturity: 0.6,
-  },
-  {
-    id: 'mathematics',
-    name: '数学',
-    description: '数量、结构和变化的抽象研究',
-    color: '#14B8A6',
-    icon: '🔢',
-    weight: 0.75,
-    maturity: 0.35,
-  },
-  {
-    id: 'life',
-    name: '生活',
-    description: '日常经验和人生智慧',
-    color: '#84CC16',
-    icon: '🌱',
-    weight: 0.9,
-    maturity: 0.5,
-  },
+  { id: 'philosophy', name: '哲学', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
+  { id: 'science', name: '科学', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
+  { id: 'technology', name: '技术', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
+  { id: 'art', name: '艺术', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
+  { id: 'psychology', name: '心理学', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
+  { id: 'language', name: '语言', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
+  { id: 'mathematics', name: '数学', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
+  { id: 'life', name: '生活', description: '', color: '#888888', icon: '📚', weight: 0.5, maturity: 0.5 },
 ];
 
 /**

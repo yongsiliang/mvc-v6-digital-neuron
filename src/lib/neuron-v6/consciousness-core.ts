@@ -82,14 +82,14 @@ import {
 import { 
   InnerDialogueEngine,
   DialecticThinkingEngine,
-  VoiceType,
-  VoicePersona,
+  EmergentVoice,
+  EmergentVoiceType,
   VoiceStatement,
   InnerDialogue,
   ConsensusResult,
   DialecticProcess,
   VoiceActivation,
-  VOICE_PERSONAS
+  ThinkingPerspective
 } from './inner-dialogue';
 import {
   KeyInfoExtractor,

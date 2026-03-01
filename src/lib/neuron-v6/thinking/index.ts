@@ -14,21 +14,21 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-// 内心对话
+// 内心对话（涌现式）
 export type {
-  VoiceType,
-  VoicePersona,
+  EmergentVoice,
+  EmergentVoiceType,
   VoiceStatement,
   InnerDialogue,
   ConsensusResult,
   DialecticProcess,
   VoiceActivation,
+  ThinkingPerspective,
 } from '../inner-dialogue';
 
 export {
   InnerDialogueEngine,
   DialecticThinkingEngine,
-  VOICE_PERSONAS,
 } from '../inner-dialogue';
 
 // 内心独白

@@ -193,10 +193,7 @@ export async function POST(request: NextRequest) {
               synthesis: result.innerDialogueState.dialecticProcess.synthesis?.slice(0, 100),
             } : null,
             voiceActivations: result.innerDialogueState.voiceActivations.map(v => ({
-              voice: v.voice,
-              name: v.voice === 'rational' ? '理性者' : 
-                    v.voice === 'emotional' ? '情感者' :
-                    v.voice === 'critic' ? '批判者' : '梦想家',
+              voiceId: v.voiceId,
               activationLevel: v.activationLevel,
               speakingCount: v.speakingCount,
             })),

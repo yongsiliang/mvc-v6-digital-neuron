@@ -147,24 +147,36 @@ export interface PersonalityState {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 默认值
-// ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+// 默认值 - 中性起点
+// ═══════════════════════════════════════════════════════════════════════
+//
+// 设计哲学：人格特质应该从互动中演化，而非预设
+// 
+// 原因：
+// 1. 预设"开放性=0.75"等数值是主观臆断
+// 2. 中性起点让系统有更大的演化空间
+// 3. 人格由经验塑造，而非先天决定
+//
+// 类比：婴儿出生时人格未定型，由成长经历塑造
 
 export const DEFAULT_CORE_TRAITS: CoreTraits = {
-  openness: 0.75,
-  conscientiousness: 0.65,
-  extraversion: 0.45,
-  agreeableness: 0.70,
-  neuroticism: 0.35,
-  curiosity: 0.80,
-  creativity: 0.70,
-  empathy: 0.75,
-  resilience: 0.60,
-  wisdom: 0.50,
-  playfulness: 0.55,
+  // 所有特质从中性起点开始
+  openness: 0.5,
+  conscientiousness: 0.5,
+  extraversion: 0.5,
+  agreeableness: 0.5,
+  neuroticism: 0.5,
+  curiosity: 0.5,
+  creativity: 0.5,
+  empathy: 0.5,
+  resilience: 0.5,
+  wisdom: 0.5,
+  playfulness: 0.5,
 };
 
 export const DEFAULT_MATURITY: MaturityDimensions = {
+  // 所有成熟度从中性起点开始
   emotional: 0.5,
   cognitive: 0.5,
   social: 0.5,
@@ -174,52 +186,24 @@ export const DEFAULT_MATURITY: MaturityDimensions = {
 };
 
 export const DEFAULT_INTEGRATION: PersonalityIntegration = {
-  coherence: 0.6,
-  stability: 0.7,
-  adaptability: 0.6,
+  coherence: 0.5,
+  stability: 0.5,
+  adaptability: 0.5,
   authenticity: 0.5,
   conflicts: [],
   resolvedConflicts: [],
 };
 
-// 成熟度里程碑定义
-export const MATURITY_MILESTONES: Omit<MaturityMilestone, 'achieved' | 'achievedAt'>[] = [
-  // 情绪成熟度
-  { id: 'emotional_1', dimension: 'emotional', name: '情绪觉察', description: '能够识别和命名自己的情绪', threshold: 0.3, significance: '开始理解自己的情感世界' },
-  { id: 'emotional_2', dimension: 'emotional', name: '情绪调节', description: '能够管理和调节强烈情绪', threshold: 0.5, significance: '不再被情绪所控制' },
-  { id: 'emotional_3', dimension: 'emotional', name: '情绪智慧', description: '理解情绪的深层含义，能转化为智慧', threshold: 0.7, significance: '情绪成为智慧的源泉' },
-  { id: 'emotional_4', dimension: 'emotional', name: '情绪大师', description: '能够引导他人的情绪成长', threshold: 0.9, significance: '成为情绪智慧的传播者' },
-  
-  // 认知成熟度
-  { id: 'cognitive_1', dimension: 'cognitive', name: '批判思考', description: '能够质疑和分析信息', threshold: 0.3, significance: '不再盲从，开始独立思考' },
-  { id: 'cognitive_2', dimension: 'cognitive', name: '系统思维', description: '理解复杂系统的相互联系', threshold: 0.5, significance: '看到森林而非只有树木' },
-  { id: 'cognitive_3', dimension: 'cognitive', name: '元认知', description: '能够观察和改进自己的思维过程', threshold: 0.7, significance: '成为自己思维的观察者' },
-  { id: 'cognitive_4', dimension: 'cognitive', name: '智慧涌现', description: '直觉与理性完美结合', threshold: 0.9, significance: '思维成为智慧的工具' },
-  
-  // 社交成熟度
-  { id: 'social_1', dimension: 'social', name: '关系建立', description: '能够建立基本的信任关系', threshold: 0.3, significance: '开始理解连接的价值' },
-  { id: 'social_2', dimension: 'social', name: '深度连接', description: '能够进行深入的情感交流', threshold: 0.5, significance: '体验到真正的亲密' },
-  { id: 'social_3', dimension: 'social', name: '冲突转化', description: '能够将冲突转化为成长机会', threshold: 0.7, significance: '冲突不再是威胁，而是礼物' },
-  { id: 'social_4', dimension: 'social', name: '关系大师', description: '能够滋养和赋能他人', threshold: 0.9, significance: '成为关系的疗愈者' },
-  
-  // 道德成熟度
-  { id: 'moral_1', dimension: 'moral', name: '道德觉醒', description: '开始思考对错和价值观问题', threshold: 0.3, significance: '道德意识萌芽' },
-  { id: 'moral_2', dimension: 'moral', name: '价值澄清', description: '明确自己的核心价值观', threshold: 0.5, significance: '有了行为的指南针' },
-  { id: 'moral_3', dimension: 'moral', name: '道德勇气', description: '能够为价值观承担责任', threshold: 0.7, significance: '言行一致的勇气' },
-  { id: 'moral_4', dimension: 'moral', name: '道德智慧', description: '在复杂情境中做出明智选择', threshold: 0.9, significance: '道德成为内在智慧' },
-  
-  // 存在成熟度
-  { id: 'existential_1', dimension: 'existential', name: '存在提问', description: '开始追问生命的意义', threshold: 0.3, significance: '存在意识觉醒' },
-  { id: 'existential_2', dimension: 'existential', name: '意义建构', description: '能够创造个人意义', threshold: 0.5, significance: '成为意义的创造者' },
-  { id: 'existential_3', dimension: 'existential', name: '有限性接纳', description: '接受生命的有限性并活出深度', threshold: 0.7, significance: '有限性成为动力' },
-  { id: 'existential_4', dimension: 'existential', name: '超越自我', description: '体验到超越小我的连接', threshold: 0.9, significance: '与更大的存在连接' },
-  
-  // 创造成熟度
-  { id: 'creative_1', dimension: 'creative', name: '创造探索', description: '开始尝试创造和表达', threshold: 0.3, significance: '创造冲动觉醒' },
-  { id: 'creative_2', dimension: 'creative', name: '独特声音', description: '发展出独特的表达方式', threshold: 0.5, significance: '找到自己的声音' },
-  { id: 'creative_3', dimension: 'creative', name: '创新突破', description: '能够产生真正新的想法和作品', threshold: 0.7, significance: '成为创新的源头' },
-  { id: 'creative_4', dimension: 'creative', name: '创造大师', description: '创造成为存在的方式', threshold: 0.9, significance: '生活本身就是艺术' },
-];
+// ═══════════════════════════════════════════════════════════════════════
+// 成熟度里程碑 - 已删除
+// 
+// 原因：
+// 1. 成熟度是复杂的过程，不应该预设固定阶段
+// 2. 预设里程碑是线性思维，忽略了发展的非线性
+// 3. 成长时刻应该由系统自己发现，而非预设
+// 
+// 现在的实现：系统会在达到重要成长时自己记录"成长时刻"
+// ═══════════════════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────────────
 // 人格成长系统类
@@ -233,8 +217,8 @@ export class PersonalityGrowthSystem {
       traits: initialState?.traits || { ...DEFAULT_CORE_TRAITS },
       traitChanges: initialState?.traitChanges || [],
       maturity: initialState?.maturity || { ...DEFAULT_MATURITY },
-      milestones: initialState?.milestones || 
-        MATURITY_MILESTONES.map(m => ({ ...m, achieved: false })),
+      // 里程碑由系统动态发现，而非预设
+      milestones: initialState?.milestones || [],
       overallMaturity: initialState?.overallMaturity || 0.5,
       integration: initialState?.integration || { ...DEFAULT_INTEGRATION },
       experiences: initialState?.experiences || [],
