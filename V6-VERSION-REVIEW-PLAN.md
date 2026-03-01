@@ -524,6 +524,33 @@ Month 2:
 
 ## 📝 变更日志
 
+### 2025-01-XX - Phase 1 持续优化（第二轮）
+**辅助函数提取**
+- ✅ 创建 `reflection-helpers.ts`（284 行）- 反思系统纯计算函数
+  - `detectEmotionalTone`, `analyzeEmotionalTransitions`, `detectContradictions`
+  - `analyzeCognitivePatterns`, `generateReflectionQuestions`, `generateInsight`
+  - `generateCuriosityQuestions`, `calculateSelfCoherence`, `synthesizeWisdomFromReflections`
+- ✅ 创建 `learning-helpers.ts`（227 行）- 长期学习纯计算函数
+  - `extractTopics`, `identifyEmotionalTrajectory`, `getDominantTone`
+  - `identifyLearningPoints`, `formSessionSummary`, `calculateStreamCoherence`
+- ✅ consciousness-core.ts 从 3834 行减少到 3623 行（减少 211 行，-5.5%）
+- ✅ TypeScript 严格模式检查通过
+- ✅ 构建成功无错误
+
+**累计优化**
+| 文件 | 原始行数 | 当前行数 | 减少 |
+|------|---------|---------|------|
+| consciousness-core.ts | 4574 | 3623 | -951 (-21%) |
+| consciousness-core/types.ts | - | 632 | +632 |
+| consciousness-core/persistence.ts | - | 273 | +273 |
+| consciousness-core/reflection-helpers.ts | - | 284 | +284 |
+| consciousness-core/learning-helpers.ts | - | 227 | +227 |
+| consciousness-core/index.ts | - | 50 | +50 |
+
+**剩余工作**
+- ⏳ consciousness-core.ts 当前 3623 行，目标 <800 行
+- ⏳ 需要继续拆分核心引擎方法
+
 ### 2025-01-XX - Phase 1 持续优化
 **文件拆分**
 - ✅ 提取 PersistenceManagerV6 到 `consciousness-core/persistence.ts`（273 行）

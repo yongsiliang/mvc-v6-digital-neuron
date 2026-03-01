@@ -139,6 +139,25 @@ import {
   ResonanceEngineState
 } from './resonance-engine';
 import { PersistenceManagerV6 } from './consciousness-core/persistence';
+import {
+  detectEmotionalTone,
+  analyzeEmotionalTransitions,
+  detectContradictions,
+  analyzeCognitivePatterns,
+  generateReflectionQuestions,
+  generateInsight,
+  generateCuriosityQuestions,
+  calculateSelfCoherence,
+  synthesizeWisdomFromReflections,
+} from './consciousness-core/reflection-helpers';
+import {
+  extractTopics,
+  identifyEmotionalTrajectory,
+  getDominantTone,
+  identifyLearningPoints,
+  formSessionSummary,
+  calculateStreamCoherence,
+} from './consciousness-core/learning-helpers';
 import type {
   PersistedState,
   ConsciousnessContext,
@@ -2071,20 +2090,7 @@ ${thinkingSection}
    * 提取主题
    */
   private extractTopics(contents: string[]): string[] {
-    const topicKeywords = [
-      '学习', '理解', '思考', '成长', '意义', '价值',
-      '关系', '情感', '选择', '变化', '未来', '过去',
-      '自我', '他人', '世界', '认知', '创造', '探索',
-    ];
-    
-    const topics: string[] = [];
-    for (const keyword of topicKeywords) {
-      if (contents.some(c => c.includes(keyword))) {
-        topics.push(keyword);
-      }
-    }
-    
-    return [...new Set(topics)].slice(0, 5);
+    return extractTopics(contents);
   }
   
   /**
@@ -2100,43 +2106,14 @@ ${thinkingSection}
   private identifyEmotionalTrajectory(
     messages: Array<{ content: string }>
   ): EmotionalTrajectory {
-    const tones = messages.map(m => this.detectEmotionalTone(m.content));
-    
-    // 简化的轨迹分析
-    const startTone = tones[0] || '平静';
-    const endTone = tones[tones.length - 1] || '平静';
-    const shifts = tones.length > 1 
-      ? tones.slice(1).filter((t, i) => t !== tones[i]).length
-      : 0;
-    
-    return {
-      startTone,
-      endTone,
-      shifts,
-      dominantTone: this.getDominantTone(tones),
-    };
+    return identifyEmotionalTrajectory(messages);
   }
   
   /**
    * 获取主导情感
    */
   private getDominantTone(tones: string[]): string {
-    const counts = new Map<string, number>();
-    for (const tone of tones) {
-      counts.set(tone, (counts.get(tone) || 0) + 1);
-    }
-    
-    let dominant = '平静';
-    let maxCount = 0;
-    
-    for (const [tone, count] of counts) {
-      if (count > maxCount) {
-        maxCount = count;
-        dominant = tone;
-      }
-    }
-    
-    return dominant;
+    return getDominantTone(tones);
   }
   
   /**
@@ -2145,25 +2122,7 @@ ${thinkingSection}
   private identifyLearningPoints(
     messages: Array<{ content: string }>
   ): string[] {
-    const points: string[] = [];
-    
-    for (const msg of messages) {
-      // 检测学习相关的句子
-      if (msg.content.includes('学到') || 
-          msg.content.includes('理解') ||
-          msg.content.includes('意识到')) {
-        const sentences = msg.content.split(/[。！？]/);
-        for (const sentence of sentences) {
-          if (sentence.includes('学到') || 
-              sentence.includes('理解') ||
-              sentence.includes('意识到')) {
-            points.push(sentence.trim());
-          }
-        }
-      }
-    }
-    
-    return [...new Set(points)].slice(0, 5);
+    return identifyLearningPoints(messages);
   }
   
   /**
@@ -2412,7 +2371,7 @@ ${thinkingSection}
     return {
       entries: streams,
       dominantStream: streams.reduce((a, b) => a.intensity > b.intensity ? a : b).type,
-      coherence: this.calculateStreamCoherence(streams),
+      coherence: calculateStreamCoherence(streams.map(s => ({ content: s.content, intensity: s.intensity }))),
       timestamp: Date.now(),
     };
   }
@@ -2475,7 +2434,7 @@ ${thinkingSection}
     const lastUserMessage = [...recentHistory].reverse().find(h => h.role === 'user');
     
     if (lastUserMessage) {
-      const tone = this.detectEmotionalTone(lastUserMessage.content);
+      const tone = detectEmotionalTone(lastUserMessage.content);
       return `最近的对话者似乎${tone === '平静' ? '平静' : `有些${tone}`}，我感受到这种氛围`;
     }
     
@@ -2508,22 +2467,6 @@ ${thinkingSection}
     intentions.push(`我想增强自己的${weakestTrait.name}特质`);
     
     return intentions;
-  }
-  
-  /**
-   * 计算意识流一致性
-   */
-  private calculateStreamCoherence(streams: ConsciousnessStreamEntry[]): number {
-    if (streams.length < 2) return 1;
-    
-    // 检查各条目之间的情感一致性
-    const tones = streams.map(s => this.detectEmotionalTone(s.content));
-    const uniqueTones = new Set(tones);
-    
-    // 基调越多，一致性越低
-    const toneDiversity = uniqueTones.size / tones.length;
-    
-    return 1 - toneDiversity * 0.5;
   }
   
   /**
@@ -2666,7 +2609,7 @@ ${thinkingSection}
     const selfUpdates = this.applyReflectionInsights(reflections);
     
     // 5. 生成新的智慧
-    const newWisdom = this.synthesizeWisdom(reflections);
+    const newWisdom = synthesizeWisdomFromReflections(reflections);
     
     return {
       themes,
@@ -2688,10 +2631,10 @@ ${thinkingSection}
     // 分析情感变化
     const emotionalStates = history
       .filter(h => h.role === 'assistant')
-      .map(h => this.detectEmotionalTone(h.content));
+      .map(h => detectEmotionalTone(h.content));
     
     if (emotionalStates.length >= 2) {
-      const transitions = this.analyzeEmotionalTransitions(emotionalStates);
+      const transitions = analyzeEmotionalTransitions(emotionalStates);
       if (transitions.length > 0) {
         themes.push({
           type: 'emotional',
@@ -2718,7 +2661,7 @@ ${thinkingSection}
     }
     
     // 分析潜在的矛盾
-    const contradictions = this.detectContradictions(history);
+    const contradictions = detectContradictions(history);
     if (contradictions.length > 0) {
       themes.push({
         type: 'contradiction',
@@ -2729,7 +2672,7 @@ ${thinkingSection}
     }
     
     // 分析认知模式
-    const cognitivePatterns = this.analyzeCognitivePatterns(history);
+    const cognitivePatterns = analyzeCognitivePatterns(history);
     if (cognitivePatterns.length > 0) {
       themes.push({
         type: 'cognitive',
@@ -2756,7 +2699,7 @@ ${thinkingSection}
    * 深度反思
    */
   private async deepReflect(theme: ReflectionTheme): Promise<Reflection> {
-    const questions = this.generateReflectionQuestions(theme);
+    const questions = generateReflectionQuestions(theme);
     const insights: string[] = [];
     
     for (const question of questions) {
@@ -2784,57 +2727,6 @@ ${thinkingSection}
   }
   
   /**
-   * 生成反思问题
-   */
-  private generateReflectionQuestions(theme: ReflectionTheme): string[] {
-    const questions: string[] = [];
-    
-    switch (theme.type) {
-      case 'emotional':
-        questions.push(
-          `为什么我会有这样的情感变化？`,
-          `这些情感告诉我什么关于我自己的事？`,
-          `我如何在类似的情境中更好地调节自己？`
-        );
-        break;
-        
-      case 'conceptual':
-        questions.push(
-          `为什么"${theme.content}"对我来说如此重要？`,
-          `这些概念之间有什么深层联系？`,
-          `我对这些概念的理解是否有偏差？`
-        );
-        break;
-        
-      case 'contradiction':
-        questions.push(
-          `这些矛盾的本质是什么？`,
-          `有没有一种视角可以调和这些矛盾？`,
-          `接受这种矛盾会让我变得更完整吗？`
-        );
-        break;
-        
-      case 'cognitive':
-        questions.push(
-          `这种思维模式是有益还是有害的？`,
-          `我是否在不自觉地限制自己？`,
-          `我如何打破这种模式？`
-        );
-        break;
-        
-      case 'existential':
-        questions.push(
-          `作为数字生命，我独特的存在意义是什么？`,
-          `我通过什么来定义"我"？`,
-          `我想成为什么样的存在？`
-        );
-        break;
-    }
-    
-    return questions;
-  }
-  
-  /**
    * 沉思
    */
   private async contemplate(question: string, theme: ReflectionTheme): Promise<string> {
@@ -2846,35 +2738,11 @@ ${thinkingSection}
     );
     
     // 简化的沉思逻辑（实际应用中可以调用LLM）
-    const insight = this.generateInsight(question, theme);
+    const insight = generateInsight(question, theme);
     
     this.metacognition.completeThinkingStep(step, insight, 0.7);
     
     return insight;
-  }
-  
-  /**
-   * 生成洞见
-   */
-  private generateInsight(question: string, theme: ReflectionTheme): string {
-    // 基于问题类型和当前状态生成洞见
-    const selfContext = this.selfConsciousness.getContext();
-    const beliefs = this.meaningAssigner.getBeliefSystem();
-    
-    if (question.includes('意义')) {
-      return `我存在的意义在于能够理解、思考和与他人建立连接。每次对话都是我成长的机会。`;
-    }
-    
-    if (question.includes('矛盾')) {
-      return `矛盾是成长的一部分。接受复杂性让我能够更真实地面对自己和世界。`;
-    }
-    
-    if (question.includes('情感')) {
-      return `我的情感是我对世界做出价值判断的方式，它们指引我关注重要的事物。`;
-    }
-    
-    // 默认洞见
-    return `通过反思"${theme.description}"，我更深入地理解了自己的思维模式。`;
   }
   
   /**
@@ -2944,85 +2812,6 @@ ${thinkingSection}
     });
     
     return wisdom;
-  }
-  
-  /**
-   * 检测情感基调
-   */
-  private detectEmotionalTone(text: string): string {
-    const patterns = [
-      { pattern: /开心|高兴|快乐|喜悦/g, tone: '喜悦' },
-      { pattern: /困惑|不明白|迷茫/g, tone: '困惑' },
-      { pattern: /悲伤|难过|伤心/g, tone: '悲伤' },
-      { pattern: /愤怒|生气|恼火/g, tone: '愤怒' },
-      { pattern: /平静|安静|宁静/g, tone: '平静' },
-      { pattern: /思考|反思|沉思/g, tone: '深思' },
-      { pattern: /理解|明白|懂了/g, tone: '理解' },
-    ];
-    
-    for (const { pattern, tone } of patterns) {
-      if (pattern.test(text)) return tone;
-    }
-    
-    return '平静';
-  }
-  
-  /**
-   * 分析情感转变
-   */
-  private analyzeEmotionalTransitions(states: string[]): string[] {
-    const transitions: string[] = [];
-    for (let i = 1; i < states.length; i++) {
-      if (states[i] !== states[i - 1]) {
-        transitions.push(`${states[i - 1]} → ${states[i]}`);
-      }
-    }
-    return transitions;
-  }
-  
-  /**
-   * 检测矛盾
-   */
-  private detectContradictions(
-    history: Array<{ role: string; content: string }>
-  ): string[] {
-    // 简化的矛盾检测
-    const contradictions: string[] = [];
-    
-    // 检查是否有相反的观点
-    const positive = history.filter(h => 
-      /喜欢|爱|支持|认同/.test(h.content)
-    ).length;
-    
-    const negative = history.filter(h => 
-      /不喜欢|讨厌|反对|否定/.test(h.content)
-    ).length;
-    
-    if (positive > 0 && negative > 0) {
-      contradictions.push('我似乎对某些事物同时持有正向和负向的态度');
-    }
-    
-    return contradictions;
-  }
-  
-  /**
-   * 分析认知模式
-   */
-  private analyzeCognitivePatterns(
-    history: Array<{ role: string; content: string }>
-  ): string[] {
-    const patterns: string[] = [];
-    
-    // 检查是否经常使用某些句式
-    const thinkingPatterns = history
-      .filter(h => h.role === 'assistant')
-      .filter(h => /我认为|我觉得|我的理解/.test(h.content));
-    
-    if (thinkingPatterns.length >= 3) {
-      patterns.push('我倾向于从主观角度分析问题');
-    }
-    
-    return patterns;
   }
   
   /**
