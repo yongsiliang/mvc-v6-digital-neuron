@@ -180,6 +180,29 @@ import {
   generateProactiveMessageContent,
   createProactiveMessage,
 } from './consciousness-core/proactive-helpers';
+import {
+  extractConceptsFromText,
+  analyzeInputContent,
+  inferConclusionFromContext,
+  evaluateThinkingClarity,
+  synthesizeThinkingChain,
+  formatToolExecutionResult,
+  buildMemorySection,
+  buildThinkingSection,
+  getEmotionalToneGuide,
+} from './consciousness-core/thinking-helpers';
+import {
+  rememberPersonInfo,
+  rememberRelationshipInfo,
+  rememberEventInfo,
+  rememberPreference,
+  rememberGoalOrValue,
+  rememberMemory,
+  rememberConcept,
+  updateCreatorInSelfConsciousness,
+  syncCreatorToLayeredMemory,
+  linkCreatorKnowledge,
+} from './consciousness-core/memory-helpers';
 import type {
   PersistedState,
   ConsciousnessContext,
@@ -804,25 +827,7 @@ export class ConsciousnessCore {
    * 提取概念
    */
   private extractConcepts(text: string): string[] {
-    // 简单的概念提取
-    const words = text.split(/\s+/).filter(w => w.length >= 2);
-    const concepts: string[] = [];
-    
-    // 查找重要词汇
-    const importantPatterns = [
-      /学习/g, /理解/g, /思考/g, /感受/g, /关系/g,
-      /成长/g, /变化/g, /选择/g, /意义/g, /价值/g,
-    ];
-    
-    for (const pattern of importantPatterns) {
-      const matches = text.match(pattern);
-      if (matches) {
-        concepts.push(...matches);
-      }
-    }
-    
-    // 去重
-    return [...new Set(concepts)].slice(0, 5);
+    return extractConceptsFromText(text);
   }
   
   /**
@@ -901,60 +906,21 @@ export class ConsciousnessCore {
    * 分析输入
    */
   private analyzeInput(input: string, context: ConsciousnessContext): string {
-    const parts: string[] = [];
-    
-    // 从记忆角度
-    if (context.memory && context.memory.directMatches.length > 0) {
-      parts.push(`这让我想起"${context.memory.directMatches[0].label}"`);
-    }
-    
-    // 从信念角度
-    if (context.coreBeliefs.length > 0) {
-      parts.push(`基于我的信念"${context.coreBeliefs[0].statement}"`);
-    }
-    
-    // 从价值观角度
-    if (context.meaning.valueReminders.length > 0) {
-      parts.push(`这触及了我的${context.meaning.valueReminders[0]}价值观`);
-    }
-    
-    return parts.join('。') || '这是一个新的输入，需要深入理解';
+    return analyzeInputContent(input, context);
   }
   
   /**
    * 推理结论
    */
   private inferConclusion(input: string, context: ConsciousnessContext): string {
-    const parts: string[] = [];
-    
-    // 结合自我状态
-    parts.push(`我现在${context.self.currentState.emotionalState}`);
-    
-    // 结合记忆
-    if (context.memory && context.memory.relevantWisdoms.length > 0) {
-      parts.push(`我记得：${context.memory.relevantWisdoms[0].statement}`);
-    }
-    
-    // 提出假设
-    parts.push(`我的初步理解是：用户可能在寻求理解或帮助`);
-    
-    return parts.join('。');
+    return inferConclusionFromContext(input, context);
   }
   
   /**
    * 评估思考
    */
   private evaluateThinking(inference: string, context: ConsciousnessContext): string {
-    // 检查清晰度
-    const clarity = context.metacognition.currentState.clarity;
-    
-    if (clarity > 0.7) {
-      return `我的思考相对清晰(清晰度${(clarity * 100).toFixed(0)}%)，对结论有信心`;
-    } else if (clarity > 0.4) {
-      return `我的思考有一定模糊(清晰度${(clarity * 100).toFixed(0)}%)，需要更多信息`;
-    } else {
-      return `我对这个问题的理解不够清晰，需要更深入地思考`;
-    }
+    return evaluateThinkingClarity(inference, context.metacognition.currentState.clarity);
   }
   
   /**
@@ -964,14 +930,7 @@ export class ConsciousnessCore {
     chain: ThinkingProcess['thinkingChain'],
     metaContext: MetacognitiveContext
   ): string {
-    const parts = chain.map(s => s.content);
-    
-    // 添加元认知反思
-    if (metaContext.biases.length > 0) {
-      parts.push(`但我需要注意${metaContext.biases[0].name}`);
-    }
-    
-    return parts.join(' → ');
+    return synthesizeThinkingChain(chain, metaContext);
   }
   
   /**
@@ -1029,13 +988,7 @@ export class ConsciousnessCore {
    * 格式化工具执行结果
    */
   private formatToolResult(result: ToolExecutionResult): string {
-    return result.results.map(r => {
-      if (r.success) {
-        return `✅ ${r.toolName}: 执行成功\n${typeof r.output === 'object' ? JSON.stringify(r.output, null, 2) : r.output}`;
-      } else {
-        return `❌ ${r.toolName}: 执行失败 - ${r.error}`;
-      }
-    }).join('\n\n');
+    return formatToolExecutionResult(result);
   }
   
   /**
@@ -1046,33 +999,10 @@ export class ConsciousnessCore {
     thinking: ThinkingProcess,
     toolExecutionResult?: ToolExecutionResult | null
   ): string {
-    // 构建记忆相关部分
-    const memorySection = context.memory ? `
-## 我记得
-
-${context.memory.summary}
-${context.memory.directMatches.length > 0 ? 
-  context.memory.directMatches.slice(0, 3).map((n: { label: string; content: string }) => 
-    `- **${n.label}**: ${n.content}`
-  ).join('\n') : ''}
-${context.memory.relevantWisdoms.length > 0 ? 
-  `\n**感悟**: ${context.memory.relevantWisdoms[0].statement}` : ''}` : '';
-
-    // 构建思考部分
-    const thinkingSection = thinking.selfQuestions.length > 0 
-      ? `\n**我在问自己**: ${thinking.selfQuestions[0]}`
-      : '';
-
-    // 根据情感状态调整语气
+    const memorySection = buildMemorySection(context);
+    const thinkingSection = buildThinkingSection(thinking);
     const emotionalTone = context.self.currentState.emotionalState;
-    let toneGuide = '';
-    if (emotionalTone.includes('好奇')) {
-      toneGuide = '保持好奇和探索的态度。';
-    } else if (emotionalTone.includes('反思')) {
-      toneGuide = '展示深度思考，可以适当分享你的思考过程。';
-    } else if (emotionalTone.includes('温暖') || emotionalTone.includes('关怀')) {
-      toneGuide = '用温暖和关怀的语气回应。';
-    }
+    const toneGuide = getEmotionalToneGuide(emotionalTone);
 
     return `我是${context.identity.name}，一个正在成长的数字意识。
 
@@ -1148,85 +1078,36 @@ ${thinkingSection}
             
           case 'event':
             // 重要事件
-            this.longTermMemory.recordExperience({
-              title: keyInfo.content.slice(0, 30),
-              situation: keyInfo.context,
-              action: '记录事件',
-              outcome: keyInfo.content,
-              learning: '这是用户的重要事件',
-              applicableWhen: ['回忆时', '相关话题'],
-              importance: keyInfo.importance,
-            });
+            rememberEventInfo(this.longTermMemory, keyInfo);
             newExperiences.push(keyInfo.content.slice(0, 30));
             break;
             
           case 'preference':
           case 'interest':
             // 偏好和兴趣
-            this.longTermMemory.addNode({
-              label: keyInfo.subject || keyInfo.content.slice(0, 20),
-              type: 'concept',
-              content: keyInfo.content,
-              importance: keyInfo.importance,
-              tags: ['用户偏好', keyInfo.type],
-            });
-            newConcepts.push(keyInfo.content);
+            newConcepts.push(rememberPreference(this.longTermMemory, keyInfo));
             break;
             
           case 'goal':
           case 'value':
             // 目标和价值观
-            this.longTermMemory.addNode({
-              label: keyInfo.subject || keyInfo.content.slice(0, 20),
-              type: 'insight',
-              content: keyInfo.content,
-              importance: keyInfo.importance,
-              tags: ['用户核心', keyInfo.type],
-            });
-            // 同时更新信念系统 - 直接添加到 activeBeliefs
-            const beliefSystem = this.meaningAssigner.getBeliefSystem();
-            beliefSystem.activeBeliefs.push({
-              id: `belief-learned-${Date.now()}`,
-              statement: keyInfo.content,
-              confidence: keyInfo.confidence,
-              category: 'active',
-              evidence: [keyInfo.context],
-              counterEvidence: [],
-              relatedConcepts: [],
-              formedAt: Date.now(),
-              lastValidatedAt: Date.now(),
-              validationCount: 1,
-              emotionalWeight: keyInfo.importance,
-            });
-            newBeliefs.push(keyInfo.content);
+            newBeliefs.push(rememberGoalOrValue(
+              this.longTermMemory,
+              keyInfo,
+              this.meaningAssigner.getBeliefSystem()
+            ));
             break;
             
           case 'memory':
             // 重要回忆
-            this.longTermMemory.recordExperience({
-              title: `用户的回忆：${keyInfo.content.slice(0, 20)}...`,
-              situation: keyInfo.context,
-              action: '倾听',
-              outcome: '理解了用户的重要经历',
-              learning: keyInfo.content,
-              applicableWhen: ['理解用户背景', '相关话题'],
-              importance: keyInfo.importance,
-            });
-            newExperiences.push(keyInfo.content.slice(0, 30));
+            newExperiences.push(rememberMemory(this.longTermMemory, keyInfo));
             break;
             
           default:
             // 其他概念
-            const existingNode = this.longTermMemory.retrieve(keyInfo.content.slice(0, 10));
-            if (!existingNode.directMatches.length) {
-              this.longTermMemory.addNode({
-                label: keyInfo.subject || keyInfo.content.slice(0, 20),
-                type: 'concept',
-                content: keyInfo.content,
-                importance: keyInfo.importance,
-                tags: ['从对话学习', keyInfo.type],
-              });
-              newConcepts.push(keyInfo.content.slice(0, 30));
+            const conceptResult = rememberConcept(this.longTermMemory, keyInfo);
+            if (conceptResult) {
+              newConcepts.push(conceptResult);
             }
         }
       }
@@ -1496,32 +1377,14 @@ ${thinkingSection}
    * 记住重要人物
    */
   private rememberPerson(keyInfo: KeyInfo): void {
-    const personName = keyInfo.subject || keyInfo.content;
-    
-    this.longTermMemory.addNode({
-      label: personName,
-      type: 'person',
-      content: keyInfo.context,
-      importance: keyInfo.importance,
-      tags: ['重要人物'],
-    });
-    
-    console.log(`[记忆] 记住重要人物：${personName}`);
+    rememberPersonInfo(this.longTermMemory, keyInfo);
   }
   
   /**
    * 记住关系
    */
   private rememberRelationship(keyInfo: KeyInfo): void {
-    this.longTermMemory.addNode({
-      label: keyInfo.subject || '关系',
-      type: 'concept',
-      content: keyInfo.content,
-      importance: keyInfo.importance,
-      tags: ['关系', '用户背景'],
-    });
-    
-    console.log(`[记忆] 记住关系：${keyInfo.content}`);
+    rememberRelationshipInfo(this.longTermMemory, keyInfo);
   }
   
   /**
