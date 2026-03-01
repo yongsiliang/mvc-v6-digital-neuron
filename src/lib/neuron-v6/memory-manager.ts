@@ -383,28 +383,26 @@ export class MemoryManager {
     const episodicStats = this.memory.getStats();
     const now = Date.now();
     
-    // 如果有获取低强度记忆的方法
-    if (typeof (this.memory as any).getLowStrengthMemories === 'function') {
-      const lowStrength = (this.memory as any).getLowStrengthMemories('episodic', this.config.forgettingThreshold);
-      
-      for (const id of lowStrength) {
-        // 检查是否应该遗忘
-        const memory = (this.memory as any).episodic?.get(id);
-        if (memory) {
-          const age = (now - memory.timestamp) / (24 * 60 * 60 * 1000);
-          const classification = this.classifier.classify(memory.content);
-          
-          // 决定是删除还是归档
-          if (this.classifier.isDeletable(memory.content, age)) {
-            // 删除
-            (this.memory as any).episodic?.delete(id);
-            removed++;
-          } else if (memory.importance > 0.3 && age > 7) {
-            // 归档到长期存储（这里简化处理，实际应该持久化）
-            archived++;
-            removed++;  // 从内存中移除
-            (this.memory as any).episodic?.delete(id);
-          }
+    // 获取低强度记忆
+    const lowStrength = this.memory.getLowStrengthMemories('episodic', this.config.forgettingThreshold);
+    
+    for (const id of lowStrength) {
+      // 检查是否应该遗忘
+      const memory = this.memory.getEpisodicMemory(id);
+      if (memory) {
+        const age = (now - memory.timestamp) / (24 * 60 * 60 * 1000);
+        const classification = this.classifier.classify(memory.content);
+        
+        // 决定是删除还是归档
+        if (this.classifier.isDeletable(memory.content, age)) {
+          // 删除
+          this.memory.deleteEpisodicMemory(id);
+          removed++;
+        } else if (memory.importance > 0.3 && age > 7) {
+          // 归档到长期存储（这里简化处理，实际应该持久化）
+          archived++;
+          removed++;  // 从内存中移除
+          this.memory.deleteEpisodicMemory(id);
         }
       }
     }
@@ -424,27 +422,24 @@ export class MemoryManager {
     // 如果超过上限，移除最不重要的
     if (stats.consolidatedCount > 100) {
       // 获取所有巩固记忆并按重要性排序
-      const consolidated = (this.memory as any).consolidated;
-      if (consolidated) {
-        const memories = [...consolidated.values()] as ConsolidatedMemory[];
-        memories.sort((a, b) => a.importance - b.importance);
-        
-        const toRemove = memories.slice(0, stats.consolidatedCount - 100);
-        
-        for (const memory of toRemove) {
-          // 检查是否是核心记忆
-          if (memory.tags?.includes('core')) {
-            // 核心记忆降级而不是删除
-            this.memory.addEpisodicMemory(memory.content, {
-              importance: memory.importance * 0.8,
-              tags: [...(memory.tags || []), 'downgraded'],
-            });
-            downgraded++;
-          } else {
-            // 非核心记忆直接删除
-            consolidated.delete(memory.id);
-            removed++;
-          }
+      const memories = this.memory.getAllConsolidatedMemories();
+      memories.sort((a, b) => a.importance - b.importance);
+      
+      const toRemove = memories.slice(0, stats.consolidatedCount - 100);
+      
+      for (const memory of toRemove) {
+        // 检查是否是核心记忆
+        if (memory.tags?.includes('core')) {
+          // 核心记忆降级而不是删除
+          this.memory.addEpisodicMemory(memory.content, {
+            importance: memory.importance * 0.8,
+            tags: [...(memory.tags || []), 'downgraded'],
+          });
+          downgraded++;
+        } else {
+          // 非核心记忆直接删除
+          this.memory.deleteConsolidatedMemory(memory.id);
+          removed++;
         }
       }
     }
@@ -466,24 +461,18 @@ export class MemoryManager {
     // 计算情景记忆的平均重要性和最老年龄
     let episodicAvgImportance = 0;
     let episodicOldestAge = 0;
-    const episodicMemories = (this.memory as any).episodic;
-    if (episodicMemories) {
-      const memories = [...episodicMemories.values()] as EpisodicMemory[];
-      if (memories.length > 0) {
-        episodicAvgImportance = memories.reduce((sum, m) => sum + (m.importance || 0), 0) / memories.length;
-        const oldest = memories.reduce((min, m) => Math.min(min, m.timestamp), Infinity);
-        episodicOldestAge = oldest !== Infinity ? (now - oldest) / (24 * 60 * 60 * 1000) : 0;
-      }
+    const episodicMemories = this.memory.getAllEpisodicMemories();
+    if (episodicMemories.length > 0) {
+      episodicAvgImportance = episodicMemories.reduce((sum, m) => sum + (m.importance || 0), 0) / episodicMemories.length;
+      const oldest = episodicMemories.reduce((min, m) => Math.min(min, m.timestamp), Infinity);
+      episodicOldestAge = oldest !== Infinity ? (now - oldest) / (24 * 60 * 60 * 1000) : 0;
     }
     
     // 计算巩固记忆的平均重要性
     let consolidatedAvgImportance = 0;
-    const consolidatedMemories = (this.memory as any).consolidated;
-    if (consolidatedMemories) {
-      const memories = [...consolidatedMemories.values()] as ConsolidatedMemory[];
-      if (memories.length > 0) {
-        consolidatedAvgImportance = memories.reduce((sum, m) => sum + (m.importance || 0), 0) / memories.length;
-      }
+    const consolidatedMemories = this.memory.getAllConsolidatedMemories();
+    if (consolidatedMemories.length > 0) {
+      consolidatedAvgImportance = consolidatedMemories.reduce((sum, m) => sum + (m.importance || 0), 0) / consolidatedMemories.length;
     }
     
     // 生成建议

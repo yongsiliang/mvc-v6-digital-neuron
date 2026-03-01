@@ -49,6 +49,25 @@ export interface KeyInfo {
 /** 提取结果 */
 export interface ExtractionResult {
   keyInfos: KeyInfo[];
+  confidence: number;
+  method: 'rule' | 'llm' | 'hybrid';
+  summary?: string;
+  shouldRemember?: boolean;
+  memoryPriority?: 'critical' | 'high' | 'medium' | 'low';
+}
+
+/** LLM 返回的 KeyInfo 格式 */
+interface LLMKeyInfo {
+  type: KeyInfoType;
+  content: string;
+  subject?: string;
+  importance: number;
+  reason?: string;
+}
+
+/** 提取结果 */
+interface LLMExtractionResponse {
+  keyInfos: KeyInfo[];
   summary: string;
   shouldRemember: boolean;
   memoryPriority: 'critical' | 'high' | 'medium' | 'low';
@@ -325,6 +344,8 @@ export class KeyInfoExtractor {
     
     return {
       keyInfos: uniqueInfos,
+      confidence: 0.85,
+      method: 'rule' as const,
       summary,
       shouldRemember,
       memoryPriority,
@@ -388,7 +409,7 @@ export class KeyInfoExtractor {
         // 合并规则提取和LLM提取的结果
         const combinedInfos = [
           ...ruleResult.keyInfos,
-          ...llmResult.keyInfos.map((info: any) => ({
+          ...llmResult.keyInfos.map((info: LLMKeyInfo) => ({
             type: info.type as KeyInfoType,
             content: info.content,
             subject: info.subject,
@@ -405,6 +426,8 @@ export class KeyInfoExtractor {
         
         return {
           keyInfos: uniqueInfos,
+          confidence: 0.95,
+          method: 'hybrid' as const,
           summary: llmResult.summary || ruleResult.summary,
           shouldRemember: uniqueInfos.length > 0,
           memoryPriority: this.determinePriority(uniqueInfos),

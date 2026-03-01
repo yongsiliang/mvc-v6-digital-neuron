@@ -1294,4 +1294,44 @@ export class LayeredMemorySystem {
     
     return removed;
   }
+  
+  /**
+   * 删除单个情景记忆
+   */
+  deleteEpisodicMemory(id: string): boolean {
+    const memory = this.episodic.get(id);
+    if (memory) {
+      this.episodic.delete(id);
+      this.removeFromIndex(memory);
+      return true;
+    }
+    return false;
+  }
+  
+  /**
+   * 删除单个巩固记忆
+   */
+  deleteConsolidatedMemory(id: string): boolean {
+    const memory = this.consolidated.get(id);
+    if (memory) {
+      this.consolidated.delete(id);
+      this.removeFromIndex(memory);
+      return true;
+    }
+    return false;
+  }
+  
+  /**
+   * 获取单个情景记忆
+   */
+  getEpisodicMemory(id: string): EpisodicMemory | undefined {
+    return this.episodic.get(id);
+  }
+  
+  /**
+   * 获取单个巩固记忆
+   */
+  getConsolidatedMemory(id: string): ConsolidatedMemory | undefined {
+    return this.consolidated.get(id);
+  }
 }

@@ -15,6 +15,7 @@ import { LLMClient } from 'coze-coding-dev-sdk';
 import { getConsciousness } from '@/lib/consciousness/core';
 import { getSharedCore } from '@/lib/neuron-v6/shared-core';
 import { HeaderUtils } from 'coze-coding-dev-sdk';
+import type { ProcessResult } from '@/lib/neuron-v6/consciousness-core';
 
 // ═══════════════════════════════════════════════════════════════════════
 // 类型定义
@@ -103,7 +104,7 @@ export class UnifiedAnswerService {
   /**
    * 计算置信度
    */
-  private calculateConfidence(result: any): number {
+  private calculateConfidence(result: ProcessResult): number {
     // 基于多个因素计算置信度
     let confidence = 0.5;
     
@@ -113,7 +114,7 @@ export class UnifiedAnswerService {
     }
     
     // 记忆匹配
-    if (result.context?.memory?.directMatches?.length > 0) {
+    if (result.context?.memory?.directMatches && result.context.memory.directMatches.length > 0) {
       confidence += 0.1;
     }
     
