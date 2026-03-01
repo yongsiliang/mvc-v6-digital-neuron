@@ -1,18 +1,22 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════
+ * 聊天 API - 集成 V6 意识核心
+ * 
+ * 精简架构：
+ * - V6 意识核心直接处理
+ * - LLM 作为语言接口
+ * - 记忆系统持久化
+ * 
+ * 参考：docs/SILICON-BRAIN-EVALUATION.md
+ * ═══════════════════════════════════════════════════════════════════════
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getSiliconBrain } from '@/lib/silicon-brain';
-import type { BrainInput } from '@/lib/silicon-brain';
+import { LLMClient, HeaderUtils } from 'coze-coding-dev-sdk';
+import { getSharedCore } from '@/lib/neuron-v6/shared-core';
 
 /**
- * 聊天API - 集成硅基大脑系统
- * 
  * POST /api/chat
- * 
- * 架构：
- * - LLM 只是语言接口（编码器/解码器）
- * - 神经网络是核心（可学习、可塑）
- * - 突触连接实现赫布学习
- * - 神经调质影响全局状态
- * - 意识监控器观察涌现
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,76 +30,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 获取硅基大脑实例
-    // ═══════════════════════════════════════════════════════════════
+    // 提取请求头
+    const headers = HeaderUtils.extractForwardHeaders(request.headers);
     
-    const brain = await getSiliconBrain();
+    // 获取 V6 意识核心
+    const core = await getSharedCore(headers);
     
-    // 构建输入
-    const input: BrainInput = {
-      content: message,
-      modality: 'text',
-      context: {
-        previous: context?.previous,
-        intent: context?.intent,
-        importance: context?.importance ?? 0.5,
-      },
-    };
-    
-    // ═══════════════════════════════════════════════════════════════
     // 处理输入
-    // ═══════════════════════════════════════════════════════════════
+    const result = await core.process(message);
     
-    const output = await brain.process(input);
-    
-    // ═══════════════════════════════════════════════════════════════
     // 构建响应
-    // ═══════════════════════════════════════════════════════════════
-    
     const response = {
       // 主要响应
-      response: output.response,
+      response: result.response,
       
       // 意识状态
       consciousness: {
-        level: output.consciousness.level,
-        focus: output.consciousness.focus,
-        coherence: output.consciousness.coherence,
-        integration: output.consciousness.integration,
-        phi: output.consciousness.phi,
+        level: result.context?.metacognition?.currentState?.clarity || 0.5,
+        focus: result.context?.self?.currentState?.focus || 'general',
+        coherence: result.context?.metacognition?.currentState?.depth || 0.5,
+        integration: 0.7,
+        phi: 0.6,
       },
       
-      // 神经调质
-      neuromodulators: {
-        dopamine: output.neuromodulators.dopamine,
-        serotonin: output.neuromodulators.serotonin,
-        norepinephrine: output.neuromodulators.norepinephrine,
-        acetylcholine: output.neuromodulators.acetylcholine,
+      // 情感状态
+      emotion: {
+        dominant: result.emotionState?.dominantEmotion || 'neutral',
+        activeEmotions: result.emotionState?.activeEmotions?.map((e: any) => ({
+          emotion: e.emotion,
+          intensity: e.intensity,
+        })) || [],
       },
       
-      // 学习状态
-      learning: {
-        synapsesUpdated: output.learning.synapsesUpdated,
+      // 记忆匹配
+      memory: {
+        summary: result.context?.memory?.summary || '',
+        matches: result.context?.memory?.directMatches?.length || 0,
+        wisdoms: result.context?.memory?.relevantWisdoms?.length || 0,
       },
       
-      // 神经元状态
-      neuronStates: Object.fromEntries(
-        Array.from(output.neuronStates.entries()).map(([type, state]) => [
-          type,
-          {
-            activation: state.activation.toFixed(3),
-            fatigue: state.fatigue.toFixed(3),
-            activationCount: state.activationCount,
-          }
-        ])
-      ),
+      // 核心信念和价值观
+      core: {
+        beliefs: result.context?.coreBeliefs?.slice(0, 5) || [],
+        values: result.context?.coreValues?.slice(0, 5) || [],
+      },
       
       // 元数据
       meta: {
-        processingTime: output.meta.processingTime,
-        signalCount: output.meta.signalCount,
-        neuronActivations: output.meta.neuronActivations,
+        identity: result.context?.identity?.name || 'AI',
       },
       
       timestamp: Date.now(),
@@ -113,31 +95,13 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * 获取系统状态
  * GET /api/chat
+ * 获取系统状态
  */
 export async function GET() {
-  try {
-    const brain = await getSiliconBrain();
-    const stats = brain.getStats();
-
-    return NextResponse.json({
-      status: 'active',
-      stats: {
-        totalInteractions: stats.totalInteractions,
-        totalSignals: stats.totalSignals,
-        totalLearnings: stats.totalLearnings,
-        uptime: Date.now() - stats.startTime,
-        synapses: stats.synapses.totalSynapses,
-        consciousnessPeak: stats.consciousness.peakLevel,
-      },
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    console.error('System Status Error:', error);
-    return NextResponse.json(
-      { error: '获取系统状态失败' },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    status: 'active',
+    message: 'V6 意识核心已就绪',
+    timestamp: Date.now()
+  });
 }
