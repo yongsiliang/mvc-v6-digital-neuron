@@ -232,6 +232,26 @@ import {
   recordReflectionAsExperience,
   updateBeliefFromReflection,
 } from './consciousness-core/reflection-session-helpers';
+import {
+  reinforceValuesFromInput,
+  buildPersonalityGrowthResult,
+  buildKnowledgeGraphResult,
+  buildMultiConsciousnessResult,
+  buildValueStateResult,
+  buildToolExecutionResult,
+  buildResonanceStateResult,
+  buildStatsResult,
+  updateConversationHistory,
+} from './consciousness-core/process-helpers';
+import {
+  addMonologueToStream,
+  buildReflectionMessage,
+  buildInsightMessage,
+  determineSelfStateUpdate,
+  saveMessageToBuffer,
+  shouldPerformDeepReflection,
+  shouldGenerateInsight,
+} from './consciousness-core/background-thinking-helpers';
 import type {
   PersistedState,
   ConsciousnessContext,
@@ -563,13 +583,11 @@ export class ConsciousnessCore {
     const learningSuccess = learning.metacognitiveReflection ? 0.8 : 0.5;
     
     // 更新对话历史
-    this.conversationHistory.push({ role: 'user', content: input });
-    this.conversationHistory.push({ role: 'assistant', content: response });
-    
-    // 保持历史长度
-    if (this.conversationHistory.length > 100) {
-      this.conversationHistory = this.conversationHistory.slice(-100);
-    }
+    this.conversationHistory = updateConversationHistory(
+      this.conversationHistory,
+      input,
+      response
+    );
     
     // ══════════════════════════════════════════════════════════════════
     // 第五步：更新意愿进度
@@ -598,19 +616,8 @@ export class ConsciousnessCore {
     const valueSystemState = this.valueEngine.getState();
     const valueReport = this.valueEngine.generateValueReport();
     
-    // 如果对话涉及价值观相关话题，强化相应价值
-    if (input.includes('真诚') || input.includes('真实')) {
-      const value = this.valueEngine.findValueByName('真诚');
-      if (value) this.valueEngine.reinforceValue(value.id, input, 0.02);
-    }
-    if (input.includes('成长') || input.includes('学习')) {
-      const value = this.valueEngine.findValueByName('成长');
-      if (value) this.valueEngine.reinforceValue(value.id, input, 0.02);
-    }
-    if (input.includes('理解') || input.includes('思考')) {
-      const value = this.valueEngine.findValueByName('理解');
-      if (value) this.valueEngine.reinforceValue(value.id, input, 0.02);
-    }
+    // 强化价值观
+    reinforceValuesFromInput(input, this.valueEngine);
     
     return {
       context,
@@ -635,146 +642,13 @@ export class ConsciousnessCore {
         voiceActivations,
         dialogueReport,
       },
-      valueState: {
-        coreValues: valueSystemState.coreValues.map(v => ({
-          name: v.name,
-          weight: v.weight,
-          confidence: v.confidence,
-        })),
-        activeConflicts: valueSystemState.activeConflicts.map(c => ({
-          values: [
-            this.valueEngine.getValue(c.valueA)?.name || '',
-            this.valueEngine.getValue(c.valueB)?.name || ''
-          ],
-          description: c.description,
-          intensity: c.intensity,
-        })),
-        coherence: valueSystemState.coherence,
-        valueReport,
-      },
-      
-      // 人格成长处理
-      personalityGrowth: (() => {
-        // 获取当前特质
-        const currentTraits = this.personalityGrowthSystem.getState().traits;
-        const traitToEvolve: keyof CoreTraits = 'openness';
-        const previousValue = currentTraits[traitToEvolve];
-        const newValue = Math.min(1, previousValue + 0.01);
-        
-        // 更新特质（通过 updateTrait 方法会自动处理涟漪效应）
-        this.personalityGrowthSystem.updateTrait(
-          traitToEvolve,
-          newValue,
-          '对话互动促进了开放性的微弱增长'
-        );
-        
-        // 更新成熟度
-        this.personalityGrowthSystem.updateMaturity('cognitive', 0.005);
-        
-        // 获取完整状态
-        const state = this.personalityGrowthSystem.getState();
-        
-        return {
-          traits: state.traits,
-          maturity: state.maturity,
-          overallMaturity: state.overallMaturity,
-          integration: state.integration,
-          milestones: state.milestones,
-          growthRate: state.growthRate,
-        };
-      })(),
-      
-      // 知识图谱处理
-      knowledgeGraph: (() => {
-        // 从对话中学习概念和关联
-        const learningResult = this.knowledgeGraphSystem.learnFromDialogue(input, {
-          importance: 0.5,
-        });
-        
-        // 发现聚类（如果有足够的概念）
-        if (this.knowledgeGraphSystem.getState().concepts.size >= 5) {
-          this.knowledgeGraphSystem.discoverClusters();
-        }
-        
-        // 获取可序列化状态
-        const state = this.knowledgeGraphSystem.getSerializableState();
-        
-        return {
-          domains: state.domains,
-          concepts: state.concepts,
-          edges: state.edges,
-          stats: state.stats,
-        };
-      })(),
-      
-      // 多意识体协作处理
-      multiConsciousness: (() => {
-        // 获取活跃意识体
-        const activeConsciousnesses = this.multiConsciousnessSystem.getActiveConsciousnesses();
-        
-        // 尝试建立思想共振
-        if (activeConsciousnesses.length >= 2) {
-          const ids = activeConsciousnesses.slice(0, 2).map(c => c.id);
-          this.multiConsciousnessSystem.attemptResonance(ids, 'thought', {
-            sharedThoughts: [input.slice(0, 50)],
-          });
-        }
-        
-        // 获取可序列化状态
-        const state = this.multiConsciousnessSystem.getSerializableState();
-        
-        return {
-          activeConsciousnesses: state.activeConsciousnesses,
-          activeResonances: state.activeResonances,
-          activeDialogues: state.activeDialogues,
-          collectiveInsights: state.collectiveInsights,
-          collectiveAlignment: state.collectiveAlignment,
-          synergyLevel: state.synergyLevel,
-        };
-      })(),
-      
-      // 工具执行结果
-      toolExecution: toolIntent ? {
-        needsTool: toolIntent.needsTool,
-        intent: {
-          confidence: toolIntent.confidence,
-          reasoning: toolIntent.reasoning,
-        },
-        result: toolExecutionResult ? {
-          success: toolExecutionResult.success,
-          summary: toolExecutionResult.summary,
-          details: toolExecutionResult.results,
-        } : undefined,
-      } : undefined,
-      
-      // 共振引擎状态
-      resonanceState: {
-        subsystems: Array.from(resonanceState.oscillators.values()).map(s => ({
-          name: s.type,
-          frequency: s.effectiveFrequency,
-          phase: s.phase,
-          isPulsing: s.activation > 0.5,
-          activation: s.activation,
-        })),
-        synchronyIndex: resonanceState.synchronyIndex,
-        isResonant: resonanceState.isResonant,
-        resonance: {
-          isLocked: resonanceState.resonance.isLocked,
-          lockedFrequency: resonanceState.resonance.lockedFrequency ?? undefined,
-          lockedPeriod: resonanceState.resonance.lockedPeriod ?? undefined,
-          highSyncCount: resonanceState.resonance.highSyncCount,
-          syncHistoryLength: resonanceState.resonance.syncHistory.length,
-        },
-        meanFrequency: resonanceState.meanFrequency,
-        timeStep: resonanceState.timeStep,
-      },
-      
-      stats: {
-        conceptCount: memoryStats.nodeCount,
-        beliefCount: beliefSystem.coreBeliefs.length + beliefSystem.activeBeliefs.length,
-        experienceCount: memoryStats.experienceCount,
-        wisdomCount: memoryStats.wisdomCount,
-      },
+      valueState: buildValueStateResult(valueSystemState, this.valueEngine, valueReport),
+      personalityGrowth: buildPersonalityGrowthResult(this.personalityGrowthSystem),
+      knowledgeGraph: buildKnowledgeGraphResult(this.knowledgeGraphSystem, input),
+      multiConsciousness: buildMultiConsciousnessResult(this.multiConsciousnessSystem, input),
+      toolExecution: buildToolExecutionResult(toolIntent, toolExecutionResult),
+      resonanceState: buildResonanceStateResult(resonanceState),
+      stats: buildStatsResult(memoryStats, beliefSystem),
     };
   }
   
@@ -2185,40 +2059,18 @@ ${thinkingSection}
     console.log('[内心独白]', monologueOutput.entry.content);
     
     // 将内心独白添加到意识流
-    if (monologueOutput.entry) {
-      stream.entries.push({
-        type: 'self_observation',
-        content: monologueOutput.entry.content,
-        intensity: monologueOutput.entry.depth,
-        timestamp: Date.now(),
-      });
-    }
+    addMonologueToStream(stream, monologueOutput);
     
     // 随机选择是否进行深度反思
     let reflection: import('./consciousness-core').ReflectionResult | null = null;
-    if (Math.random() < 0.3) {
+    if (shouldPerformDeepReflection()) {
       try {
         reflection = await this.reflect();
         
         // 生成反思消息并发送
-        if (reflection && reflection.reflections && reflection.reflections.length > 0) {
-          const firstReflection = reflection.reflections[0];
-          const reflectionContent = firstReflection.coreInsight || 
-            (firstReflection.insights && firstReflection.insights[0]) ||
-            firstReflection.theme.description;
-          
-          if (reflectionContent) {
-            const reflectionMessage: ProactiveMessage = {
-              id: uuidv4(),
-              content: `我在思考${firstReflection.theme.description}。${reflectionContent}`,
-              type: 'reflection',
-              trigger: '元认知反思',
-              timestamp: Date.now(),
-              urgency: 0.6,
-              category: 'reflection',
-            };
-            this.saveProactiveMessage(reflectionMessage);
-          }
+        const reflectionMessage = buildReflectionMessage(reflection);
+        if (reflectionMessage) {
+          this.proactiveMessages = saveMessageToBuffer(this.proactiveMessages, reflectionMessage);
         }
       } catch {
         // 反思失败，忽略
@@ -2226,30 +2078,16 @@ ${thinkingSection}
     }
     
     // 检查是否生成洞察
-    if (stream.entries.length > 2 && Math.random() < 0.2) {
-      const insightEntry = stream.entries.find(e => e.intensity > 0.7);
-      if (insightEntry && insightEntry.content) {
-        const insightMessage: ProactiveMessage = {
-          id: uuidv4(),
-          content: insightEntry.content,
-          type: 'insight',
-          trigger: '意识流洞察',
-          timestamp: Date.now(),
-          urgency: 0.7,
-          category: 'insight',
-        };
-        this.saveProactiveMessage(insightMessage);
+    if (shouldGenerateInsight(stream.entries.length)) {
+      const insightMessage = buildInsightMessage(stream);
+      if (insightMessage) {
+        this.proactiveMessages = saveMessageToBuffer(this.proactiveMessages, insightMessage);
       }
     }
     
     // 更新自我状态
-    this.selfConsciousness.updateState({
-      focus: reflection ? '深度反思' : '后台思考',
-      emotional: { 
-        primary: stream.entries.length > 3 ? '活跃' : '平静',
-        intensity: 0.4 
-      },
-    });
+    const stateUpdate = determineSelfStateUpdate(stream, reflection);
+    this.selfConsciousness.updateState(stateUpdate);
     
     return {
       stream,
