@@ -518,11 +518,24 @@ Month 2:
 
 *生成时间：2024-03-01*  
 *版本：V6*  
-*状态：Phase 1 部分完成（类型安全 ✅，文件拆分 ⏳）*
+*状态：Phase 1 进行中（类型安全 ✅，文件拆分 🔄）*
 
 ---
 
 ## 📝 变更日志
+
+### 2025-01-XX - Phase 1 持续优化
+**文件拆分**
+- ✅ 提取 PersistenceManagerV6 到 `consciousness-core/persistence.ts`（273 行）
+- ✅ 提取类型定义到 `consciousness-core/types.ts`（632 行）
+- ✅ 创建模块入口 `consciousness-core/index.ts`（50 行）
+- ✅ consciousness-core.ts 从 4574 行减少到 3834 行（减少 740 行，-16%）
+- ✅ TypeScript 严格模式检查通过
+- ✅ 构建成功无错误
+
+**剩余工作**
+- ⏳ consciousness-core.ts 当前 3834 行，目标 <800 行
+- ⏳ 需要继续拆分核心引擎方法
 
 ### 2025-01-XX - Phase 1 部分完成
 **类型安全优化**
@@ -541,3 +554,5 @@ Month 2:
 - `LayeredMemorySystem`: 新增公共方法 `deleteEpisodicMemory`, `deleteConsolidatedMemory`, `getEpisodicMemory`, `getConsolidatedMemory`
 - `ExtractionResult`: 新增 `summary`, `shouldRemember`, `memoryPriority` 属性
 - 定义 `LLMKeyInfo` 接口替代 `any` 类型
+- 更新 `SpeakTrigger` 接口定义以匹配实际使用
+- 新增 `VolitionAction` 接口

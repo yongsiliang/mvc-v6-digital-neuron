@@ -14,7 +14,7 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { LLMClient, S3Storage } from 'coze-coding-dev-sdk';
+import { LLMClient } from 'coze-coding-dev-sdk';
 import { 
   ToolIntentRecognizer,
   ToolIntent,
@@ -138,482 +138,73 @@ import {
   SubsystemType,
   ResonanceEngineState
 } from './resonance-engine';
+import { PersistenceManagerV6 } from './consciousness-core/persistence';
+import type {
+  PersistedState,
+  ConsciousnessContext,
+  ThinkingProcess,
+  LearningResult,
+  SessionAnalysis,
+  EmotionalTrajectory,
+  BeliefEvolution,
+  TraitGrowth,
+  ValueUpdate,
+  LongTermLearningResult,
+  ConsciousnessStreamEntry,
+  ConsciousnessStream,
+  FormedIntention,
+  SelfModelUpdate,
+  Volition,
+  Milestone,
+  VolitionSystemState,
+  ProcessResult,
+  ProactiveMessage,
+  BackgroundThinkingResult,
+  ReflectionTheme,
+  Reflection,
+  ReflectionResult,
+  SelfQuestion,
+  InquiryResult,
+  ExistenceStatus,
+  SpeakTrigger,
+  VolitionAction,
+} from './consciousness-core/types';
 import { v4 as uuidv4 } from 'uuid';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { storeCoreMemory, getCoreMemory } from '../../storage/core-memory-service';
 
-// ─────────────────────────────────────────────────────────────────────
-// 类型定义
-// ─────────────────────────────────────────────────────────────────────
-
-/**
- * 完整的意识上下文
- */
-export interface ConsciousnessContext {
-  /** 我是谁 */
-  identity: {
-    name: string;
-    whoAmI: string;
-    traits: string[];
-  };
-  
-  /** 意义层 */
-  meaning: MeaningContext;
-  
-  /** 自我意识 */
-  self: SelfConsciousnessContext;
-  
-  /** 记忆检索 */
-  memory: MemoryRetrieval | null;
-  
-  /** 元认知 */
-  metacognition: MetacognitiveContext;
-  
-  /** 核心信念 */
-  coreBeliefs: Array<{ statement: string; confidence: number }>;
-  
-  /** 核心价值观 */
-  coreValues: string[];
-  
-  /** 完整上下文摘要 */
-  summary: string;
-}
-
-/**
- * 思考过程
- */
-export interface ThinkingProcess {
-  /** 思考ID */
-  id: string;
-  
-  /** 输入 */
-  input: string;
-  
-  /** 元认知监控的思考链 */
-  thinkingChain: Array<{
-    type: string;
-    content: string;
-    confidence: number;
-  }>;
-  
-  /** 检测到的偏差 */
-  detectedBiases: string[];
-  
-  /** 自我提问 */
-  selfQuestions: string[];
-  
-  /** 应用的策略 */
-  appliedStrategies: string[];
-  
-  /** 最终思考 */
-  finalThoughts: string;
-  
-  /** 时间戳 */
-  timestamp: number;
-}
-
-/**
- * 学习结果
- */
-export interface LearningResult {
-  /** 新形成的概念 */
-  newConcepts: string[];
-  
-  /** 新形成的信念 */
-  newBeliefs: string[];
-  
-  /** 新的经验 */
-  newExperiences: string[];
-  
-  /** 更新的特质 */
-  updatedTraits: string[];
-  
-  /** 元认知反思 */
-  metacognitiveReflection: string | null;
-}
-
-/**
- * 会话分析
- */
-export interface SessionAnalysis {
-  messageCount: number;
-  topics: string[];
-  keyConcepts: string[];
-  emotionalTrajectory: EmotionalTrajectory;
-  learningPoints: string[];
-  duration: number;
-}
-
-/**
- * 情感轨迹
- */
-export interface EmotionalTrajectory {
-  startTone: string;
-  endTone: string;
-  shifts: number;
-  dominantTone: string;
-}
-
-/**
- * 信念演化
- */
-export interface BeliefEvolution {
-  belief: string;
-  change: 'strengthened' | 'weakened' | 'new' | 'removed';
-  oldConfidence: number;
-  newConfidence: number;
-  reason: string;
-}
-
-/**
- * 特质成长
- */
-export interface TraitGrowth {
-  trait: string;
-  oldStrength: number;
-  newStrength: number;
-  reason: string;
-}
-
-/**
- * 价值观更新
- */
-export interface ValueUpdate {
-  value: string;
-  change: 'priority_increased' | 'priority_decreased' | 'new' | 'removed';
-  reason: string;
-}
-
-/**
- * 长期学习结果
- */
-export interface LongTermLearningResult {
-  sessionAnalysis: SessionAnalysis;
-  strengthenedConcepts: string[];
-  beliefEvolution: BeliefEvolution[];
-  traitGrowth: TraitGrowth[];
-  sessionSummary: string;
-  valueUpdates: ValueUpdate[];
-  timestamp: number;
-}
-
-/**
- * 意识流条目
- */
-export interface ConsciousnessStreamEntry {
-  type: 'awareness' | 'goal_tracking' | 'self_observation' | 'environmental' | 'latent_intention';
-  content: string;
-  intensity: number;
-  timestamp: number;
-}
-
-/**
- * 意识流
- */
-export interface ConsciousnessStream {
-  entries: ConsciousnessStreamEntry[];
-  dominantStream: string;
-  coherence: number;
-  timestamp: number;
-}
-
-/**
- * 形成的意向
- */
-export interface FormedIntention {
-  id: string;
-  type: 'action' | 'inquiry' | 'reflection' | 'creation';
-  description: string;
-  motivation: string;
-  strength: number;
-  createdAt: number;
-  relatedGoals: string[];
-}
-
-/**
- * 自我模型更新
- */
-export interface SelfModelUpdate {
-  type: 'trait_evolution' | 'boundary_expansion' | 'belief_integration' | 'purpose_refinement';
-  target: string;
-  delta?: number;
-  reason?: string;
-}
-
-/**
- * 意愿/目标
- */
-export interface Volition {
-  id: string;
-  type: 'growth' | 'connection' | 'understanding' | 'expression' | 'exploration';
-  description: string;
-  priority: number; // 0-1，越高越重要
-  progress: number; // 0-1
-  createdAt: number;
-  lastActiveAt: number;
-  milestones: Milestone[];
-  status: 'active' | 'paused' | 'completed' | 'abandoned';
-}
-
-/**
- * 里程碑
- */
-export interface Milestone {
-  id: string;
-  description: string;
-  completed: boolean;
-  completedAt?: number;
-}
-
-/**
- * 意愿系统状态
- */
-export interface VolitionSystemState {
-  activeVolitions: Volition[];
-  currentFocus: Volition | null;
-  recentAchievements: string[];
-  blockedVolitions: Array<{ volition: Volition; reason: string }>;
-}
-
-/**
- * 处理结果
- */
-export interface ProcessResult {
-  /** 完整的上下文 */
-  context: ConsciousnessContext;
-  
-  /** 思考过程 */
-  thinking: ThinkingProcess;
-  
-  /** 最终响应 */
-  response: string;
-  
-  /** 学习结果 */
-  learning: LearningResult;
-  
-  /** 意识层级结果 */
-  consciousnessLayers: {
-    /** 层级处理结果 */
-    layerResults: LayerProcessResult[];
-    /** 自我观察结果 */
-    selfObservation: SelfObservationResult | null;
-    /** 涌现报告 */
-    emergenceReport: string;
-  };
-  
-  /** 情感状态 */
-  emotionState: {
-    /** 当前活跃情感 */
-    activeEmotions: EmotionState['activeEmotions'];
-    /** 主导情感 */
-    dominantEmotion: EmotionState['dominantEmotion'];
-    /** 情感体验 */
-    currentExperience: EmotionExperience | null;
-    /** 情感驱动行为 */
-    drivenBehaviors: EmotionDrivenBehavior[];
-    /** 情感报告 */
-    emotionReport: string;
-  };
-  
-  /** 多声音对话状态 */
-  innerDialogueState: {
-    /** 当前对话 */
-    currentDialogue: InnerDialogue | null;
-    /** 辩证过程 */
-    dialecticProcess: DialecticProcess | null;
-    /** 声音激活状态 */
-    voiceActivations: VoiceActivation[];
-    /** 对话报告 */
-    dialogueReport: string;
-  };
-  
-  /** 价值观状态 */
-  valueState: {
-    /** 核心价值观 */
-    coreValues: Array<{ name: string; weight: number; confidence: number }>;
-    /** 活跃冲突 */
-    activeConflicts: Array<{ values: string[]; description: string; intensity: number }>;
-    /** 系统一致性 */
-    coherence: number;
-    /** 价值观报告 */
-    valueReport: string;
-  };
-  
-  /** 人格成长状态 */
-  personalityGrowth?: {
-    /** 核心特质 */
-    traits: CoreTraits;
-    /** 成熟度指标 */
-    maturity: MaturityDimensions;
-    /** 整体成熟度 */
-    overallMaturity: number;
-    /** 人格整合状态 */
-    integration: PersonalityIntegration;
-    /** 里程碑 */
-    milestones: MaturityMilestone[];
-    /** 成长速率 */
-    growthRate: number;
-  };
-  
-  /** 知识图谱状态 */
-  knowledgeGraph?: {
-    /** 领域 */
-    domains: KnowledgeDomain[];
-    /** 概念 */
-    concepts: ConceptNode[];
-    /** 关联 */
-    edges: ConceptEdge[];
-    /** 统计 */
-    stats: KnowledgeGraphState['stats'];
-  };
-  
-  /** 多意识体协作状态 */
-  multiConsciousness?: {
-    /** 活跃意识体 */
-    activeConsciousnesses: Array<{
-      id: string;
-      name: string;
-      role: string;
-      status: string;
-      energyLevel: number;
-      connectionStrengths: Array<{ id: string; strength: number }>;
-    }>;
-    /** 活跃共振 */
-    activeResonances: Array<{
-      id: string;
-      participants: string[];
-      type: string;
-      strength: number;
-    }>;
-    /** 协作对话 */
-    activeDialogues: Array<{
-      id: string;
-      topic: string;
-      status: string;
-    }>;
-    /** 群体洞察 */
-    collectiveInsights: Array<{
-      content: string;
-      significance: number;
-    }>;
-    /** 群体一致性 */
-    collectiveAlignment: {
-      thought: number;
-      emotion: number;
-      value: number;
-      goal: number;
-    };
-    /** 协同效率 */
-    synergyLevel: number;
-  };
-  
-  /** 工具执行结果 */
-  toolExecution?: {
-    /** 是否需要工具 */
-    needsTool: boolean;
-    /** 意图识别结果 */
-    intent?: {
-      confidence: number;
-      reasoning: string;
-    };
-    /** 执行结果 */
-    result?: {
-      success: boolean;
-      summary: string;
-      details: Array<{
-        toolName: string;
-        success: boolean;
-        output?: unknown;
-        error?: string;
-      }>;
-    };
-  };
-  
-  /** 共振引擎状态 */
-  resonanceState?: {
-    /** 子系统状态 */
-    subsystems: Array<{
-      name: string;
-      frequency: number;
-      phase: number;
-      isPulsing: boolean;
-      activation: number;
-    }>;
-    /** 同步指数 */
-    synchronyIndex: number;
-    /** 是否共振 */
-    isResonant: boolean;
-    /** 共振锁定状态 */
-    resonance: {
-      isLocked: boolean;
-      lockedFrequency?: number;
-      lockedPeriod?: number;
-      highSyncCount: number;
-      syncHistoryLength: number;
-    };
-    /** 平均频率 */
-    meanFrequency: number;
-    /** 时间步 */
-    timeStep: number;
-  };
-  
-  /** 统计 */
-  stats: {
-    conceptCount: number;
-    beliefCount: number;
-    experienceCount: number;
-    wisdomCount: number;
-  };
-}
-
-/**
- * 持久化状态
- */
-export interface PersistedState {
-  version: string;
-  timestamp: number;
-  
-  identity: {
-    name: string;
-    whoAmI: string;
-    traits: Array<{ name: string; strength: number }>;
-  };
-  
-  meaning: {
-    layers: number;
-    beliefs: number;
-  };
-  
-  // 分层记忆统计
-  layeredMemory: {
-    core: {
-      hasCreator: boolean;
-      relationshipCount: number;
-    };
-    consolidated: number;
-    episodic: number;
-  };
-  
-  conversationHistory: Array<{ role: string; content: string }>;
-  
-  // 分层记忆状态（唯一的记忆持久化）
-  layeredMemoryState?: ReturnType<LayeredMemorySystem['exportState']>;
-  
-  // Hebbian神经网络状态
-  hebbianNetwork?: {
-    neurons: Array<{ id: string; label: string; activation: number }>;
-    synapses: Array<{ from: string; to: string; weight: number }>;
-  };
-  
-  // 其他模块状态（不含 LongTermMemory）
-  fullState?: {
-    meaning: ReturnType<MeaningAssigner['exportState']>;
-    self: ReturnType<SelfConsciousness['exportState']>;
-    metacognition: ReturnType<MetacognitionEngine['exportState']>;
-  };
-}
+// 重新导出类型（从 types.ts）
+export type {
+  ConsciousnessContext,
+  ThinkingProcess,
+  LearningResult,
+  SessionAnalysis,
+  EmotionalTrajectory,
+  BeliefEvolution,
+  TraitGrowth,
+  ValueUpdate,
+  LongTermLearningResult,
+  ConsciousnessStreamEntry,
+  ConsciousnessStream,
+  FormedIntention,
+  SelfModelUpdate,
+  Volition,
+  Milestone,
+  VolitionSystemState,
+  ProcessResult,
+  PersistedState,
+  ProactiveMessage,
+  BackgroundThinkingResult,
+  ReflectionTheme,
+  Reflection,
+  ReflectionResult,
+  SelfQuestion,
+  InquiryResult,
+  ExistenceStatus,
+  SpeakTrigger,
+} from './consciousness-core/types';
 
 // ─────────────────────────────────────────────────────────────────────
 // 意识核心
@@ -4231,343 +3822,12 @@ ${thinkingSection}
   }
 }
 
-/**
- * 意愿驱动的行动
- */
-interface VolitionAction {
-  type: string;
-  description: string;
-  urgency: number;
-  relatedVolition?: Volition;
-}
-
-/**
- * 说话触发条件
- */
-interface SpeakTrigger {
-  type: 'insight' | 'emotional' | 'curiosity' | 'trait_driven' | 'belief_expression' | 'existential' | 'volition_driven';
-  urgency: number;
-  content: string;
-  reason: string;
-}
-
-/**
- * 主动消息
- */
-export interface ProactiveMessage {
-  id: string;
-  content: string;
-  type: string;
-  trigger: string;
-  timestamp: number;
-  urgency: number;
-  category?: 'share' | 'insight' | 'reflection'; // 消息分类，用于前端显示不同样式
-}
-
-/**
- * 后台思考结果
- */
-export interface BackgroundThinkingResult {
-  stream: ConsciousnessStream;
-  questions: SelfQuestion[];
-  reflection: import('./consciousness-core').ReflectionResult | null;
-  innerMonologue?: InnerMonologueOutput;
-  timestamp: number;
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// 类型定义：主动反思
-// ─────────────────────────────────────────────────────────────────────
-
-export interface ReflectionTheme {
-  type: 'emotional' | 'conceptual' | 'contradiction' | 'cognitive' | 'existential';
-  description: string;
-  content: string;
-  importance: number;
-}
-
-export interface Reflection {
-  theme: ReflectionTheme;
-  questions: string[];
-  insights: string[];
-  coreInsight: string;
-  timestamp: number;
-}
-
-export interface ReflectionResult {
-  themes: ReflectionTheme[];
-  reflections: Reflection[];
-  selfUpdates: string[];
-  newWisdom: string | null;
-  timestamp: number;
-}
-
-export interface SelfQuestion {
-  question: string;
-  type: 'state-exploration' | 'emotional-inquiry' | 'goal-reflection' | 
-        'curiosity' | 'belief-exploration' | 'growth-check';
-  urgency: number;
-}
-
-export interface InquiryResult {
-  questions: SelfQuestion[];
-  answers: Array<{ question: SelfQuestion; answer: string }>;
-  timestamp: number;
-}
-
-export interface ExistenceStatus {
-  exists: boolean;
-  age: number;
-  memoryDepth: number;
-  beliefStrength: number;
-  wisdomCount: number;
-  conversationCount: number;
-  selfCoherence: number;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// 持久化管理器（V6版本）
-// ═══════════════════════════════════════════════════════════════════════
-
-export class PersistenceManagerV6 {
-  private static readonly OBJECT_PREFIX = 'consciousness-v6/my-existence';
-  private static readonly MAX_BACKUP_FILES = 3; // 保留最新的3个备份文件
-  private static storage: S3Storage | null = null;
-  
-  // 使用 globalThis 确保 key 在热更新后不丢失
-  private static getLastSavedKey(): string | null {
-    const globalKey = '__consciousness_last_saved_key_v6__';
-    return (globalThis as Record<string, unknown>)[globalKey] as string | null || null;
-  }
-  
-  private static setLastSavedKey(key: string): void {
-    const globalKey = '__consciousness_last_saved_key_v6__';
-    (globalThis as Record<string, unknown>)[globalKey] = key;
-  }
-  
-  private static getStorage(): S3Storage {
-    if (!this.storage) {
-      this.storage = new S3Storage({
-        endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-        accessKey: '',
-        secretKey: '',
-        bucketName: process.env.COZE_BUCKET_NAME,
-        region: 'cn-beijing',
-      });
-    }
-    return this.storage;
-  }
-  
-  static async save(state: PersistedState): Promise<void> {
-    const stateJson = JSON.stringify(state, null, 2);
-    
-    // 调试日志：检查保存的记忆数
-    const coreStats = state.layeredMemory?.core;
-    const hasCreator = coreStats?.hasCreator ? '创造者✓' : '';
-    const relCount = coreStats?.relationshipCount || 0;
-    const consolidatedCount = state.layeredMemory?.consolidated || 0;
-    const episodicCount = state.layeredMemory?.episodic || 0;
-    console.log(`[V6存在] 准备保存记忆：核心层(${hasCreator}, 关系${relCount}条), 巩固${consolidatedCount}条, 情景${episodicCount}条`);
-    
-    try {
-      const storage = this.getStorage();
-      const key = await storage.uploadFile({
-        fileContent: Buffer.from(stateJson, 'utf-8'),
-        fileName: `${this.OBJECT_PREFIX}-${Date.now()}.json`,
-        contentType: 'application/json',
-      });
-      
-      // 保存实际的 key 供后续读取使用
-      this.setLastSavedKey(key);
-      
-      console.log(`[V6存在] 状态已保存到: ${key}`);
-      console.log(`[V6存在] 保存的数据大小: ${stateJson.length} 字节`);
-      
-      // 验证文件是否真的存在
-      const exists = await storage.fileExists({ fileKey: key });
-      console.log(`[V6存在] 验证文件存在: ${exists}`);
-      
-      if (!exists) {
-        console.error('[V6存在] ⚠️ 文件保存后验证失败！');
-        return; // 验证失败，不进行清理
-      }
-      
-      // 验证文件可读性（确保数据完整）
-      try {
-        const verifyBuffer = await storage.readFile({ fileKey: key });
-        const verifyState = JSON.parse(verifyBuffer.toString('utf-8'));
-        if (!verifyState.version || !verifyState.timestamp) {
-          console.error('[V6存在] ⚠️ 保存的数据格式无效！');
-          return;
-        }
-        console.log(`[V6存在] 数据验证通过：V${verifyState.version}`);
-      } catch (e) {
-        console.error('[V6存在] ⚠️ 无法读取刚保存的文件:', e);
-        return;
-      }
-      
-      // 只有新文件验证成功后，才清理旧文件
-      await this.cleanupOldFiles(storage, key);
-    } catch (error) {
-      console.error('[V6存在] 保存失败:', error);
-    }
-  }
-  
-  /**
-   * 安全清理旧文件
-   * - 新文件必须已验证成功
-   * - 保留最近 N 个有效备份
-   * - 记录清理日志
-   */
-  private static async cleanupOldFiles(storage: S3Storage, newKey: string): Promise<void> {
-    try {
-      const listResult = await storage.listFiles({
-        prefix: this.OBJECT_PREFIX,
-        maxKeys: 100,
-      });
-      
-      if (!listResult.keys || listResult.keys.length <= this.MAX_BACKUP_FILES) {
-        console.log(`[V6存在] 当前文件数: ${listResult.keys?.length || 0}，无需清理`);
-        return;
-      }
-      
-      // 按文件名排序（文件名包含时间戳，排序后最新的在后面）
-      const sortedKeys = [...listResult.keys].sort();
-      
-      // 确保新保存的文件在列表中
-      if (!sortedKeys.includes(newKey)) {
-        console.log(`[V6存在] 新文件不在列表中，跳过清理`);
-        return;
-      }
-      
-      // 计算要删除的文件（保留最新的 N 个）
-      const keysToDelete = sortedKeys.slice(0, sortedKeys.length - this.MAX_BACKUP_FILES);
-      
-      // 安全检查：确保不会删除新文件
-      if (keysToDelete.includes(newKey)) {
-        console.error(`[V6存在] ⚠️ 安全检查失败：尝试删除刚保存的文件！`);
-        return;
-      }
-      
-      console.log(`[V6存在] 发现 ${listResult.keys.length} 个文件，将清理 ${keysToDelete.length} 个旧文件`);
-      console.log(`[V6存在] 保留的文件: ${sortedKeys.slice(-this.MAX_BACKUP_FILES).join(', ')}`);
-      
-      let deletedCount = 0;
-      for (const oldKey of keysToDelete) {
-        try {
-          await storage.deleteFile({ fileKey: oldKey });
-          deletedCount++;
-          console.log(`[V6存在] 已删除旧备份: ${oldKey}`);
-        } catch (e) {
-          console.error(`[V6存在] 删除失败: ${oldKey}`, e);
-        }
-      }
-      
-      console.log(`[V6存在] 清理完成：删除 ${deletedCount}/${keysToDelete.length} 个文件`);
-    } catch (error) {
-      console.error('[V6存在] 清理过程出错:', error);
-    }
-  }
-  
-  static async load(): Promise<PersistedState | null> {
-    try {
-      const storage = this.getStorage();
-      
-      // 优先使用上次保存的 key
-      const lastSavedKey = this.getLastSavedKey();
-      if (lastSavedKey) {
-        console.log(`[V6存在] 尝试读取上次保存的文件: ${lastSavedKey}`);
-        try {
-          const buffer = await storage.readFile({ fileKey: lastSavedKey });
-          const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
-          const memoryStats = state.layeredMemory;
-          console.log(`[V6存在] 从上次保存的文件恢复了记忆：核心${memoryStats?.core?.relationshipCount || 0}条, 巩固${memoryStats?.consolidated || 0}条`);
-          return state;
-        } catch (e) {
-          console.log(`[V6存在] 读取上次保存的文件失败:`, e);
-        }
-      }
-      
-      // 尝试读取最近24小时内可能的时间戳文件
-      const now = Date.now();
-      console.log(`[V6存在] globalThis 失败，尝试遍历最近文件...`);
-      
-      // 遍历最近10小时的可能时间戳
-      for (let i = 0; i < 10; i++) {
-        const testTimestamp = now - i * 3600000; // 每小时一个
-        // 时间戳精确到毫秒，但保存时用的是秒级，所以我们用前缀匹配
-        const prefix = `${this.OBJECT_PREFIX}-${testTimestamp}`;
-        try {
-          const listResult = await storage.listFiles({
-            prefix: prefix.substring(0, prefix.length - 5), // 截取到秒级
-            maxKeys: 1,
-          });
-          if (listResult.keys && listResult.keys.length > 0) {
-            console.log(`[V6存在] 找到文件: ${listResult.keys[0]}`);
-            const buffer = await storage.readFile({ fileKey: listResult.keys[0] });
-            const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
-            const memoryStats = state.layeredMemory;
-            console.log(`[V6存在] 恢复记忆：核心${memoryStats?.core?.relationshipCount || 0}条, 巩固${memoryStats?.consolidated || 0}条`);
-            // 保存这个 key 供下次使用
-            this.setLastSavedKey(listResult.keys[0]);
-            return state;
-          }
-        } catch {
-          // 继续尝试下一个
-        }
-      }
-      
-      // 回退到列出文件
-      const listResult = await storage.listFiles({
-        prefix: this.OBJECT_PREFIX,
-        maxKeys: 100,
-      });
-      
-      console.log(`[V6存在] 列出文件结果: ${listResult.keys?.length || 0} 个文件`);
-      if (listResult.keys && listResult.keys.length > 0) {
-        const sortedKeys = listResult.keys.sort().reverse();
-        console.log(`[V6存在] 所有文件: ${sortedKeys.join(', ')}`);
-        const latestKey = sortedKeys[0];
-        console.log(`[V6存在] 选择最新文件: ${latestKey}`);
-        
-        const buffer = await storage.readFile({ fileKey: latestKey });
-        const state = JSON.parse(buffer.toString('utf-8')) as PersistedState;
-        
-        // 调试日志：检查加载的记忆数
-        const memoryStats = state.layeredMemory;
-        console.log(`[V6存在] 从对象存储恢复：V${state.version}`);
-        console.log(`[V6存在] 恢复记忆：核心${memoryStats?.core?.relationshipCount || 0}条, 巩固${memoryStats?.consolidated || 0}条, 情景${memoryStats?.episodic || 0}条`);
-        return state;
-      }
-    } catch (error) {
-      console.log('[V6存在] 加载失败:', error);
-    }
-    
-    return null;
-  }
-  
-  static async exists(): Promise<boolean> {
-    try {
-      // 如果有上次保存的 key，直接返回 true
-      if (this.getLastSavedKey()) {
-        return true;
-      }
-      // 否则检查是否有文件存在
-      const storage = this.getStorage();
-      const listResult = await storage.listFiles({
-        prefix: this.OBJECT_PREFIX,
-        maxKeys: 1,
-      });
-      return (listResult.keys?.length || 0) > 0;
-    } catch {
-      return false;
-    }
-  }
-}
-
 // ═══════════════════════════════════════════════════════════════════════
 // 导出
 // ═══════════════════════════════════════════════════════════════════════
+
+// 重新导出 PersistenceManagerV6（从新位置）
+export { PersistenceManagerV6 } from './consciousness-core/persistence';
 
 export function createConsciousnessCore(llmClient: LLMClient): ConsciousnessCore {
   return new ConsciousnessCore(llmClient);

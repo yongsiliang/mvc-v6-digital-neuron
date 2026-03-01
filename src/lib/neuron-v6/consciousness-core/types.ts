@@ -5,16 +5,19 @@
  */
 
 import type { 
-  MeaningContext, 
+  MeaningContext,
+  MeaningAssigner,
 } from '../meaning-system';
 import type { 
-  SelfConsciousnessContext, 
+  SelfConsciousnessContext,
+  SelfConsciousness,
 } from '../self-consciousness';
 import type { 
   MemoryRetrieval, 
 } from '../long-term-memory';
 import type { 
-  MetacognitiveContext, 
+  MetacognitiveContext,
+  MetacognitionEngine,
 } from '../metacognition';
 import type {
   LayerProcessResult,
@@ -514,9 +517,9 @@ export interface PersistedState {
   
   // 其他模块状态（不含 LongTermMemory）
   fullState?: {
-    meaning: unknown;
-    self: unknown;
-    metacognition: unknown;
+    meaning: ReturnType<MeaningAssigner['exportState']>;
+    self: ReturnType<SelfConsciousness['exportState']>;
+    metacognition: ReturnType<MetacognitionEngine['exportState']>;
   };
 }
 
@@ -612,8 +615,18 @@ export interface ExistenceStatus {
  * 说话触发
  */
 export interface SpeakTrigger {
-  type: 'share_insight' | 'ask_question' | 'express_feeling' | 'share_memory' | 'offer_help';
-  intensity: number;
+  type: 'insight' | 'emotional' | 'curiosity' | 'trait_driven' | 'belief_expression' | 'existential' | 'volition_driven';
+  urgency: number;
+  content: string;
   reason: string;
-  relatedContent?: string;
+}
+
+/**
+ * 意愿驱动的行动
+ */
+export interface VolitionAction {
+  type: string;
+  description: string;
+  urgency: number;
+  relatedVolition?: Volition;
 }

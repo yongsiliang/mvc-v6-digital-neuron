@@ -12,8 +12,10 @@
 // 重新导出主文件的所有内容
 export {
   ConsciousnessCore,
-  PersistenceManagerV6,
 } from '../consciousness-core';
+
+// 导出持久化管理器
+export { PersistenceManagerV6 } from './persistence';
 
 // 导出类型定义
 export type {
@@ -44,4 +46,5 @@ export type {
   InquiryResult,
   ExistenceStatus,
   SpeakTrigger,
+  VolitionAction,
 } from './types';
