@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye, Hexagon } from 'lucide-react';
+import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye, Hexagon, Triangle } from 'lucide-react';
 
 /**
  * 首页 - 功能导航
@@ -90,6 +90,42 @@ export default function Home() {
                     </div>
                   </div>
                   <ArrowRight className="w-6 h-6 text-cyan-400 group-hover:translate-x-2 transition-transform" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+        
+        {/* 推荐入口 - 正八面体哈密顿环SNN */}
+        <div className="max-w-2xl mx-auto mb-6">
+          <Link href="/octahedron-snn">
+            <Card className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border-amber-500/30 hover:border-amber-500/50 transition-all hover:shadow-xl hover:shadow-amber-500/10 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <Triangle className="w-8 h-8 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h2 className="text-xl font-bold">正八面体 SNN</h2>
+                      <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">几何-神经</span>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      哈密顿环拓扑脉冲网络：6节点环 → 周期振荡。投影即梦境六边形框架。
+                    </p>
+                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Triangle className="w-3 h-3" /> 正八面体
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Zap className="w-3 h-3" /> 脉冲传播
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> 同步振荡
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-amber-400 group-hover:translate-x-2 transition-transform" />
                 </div>
               </CardContent>
             </Card>
