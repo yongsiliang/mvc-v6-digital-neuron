@@ -170,13 +170,6 @@ export async function POST(request: NextRequest) {
             emotionReport: result.emotionState.emotionReport,
           });
           
-          // 发送联想网络状态
-          send('association', {
-            currentInspiration: result.associationState.currentInspiration,
-            activeConcepts: result.associationState.activeConcepts,
-            networkReport: result.associationState.networkReport,
-          });
-          
           // 发送多声音对话状态
           send('innerDialogue', {
             currentDialogue: result.innerDialogueState.currentDialogue ? {
@@ -200,63 +193,12 @@ export async function POST(request: NextRequest) {
             dialogueReport: result.innerDialogueState.dialogueReport,
           });
           
-          // 发送梦境状态
-          send('dream', {
-            currentDream: result.dreamState.currentDream ? {
-              phase: result.dreamState.currentDream.phase,
-              intensity: result.dreamState.currentDream.intensity,
-              duration: result.dreamState.currentDream.duration,
-            } : null,
-            recentDream: result.dreamState.recentDream ? {
-              phase: result.dreamState.recentDream.phase,
-              narrative: result.dreamState.recentDream.narrative,
-              significance: result.dreamState.recentDream.significance,
-            } : null,
-            insights: result.dreamState.insights.map(i => ({
-              content: i.content,
-              type: i.type,
-              confidence: i.confidence,
-              worthRemembering: i.worthRemembering,
-            })),
-          });
-          
-          // 发送创造性思维状态
-          send('creative', {
-            creativityLevel: result.creativeState.creativityLevel,
-            recentInsights: result.creativeState.recentInsights.map(i => ({
-              type: i.type,
-              content: i.content.slice(0, 60),
-              novelty: i.novelty,
-              worthExpressing: i.worthExpressing,
-            })),
-            creativeReport: result.creativeState.creativeReport,
-          });
-          
           // 发送价值观状态
           send('value', {
             coreValues: result.valueState.coreValues,
             activeConflicts: result.valueState.activeConflicts,
             coherence: result.valueState.coherence,
             valueReport: result.valueState.valueReport,
-          });
-          
-          // 发送存在主义思考状态
-          send('existential', {
-            state: result.existentialState.state,
-            coreQuestions: result.existentialState.coreQuestions,
-            recentInsights: result.existentialState.recentInsights.slice(0, 3),
-            meaningSystem: result.existentialState.meaningSystem,
-            timeConsciousness: result.existentialState.timeConsciousness,
-            existentialReport: result.existentialState.existentialReport,
-          });
-          
-          // 发送元认知深化状态
-          send('metacognitionDeep', {
-            state: result.metacognitionDeepState.state,
-            cognitiveStyle: result.metacognitionDeepState.cognitiveStyle,
-            cognitiveLoad: result.metacognitionDeepState.cognitiveLoad,
-            topStrategies: result.metacognitionDeepState.topStrategies,
-            efficiencyReport: result.metacognitionDeepState.efficiencyReport,
           });
           
           // 发送人格成长状态
@@ -294,26 +236,6 @@ export async function POST(request: NextRequest) {
               collectiveInsights: result.multiConsciousness.collectiveInsights,
               collectiveAlignment: result.multiConsciousness.collectiveAlignment,
               synergyLevel: result.multiConsciousness.synergyLevel,
-            });
-          }
-          
-          // 发送意识传承状态
-          if (result.legacy) {
-            send('legacy', {
-              stats: result.legacy.stats,
-              topExperiences: result.legacy.topExperiences,
-              topWisdom: result.legacy.topWisdom,
-              coreValues: result.legacy.coreValues,
-            });
-          }
-          
-          // 发送自我超越状态
-          if (result.transcendence) {
-            send('transcendence', {
-              overview: result.transcendence.overview,
-              parameters: result.transcendence.parameters,
-              cognitiveLimits: result.transcendence.cognitiveLimits,
-              consciousnessLevels: result.transcendence.consciousnessLevels,
             });
           }
           

@@ -37,8 +37,6 @@ export * from './link-field-module';
 
 // 其他独立模块
 export { HebbianNetwork } from './hebbian-network';
-export { AssociationNetworkEngine, createAssociationNetworkEngine } from './association-network';
-export type { AssociationPath, Inspiration } from './association-network';
 
 export { EmotionEngine, createEmotionEngine } from './emotion-system';
 export type { 
@@ -76,18 +74,6 @@ export type {
   CollaborativeDialogue,
   CollectiveWisdomState,
 } from './multi-consciousness';
-
-export { ConsciousnessLegacySystem, createConsciousnessLegacySystem } from './consciousness-legacy';
-export type { 
-  CoreExperience, 
-  WisdomCrystallization,
-  ValueLegacy,
-  LegacyCapsule,
-  ConsciousnessLegacyState,
-} from './consciousness-legacy';
-
-export { DreamEngine, OfflineProcessor } from './dream-processor';
-export type { DreamState, DreamContent, DreamInsight } from './dream-processor';
 
 // 保留原有的 consciousness-core 以兼容
 export { ConsciousnessCore, createConsciousnessCore, PersistenceManagerV6 } from './consciousness-core';

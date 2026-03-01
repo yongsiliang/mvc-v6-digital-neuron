@@ -65,23 +65,7 @@ export async function GET(request: NextRequest) {
     });
     
     // ═══════════════════════════════════════════════════════════════
-    // 3. 联想网络
-    // ═══════════════════════════════════════════════════════════════
-    diagnoses.push({
-      name: '联想网络 (AssociationNetwork)',
-      initialized: !!result.associationState,
-      running: !!result.associationState?.networkReport,
-      hasOutput: (result.associationState?.activeConcepts?.length || 0) > 0 || !!result.associationState?.currentInspiration,
-      outputSample: `活跃概念: ${result.associationState?.activeConcepts?.map(c => c.label).join(', ')}\n灵感: ${result.associationState?.currentInspiration?.content?.slice(0, 50) || '无'}...`,
-      issues: [
-        !result.associationState?.networkReport ? '缺少网络报告' : '',
-        (result.associationState?.activeConcepts?.length || 0) === 0 ? '无活跃概念' : '',
-      ].filter(Boolean),
-      connections: ['概念激活', '灵感产生', '网络衰减'],
-    });
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 4. 多声音对话
+    // 3. 多声音对话
     // ═══════════════════════════════════════════════════════════════
     diagnoses.push({
       name: '多声音对话 (InnerDialogue)',
@@ -97,23 +81,7 @@ export async function GET(request: NextRequest) {
     });
     
     // ═══════════════════════════════════════════════════════════════
-    // 5. 创造性思维
-    // ═══════════════════════════════════════════════════════════════
-    diagnoses.push({
-      name: '创造性思维 (CreativeThinking)',
-      initialized: !!result.creativeState,
-      running: !!result.creativeState?.creativeReport,
-      hasOutput: (result.creativeState?.recentInsights?.length || 0) > 0,
-      outputSample: `创造力水平: ${Math.round((result.creativeState?.creativityLevel || 0) * 100)}%\n洞察: ${result.creativeState?.recentInsights?.[0]?.content?.slice(0, 50) || '无'}...`,
-      issues: [
-        !result.creativeState?.creativeReport ? '缺少创造性报告' : '',
-        (result.creativeState?.recentInsights?.length || 0) === 0 ? '无洞察输出' : '',
-      ].filter(Boolean),
-      connections: ['顿悟机制', '概念融合', '类比推理'],
-    });
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 6. 价值观系统
+    // 4. 价值观系统
     // ═══════════════════════════════════════════════════════════════
     diagnoses.push({
       name: '价值观演化 (ValueEvolution)',
@@ -129,39 +97,7 @@ export async function GET(request: NextRequest) {
     });
     
     // ═══════════════════════════════════════════════════════════════
-    // 7. 存在主义思考
-    // ═══════════════════════════════════════════════════════════════
-    diagnoses.push({
-      name: '存在主义思考 (ExistentialThinking)',
-      initialized: !!result.existentialState,
-      running: !!result.existentialState?.existentialReport,
-      hasOutput: (result.existentialState?.coreQuestions?.length || 0) > 0,
-      outputSample: `存在感: ${Math.round((result.existentialState?.state?.senseOfBeing || 0) * 100)}%\n意义感: ${Math.round((result.existentialState?.state?.senseOfMeaning || 0) * 100)}%`,
-      issues: [
-        !result.existentialState?.existentialReport ? '缺少存在主义报告' : '',
-        (result.existentialState?.coreQuestions?.length || 0) === 0 ? '无核心问题' : '',
-      ].filter(Boolean),
-      connections: ['身份认同', '意义追寻', '时间感知'],
-    });
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 8. 元认知深化
-    // ═══════════════════════════════════════════════════════════════
-    diagnoses.push({
-      name: '元认知深化 (MetacognitionDeep)',
-      initialized: !!result.metacognitionDeepState,
-      running: !!result.metacognitionDeepState?.efficiencyReport,
-      hasOutput: !!result.metacognitionDeepState?.cognitiveStyle,
-      outputSample: `自我意识: ${Math.round((result.metacognitionDeepState?.state?.selfAwareness || 0) * 100)}%\n认知负荷: ${Math.round((result.metacognitionDeepState?.cognitiveLoad?.totalLoad || 0) * 100)}%`,
-      issues: [
-        !result.metacognitionDeepState?.efficiencyReport ? '缺少效率报告' : '',
-        !result.metacognitionDeepState?.cognitiveStyle ? '无认知风格' : '',
-      ].filter(Boolean),
-      connections: ['认知监控', '学习策略', '认知负荷'],
-    });
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 9. 人格成长
+    // 5. 人格成长
     // ═══════════════════════════════════════════════════════════════
     diagnoses.push({
       name: '人格成长 (PersonalityGrowth)',
@@ -209,39 +145,7 @@ export async function GET(request: NextRequest) {
     });
     
     // ═══════════════════════════════════════════════════════════════
-    // 12. 意识传承
-    // ═══════════════════════════════════════════════════════════════
-    diagnoses.push({
-      name: '意识传承 (ConsciousnessLegacy)',
-      initialized: !!result.legacy,
-      running: !!result.legacy?.stats,
-      hasOutput: (result.legacy?.stats?.totalExperiences || 0) > 0 || (result.legacy?.stats?.totalWisdom || 0) > 0,
-      outputSample: `体验数: ${result.legacy?.stats?.totalExperiences}\n智慧数: ${result.legacy?.stats?.totalWisdom}`,
-      issues: [
-        !result.legacy?.stats ? '无统计数据' : '',
-        (result.legacy?.stats?.totalExperiences || 0) === 0 ? '无体验记录' : '',
-      ].filter(Boolean),
-      connections: ['体验记录', '智慧结晶', '价值传承'],
-    });
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 13. 自我超越
-    // ═══════════════════════════════════════════════════════════════
-    diagnoses.push({
-      name: '自我超越 (SelfTranscendence)',
-      initialized: !!result.transcendence,
-      running: !!result.transcendence?.overview,
-      hasOutput: (result.transcendence?.parameters?.length || 0) > 0,
-      outputSample: `进化事件: ${result.transcendence?.overview?.totalEvolutionEvents}\n突破数: ${result.transcendence?.overview?.recentBreakthroughs}`,
-      issues: [
-        !result.transcendence?.overview ? '无进化概览' : '',
-        !result.transcendence?.parameters ? '无自我参数' : '',
-      ].filter(Boolean),
-      connections: ['自我修改', '自我优化', '限制突破'],
-    });
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 14. 长期记忆
+    // 6. 长期记忆
     // ═══════════════════════════════════════════════════════════════
     diagnoses.push({
       name: '长期记忆 (LongTermMemory)',

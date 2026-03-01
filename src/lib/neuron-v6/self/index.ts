@@ -18,20 +18,6 @@ export {
   createSelfConsciousness,
 } from '../self-consciousness';
 
-// 自我超越
-export type {
-  ModifiableParameter,
-  OptimizationGoal,
-  CognitiveLimit,
-  EvolutionMetrics,
-  EvolutionEvent,
-} from '../self-transcendence';
-
-export {
-  SelfTranscendenceSystem,
-  createSelfTranscendenceSystem,
-} from '../self-transcendence';
-
 // 人格成长
 export type {
   CoreTraits,

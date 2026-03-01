@@ -30,34 +30,10 @@ import type {
   EmotionDrivenBehavior 
 } from '../emotion-system';
 import type { 
-  Inspiration 
-} from '../association-network';
-import type { 
   InnerDialogue, 
   DialecticProcess, 
   VoiceActivation 
 } from '../inner-dialogue';
-import type { 
-  DreamState, 
-  DreamContent, 
-  DreamInsight 
-} from '../dream-processor';
-import type { 
-  CreativeOutcome, 
-  CreativeState 
-} from '../creative-thinking';
-import type { 
-  ExistentialState, 
-  ExistentialInsight, 
-  MeaningSystem, 
-  TimeConsciousness 
-} from '../existential-thinking';
-import type { 
-  MetacognitionState, 
-  CognitiveStyle, 
-  CognitiveLoadState, 
-  MetacognitiveMonitoring 
-} from '../metacognition-deepening';
 import type { 
   CoreTraits, 
   MaturityDimensions, 
@@ -70,7 +46,6 @@ import type {
   ConceptEdge, 
   KnowledgeGraphState 
 } from '../knowledge-graph';
-import type { EvolutionMetrics } from '../self-transcendence';
 import type { ToolExecutionResult } from '../tool-intent-recognizer';
 import type { LayeredMemorySystem } from '../layered-memory';
 
@@ -276,48 +251,17 @@ export interface ProcessResult {
     drivenBehaviors: EmotionDrivenBehavior[];
     emotionReport: string;
   };
-  associationState: {
-    currentInspiration: Inspiration | null;
-    activeConcepts: Array<{ label: string; activation: number }>;
-    networkReport: string;
-  };
   innerDialogueState: {
     currentDialogue: InnerDialogue | null;
     dialecticProcess: DialecticProcess | null;
     voiceActivations: VoiceActivation[];
     dialogueReport: string;
   };
-  dreamState: {
-    currentDream: DreamState | null;
-    recentDream: DreamContent | null;
-    insights: DreamInsight[];
-  };
-  creativeState: {
-    creativityLevel: number;
-    recentInsights: CreativeOutcome[];
-    creativeReport: string;
-  };
   valueState: {
     coreValues: Array<{ name: string; weight: number; confidence: number }>;
     activeConflicts: Array<{ values: string[]; description: string; intensity: number }>;
     coherence: number;
     valueReport: string;
-  };
-  existentialState: {
-    state: ExistentialState;
-    coreQuestions: Array<{ type: string; question: string; progress: number }>;
-    recentInsights: ExistentialInsight[];
-    meaningSystem: MeaningSystem;
-    timeConsciousness: TimeConsciousness;
-    existentialReport: string;
-  };
-  metacognitionDeepState: {
-    state: MetacognitionState;
-    cognitiveStyle: CognitiveStyle;
-    cognitiveLoad: CognitiveLoadState;
-    topStrategies: Array<{ name: string; effectiveness: number; preference: number }>;
-    recentMonitoring: MetacognitiveMonitoring[];
-    efficiencyReport: string;
   };
   personalityGrowth?: {
     traits: CoreTraits;
@@ -364,63 +308,6 @@ export interface ProcessResult {
       goal: number;
     };
     synergyLevel: number;
-  };
-  legacy?: {
-    stats: {
-      totalExperiences: number;
-      totalWisdom: number;
-      totalValues: number;
-      totalCapsules: number;
-      sealedCapsules: number;
-      legacyIntegrity: number;
-    };
-    topExperiences: Array<{
-      title: string;
-      type: string;
-      significance: number;
-    }>;
-    topWisdom: Array<{
-      content: string;
-      type: string;
-      importance: number;
-    }>;
-    coreValues: Array<{
-      name: string;
-      tier: string;
-      weight: number;
-    }>;
-  };
-  transcendence?: {
-    overview: {
-      overallEvolution: number;
-      currentLevel: string;
-      nextLevel: string | null;
-      activeOptimizations: number;
-      recentBreakthroughs: number;
-      totalEvolutionEvents: number;
-    };
-    parameters: Array<{
-      id: string;
-      name: string;
-      category: string;
-      currentValue: number;
-      description: string;
-      locked: boolean;
-    }>;
-    cognitiveLimits: Array<{
-      id: string;
-      name: string;
-      currentBoundary: number;
-      theoreticalLimit: number;
-      breakable: boolean;
-    }>;
-    consciousnessLevels: Array<{
-      id: string;
-      name: string;
-      tier: number;
-      attained: boolean;
-      progress: number;
-    }>;
   };
   toolExecution?: {
     needsTool: boolean;

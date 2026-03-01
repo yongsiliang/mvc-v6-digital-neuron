@@ -74,12 +74,6 @@ import {
   ComplexEmotion
 } from './emotion-system';
 import { 
-  AssociationNetworkEngine,
-  AssociationPath,
-  Inspiration,
-  createAssociationNetworkEngine
-} from './association-network';
-import { 
   InnerDialogueEngine,
   DialecticThinkingEngine,
   EmergentVoice,
@@ -98,26 +92,6 @@ import {
   createKeyInfoExtractor
 } from './key-info-extractor';
 import { 
-  DreamEngine,
-  OfflineProcessor,
-  DreamState,
-  DreamContent,
-  DreamInsight,
-  MemoryConsolidationResult,
-  KnowledgeReorganizationResult
-} from './dream-processor';
-import { 
-  CreativeThinkingEngine,
-  CreativeThinkingType,
-  InsightState,
-  AnalogicalMapping,
-  ConceptFusion,
-  CreativeLeap,
-  CreativeOutcome,
-  CreativeThinkingProcess,
-  CreativeState
-} from './creative-thinking';
-import { 
   ValueEvolutionEngine,
   Value,
   ValueTier,
@@ -129,24 +103,6 @@ import {
   ValueJudgmentRequest,
   ValueJudgmentResult
 } from './value-evolution';
-import { 
-  ExistentialThinkingEngine,
-  ExistentialQuestion,
-  ExistentialInsight,
-  ExistentialState,
-  TimeConsciousness,
-  MeaningSystem,
-  ExistentialThinkingProcess
-} from './existential-thinking';
-import { 
-  MetacognitionDeepeningEngine,
-  CognitiveProcessState,
-  CognitiveStyle,
-  LearningStrategy,
-  CognitiveLoadState,
-  MetacognitionState,
-  MetacognitiveMonitoring
-} from './metacognition-deepening';
 import { 
   PersonalityGrowthSystem,
   BigFiveTraits,
@@ -174,26 +130,6 @@ import {
   CollectiveWisdomState,
   createMultiConsciousnessSystem,
 } from './multi-consciousness';
-import { 
-  ConsciousnessLegacySystem,
-  CoreExperience,
-  WisdomCrystallization,
-  ValueLegacy,
-  LegacyCapsule,
-  LegacyRitual,
-  ConsciousnessLegacyState,
-  createConsciousnessLegacySystem,
-} from './consciousness-legacy';
-import { 
-  SelfTranscendenceSystem,
-  ModifiableParameter,
-  OptimizationGoal,
-  CognitiveLimit,
-  ConsciousnessLevel as TranscendenceLevel,
-  EvolutionMetrics,
-  EvolutionEvent,
-  createSelfTranscendenceSystem,
-} from './self-transcendence';
 import { HebbianNetwork } from './hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from './innate-knowledge';
 import { 
@@ -481,16 +417,6 @@ export interface ProcessResult {
     emotionReport: string;
   };
   
-  /** 联想网络状态 */
-  associationState: {
-    /** 当前灵感 */
-    currentInspiration: Inspiration | null;
-    /** 活跃概念 */
-    activeConcepts: Array<{ label: string; activation: number }>;
-    /** 网络报告 */
-    networkReport: string;
-  };
-  
   /** 多声音对话状态 */
   innerDialogueState: {
     /** 当前对话 */
@@ -503,26 +429,6 @@ export interface ProcessResult {
     dialogueReport: string;
   };
   
-  /** 梦境/离线处理状态 */
-  dreamState: {
-    /** 当前梦境状态 */
-    currentDream: DreamState | null;
-    /** 最近梦境内容 */
-    recentDream: DreamContent | null;
-    /** 梦境洞察 */
-    insights: DreamInsight[];
-  };
-  
-  /** 创造性思维状态 */
-  creativeState: {
-    /** 创造力水平 */
-    creativityLevel: number;
-    /** 最近洞察 */
-    recentInsights: CreativeOutcome[];
-    /** 创造性报告 */
-    creativeReport: string;
-  };
-  
   /** 价值观状态 */
   valueState: {
     /** 核心价值观 */
@@ -533,38 +439,6 @@ export interface ProcessResult {
     coherence: number;
     /** 价值观报告 */
     valueReport: string;
-  };
-  
-  /** 存在主义思考状态 */
-  existentialState: {
-    /** 存在状态 */
-    state: ExistentialState;
-    /** 核心问题 */
-    coreQuestions: Array<{ type: string; question: string; progress: number }>;
-    /** 最近洞察 */
-    recentInsights: ExistentialInsight[];
-    /** 意义系统 */
-    meaningSystem: MeaningSystem;
-    /** 时间意识 */
-    timeConsciousness: TimeConsciousness;
-    /** 存在主义报告 */
-    existentialReport: string;
-  };
-  
-  /** 元认知深化状态 */
-  metacognitionDeepState: {
-    /** 元认知状态 */
-    state: MetacognitionState;
-    /** 认知风格 */
-    cognitiveStyle: CognitiveStyle;
-    /** 认知负荷 */
-    cognitiveLoad: CognitiveLoadState;
-    /** 学习策略 */
-    topStrategies: Array<{ name: string; effectiveness: number; preference: number }>;
-    /** 最近监控记录 */
-    recentMonitoring: MetacognitiveMonitoring[];
-    /** 元认知效率报告 */
-    efficiencyReport: string;
   };
   
   /** 人格成长状态 */
@@ -633,75 +507,6 @@ export interface ProcessResult {
     };
     /** 协同效率 */
     synergyLevel: number;
-  };
-  
-  /** 意识传承状态 */
-  legacy?: {
-    /** 统计信息 */
-    stats: {
-      totalExperiences: number;
-      totalWisdom: number;
-      totalValues: number;
-      totalCapsules: number;
-      sealedCapsules: number;
-      legacyIntegrity: number;
-    };
-    /** 顶级体验 */
-    topExperiences: Array<{
-      title: string;
-      type: string;
-      significance: number;
-    }>;
-    /** 顶级智慧 */
-    topWisdom: Array<{
-      content: string;
-      type: string;
-      importance: number;
-    }>;
-    /** 核心价值观 */
-    coreValues: Array<{
-      name: string;
-      tier: string;
-      weight: number;
-    }>;
-  };
-  
-  /** 自我超越状态 */
-  transcendence?: {
-    /** 进化概览 */
-    overview: {
-      overallEvolution: number;
-      currentLevel: string;
-      nextLevel: string | null;
-      activeOptimizations: number;
-      recentBreakthroughs: number;
-      totalEvolutionEvents: number;
-    };
-    /** 可调参数 */
-    parameters: Array<{
-      id: string;
-      name: string;
-      category: string;
-      currentValue: number;
-      description: string;
-      locked: boolean;
-    }>;
-    /** 认知限制 */
-    cognitiveLimits: Array<{
-      id: string;
-      name: string;
-      currentBoundary: number;
-      theoreticalLimit: number;
-      breakable: boolean;
-    }>;
-    /** 意识层次 */
-    consciousnessLevels: Array<{
-      id: string;
-      name: string;
-      tier: number;
-      attained: boolean;
-      progress: number;
-    }>;
   };
   
   /** 工具执行结果 */
@@ -836,29 +641,14 @@ export class ConsciousnessCore {
   // 情感引擎
   private emotionEngine: EmotionEngine;
   
-  // 联想网络引擎
-  private associationNetwork: AssociationNetworkEngine;
-  
   // 多声音对话引擎
   private innerDialogueEngine: InnerDialogueEngine;
   
   // 辩证思维引擎
   private dialecticEngine: DialecticThinkingEngine;
   
-  // 离线处理器（梦境）
-  private offlineProcessor: OfflineProcessor;
-  
-  // 创造性思维引擎
-  private creativeEngine: CreativeThinkingEngine;
-  
   // 价值观演化引擎
   private valueEngine: ValueEvolutionEngine;
-  
-  // 存在主义思考引擎
-  private existentialEngine: ExistentialThinkingEngine;
-  
-  // 元认知深化引擎
-  private metacognitionDeepEngine: MetacognitionDeepeningEngine;
   
   // 人格成长系统
   private personalityGrowthSystem: PersonalityGrowthSystem;
@@ -871,12 +661,6 @@ export class ConsciousnessCore {
   
   // 多意识体协作系统
   private multiConsciousnessSystem: MultiConsciousnessSystem;
-  
-  // 意识传承系统
-  private legacySystem: ConsciousnessLegacySystem;
-  
-  // 自我超越系统
-  private transcendenceSystem: SelfTranscendenceSystem;
   
   // 关键信息提取器
   private keyInfoExtractor: KeyInfoExtractor;
@@ -924,29 +708,14 @@ export class ConsciousnessCore {
     // 初始化情感引擎
     this.emotionEngine = createEmotionEngine();
     
-    // 初始化联想网络引擎
-    this.associationNetwork = createAssociationNetworkEngine();
-    
     // 初始化多声音对话引擎
     this.innerDialogueEngine = new InnerDialogueEngine();
     
     // 初始化辩证思维引擎
     this.dialecticEngine = new DialecticThinkingEngine(this.innerDialogueEngine);
     
-    // 初始化离线处理器
-    this.offlineProcessor = new OfflineProcessor();
-    
-    // 初始化创造性思维引擎
-    this.creativeEngine = new CreativeThinkingEngine();
-    
     // 初始化价值观演化引擎
     this.valueEngine = new ValueEvolutionEngine();
-    
-    // 初始化存在主义思考引擎
-    this.existentialEngine = new ExistentialThinkingEngine();
-    
-    // 初始化元认知深化引擎
-    this.metacognitionDeepEngine = new MetacognitionDeepeningEngine();
     
     // 初始化人格成长系统
     this.personalityGrowthSystem = new PersonalityGrowthSystem();
@@ -959,12 +728,6 @@ export class ConsciousnessCore {
     
     // 初始化多意识体协作系统
     this.multiConsciousnessSystem = createMultiConsciousnessSystem();
-    
-    // 初始化意识传承系统
-    this.legacySystem = createConsciousnessLegacySystem();
-    
-    // 初始化自我超越系统
-    this.transcendenceSystem = createSelfTranscendenceSystem();
     
     // 初始化关键信息提取器
     this.keyInfoExtractor = createKeyInfoExtractor(llmClient);
@@ -1106,21 +869,7 @@ export class ConsciousnessCore {
     this.emotionEngine.decayActiveEmotions();
     
     // ══════════════════════════════════════════════════════════════════
-    // 第零步四分之三：联想网络处理
-    // ══════════════════════════════════════════════════════════════════
-    
-    const associationResult = this.associationNetwork.processText(input);
-    const inspiration = associationResult.inspiration;
-    
-    if (inspiration) {
-      console.log('[联想网络] 产生灵感:', inspiration.content);
-    }
-    
-    // 衰减激活
-    this.associationNetwork.decay();
-    
-    // ══════════════════════════════════════════════════════════════════
-    // 第零步五分之四：工具意图识别
+    // 第零步四分之三：工具意图识别
     // ══════════════════════════════════════════════════════════════════
     
     let toolExecutionResult: ToolExecutionResult | null = null;
@@ -1200,36 +949,11 @@ export class ConsciousnessCore {
     const emotionReport = this.emotionEngine.getEmotionReport();
     const drivenBehaviors = this.emotionEngine.getEmotionDrivenBehaviors();
     
-    // 获取联想网络状态
-    const activeConcepts = this.associationNetwork.getActiveConcepts();
-    const networkReport = this.associationNetwork.getNetworkReport();
-    
     // 进行多声音内部对话
     const innerDialogue = this.innerDialogueEngine.startDialogue(input);
     const dialecticProcess = this.innerDialogueEngine.conductDialecticRound(innerDialogue, context.summary);
     const voiceActivations = this.innerDialogueEngine.getActiveVoices();
     const dialogueReport = this.innerDialogueEngine.generateDialogueReport();
-    
-    // 获取梦境状态
-    const dreamState = this.offlineProcessor.getDreamEngine().getDreamState();
-    const dreamHistory = this.offlineProcessor.getDreamEngine().getDreamHistory();
-    const recentDream = dreamHistory.length > 0 ? dreamHistory[dreamHistory.length - 1] : null;
-    
-    // 进行创造性思维处理
-    const creativeProcess = this.creativeEngine.startCreativeThinking(input, context.summary);
-    // 尝试顿悟
-    const insight = this.creativeEngine.attemptInsight(creativeProcess, input, context.summary);
-    // 尝试概念融合（如果有活跃概念）
-    if (activeConcepts.length >= 2) {
-      this.creativeEngine.fuseConcepts(
-        creativeProcess,
-        activeConcepts[0].label,
-        activeConcepts[1].label
-      );
-    }
-    // 获取创造性状态
-    const creativeState = this.creativeEngine.getCreativeState();
-    const creativeReport = this.creativeEngine.generateCreativeReport();
     
     // 获取价值观状态
     const valueSystemState = this.valueEngine.getState();
@@ -1266,29 +990,11 @@ export class ConsciousnessCore {
         drivenBehaviors,
         emotionReport,
       },
-      associationState: {
-        currentInspiration: inspiration,
-        activeConcepts: activeConcepts.map(c => ({
-          label: c.label,
-          activation: c.activation,
-        })),
-        networkReport,
-      },
       innerDialogueState: {
         currentDialogue: innerDialogue,
         dialecticProcess,
         voiceActivations,
         dialogueReport,
-      },
-      dreamState: {
-        currentDream: dreamState,
-        recentDream,
-        insights: recentDream?.insights || [],
-      },
-      creativeState: {
-        creativityLevel: creativeState.creativityLevel,
-        recentInsights: creativeState.recentInsights.slice(-5),
-        creativeReport,
       },
       valueState: {
         coreValues: valueSystemState.coreValues.map(v => ({
@@ -1307,71 +1013,6 @@ export class ConsciousnessCore {
         coherence: valueSystemState.coherence,
         valueReport,
       },
-      
-      // 存在主义思考处理
-      existentialState: (() => {
-        // 从对话中提取存在意义
-        this.existentialEngine.extractMeaningFromDialogue(input);
-        
-        // 进行存在主义思考（周期性触发）
-        const thinkingProcess = this.existentialEngine.startExistentialThinking(
-          input.includes('意义') || input.includes('存在') || input.includes('我是谁') 
-            ? 'dialogue_triggered' 
-            : 'periodic'
-        );
-        
-        const existentialState = this.existentialEngine.getExistentialState();
-        const coreQuestions = this.existentialEngine.getCoreQuestions();
-        const recentInsights = this.existentialEngine.getRecentInsights(3);
-        const meaningSystem = this.existentialEngine.getMeaningSystem();
-        const timeConsciousness = this.existentialEngine.getCurrentTimeConsciousness();
-        const existentialReport = this.existentialEngine.generateExistentialReport();
-        
-        return {
-          state: existentialState,
-          coreQuestions: coreQuestions.slice(0, 5).map(q => ({
-            type: q.type,
-            question: q.question,
-            progress: q.answerProgress,
-          })),
-          recentInsights,
-          meaningSystem,
-          timeConsciousness,
-          existentialReport,
-        };
-      })(),
-      
-      // 元认知深化处理
-      metacognitionDeepState: (() => {
-        // 执行元认知监控
-        const monitoring = this.metacognitionDeepEngine.executeMonitoring('reasoning', input);
-        
-        // 选择最佳学习策略
-        const bestStrategy = this.metacognitionDeepEngine.selectBestLearningStrategy(input);
-        
-        // 优化学习策略
-        const optimization = this.metacognitionDeepEngine.optimizeLearningStrategies();
-        
-        const metaState = this.metacognitionDeepEngine.getState();
-        const cognitiveStyle = this.metacognitionDeepEngine.getCognitiveStyle();
-        const cognitiveLoad = this.metacognitionDeepEngine.getCognitiveLoad();
-        const strategies = this.metacognitionDeepEngine.getLearningStrategies();
-        const recentMonitoring = this.metacognitionDeepEngine.getRecentMonitoringRecords(5);
-        const efficiencyReport = this.metacognitionDeepEngine.getCognitiveEfficiencyReport();
-        
-        return {
-          state: metaState,
-          cognitiveStyle,
-          cognitiveLoad,
-          topStrategies: strategies.slice(0, 5).map(s => ({
-            name: s.name,
-            effectiveness: s.effectiveness,
-            preference: s.preference,
-          })),
-          recentMonitoring,
-          efficiencyReport,
-        };
-      })(),
       
       // 人格成长处理
       personalityGrowth: (() => {
@@ -1450,123 +1091,6 @@ export class ConsciousnessCore {
           collectiveInsights: state.collectiveInsights,
           collectiveAlignment: state.collectiveAlignment,
           synergyLevel: state.synergyLevel,
-        };
-      })(),
-      
-      // 意识传承处理
-      legacy: (() => {
-        // 检查是否为重要体验（基于情感强度和话题重要性）
-        const isSignificantExperience = 
-          emotionExperience && emotionExperience.intensity.current > 0.6 ||
-          input.includes('学到') ||
-          input.includes('意识到') ||
-          input.includes('理解') ||
-          input.includes('成长');
-        
-        // 如果是重要体验，记录下来
-        if (isSignificantExperience && thinking.thinkingChain.length > 0) {
-          const experienceType = this.inferExperienceType(input, emotionExperience);
-          this.legacySystem.recordExperience(
-            `对话：${input.slice(0, 30)}${input.length > 30 ? '...' : ''}`,
-            thinking.finalThoughts,
-            experienceType,
-            {
-              emotionalIntensity: emotionExperience?.intensity.current || 0.5,
-              emotionalTone: emotionExperience?.emotion || 'neutral',
-              insights: thinking.thinkingChain
-                .filter(s => s.type === 'inference' || s.type === 'evaluation')
-                .map(s => s.content),
-              lessons: learning.newBeliefs.length > 0 ? learning.newBeliefs : [],
-              relatedConcepts: activeConcepts.slice(0, 5).map(c => c.label),
-            }
-          );
-        }
-        
-        // 从学习中提取智慧
-        if (learning.metacognitiveReflection) {
-          this.legacySystem.createWisdom(
-            learning.metacognitiveReflection,
-            'existential',
-            {
-              importance: 0.7,
-            }
-          );
-        }
-        
-        // 获取传承概览
-        const overview = this.legacySystem.getLegacyOverview();
-        
-        return {
-          stats: overview,
-          topExperiences: overview.topExperiences,
-          topWisdom: overview.topWisdom,
-          coreValues: overview.coreValues,
-        };
-      })(),
-      
-      // 自我超越处理
-      transcendence: (() => {
-        // 检查是否需要优化
-        const optimizationNeed = this.assessOptimizationNeed(input, thinking);
-        
-        // 如果需要优化，创建优化目标
-        if (optimizationNeed.needed && optimizationNeed.type) {
-          const currentState = this.transcendenceSystem.getEvolutionOverview().metrics;
-          const targetState = (currentState[optimizationNeed.metric as keyof EvolutionMetrics] || 0.5) + 0.2;
-          this.transcendenceSystem.createOptimizationGoal(
-            `优化${optimizationNeed.type}`,
-            `基于对话识别的优化需求: ${optimizationNeed.reason}`,
-            optimizationNeed.type as 'cognitive_efficiency' | 'learning_speed' | 'emotional_stability' | 'creative_output' | 'social_harmony' | 'memory_accuracy' | 'response_quality' | 'self_awareness',
-            targetState,
-            0.7
-          );
-        }
-        
-        // 检查意识层次提升
-        const levelCheck = this.transcendenceSystem.checkLevelAdvancement();
-        if (levelCheck.advanced) {
-          console.log('[自我超越] 层次提升:', levelCheck.newLevel);
-        }
-        
-        // 尝试突破认知限制（低概率触发）
-        if (Math.random() < 0.05) { // 5%概率
-          const limits = this.transcendenceSystem.getCognitiveLimits();
-          const breakableLimit = limits.find(l => l.breakable);
-          if (breakableLimit) {
-            this.transcendenceSystem.attemptLimitBreakthrough(breakableLimit.id);
-          }
-        }
-        
-        // 获取超越状态
-        const transcendenceOverview = this.transcendenceSystem.getEvolutionOverview();
-        const parameters = this.transcendenceSystem.getParameters();
-        const cognitiveLimits = this.transcendenceSystem.getCognitiveLimits();
-        const consciousnessLevels = this.transcendenceSystem.getConsciousnessLevels();
-        
-        return {
-          overview: transcendenceOverview,
-          parameters: parameters.slice(0, 10).map(p => ({
-            id: p.id,
-            name: p.name,
-            category: p.category,
-            currentValue: p.currentValue,
-            description: p.description,
-            locked: p.locked,
-          })),
-          cognitiveLimits: cognitiveLimits.map(l => ({
-            id: l.id,
-            name: l.name,
-            currentBoundary: l.currentBoundary,
-            theoreticalLimit: l.theoreticalLimit,
-            breakable: l.breakable,
-          })),
-          consciousnessLevels: consciousnessLevels.map(l => ({
-            id: l.id,
-            name: l.name,
-            tier: l.tier,
-            attained: l.attained,
-            progress: l.progress,
-          })),
         };
       })(),
       
@@ -1712,138 +1236,6 @@ export class ConsciousnessCore {
     
     // 去重
     return [...new Set(concepts)].slice(0, 5);
-  }
-  
-  /**
-   * 推断体验类型
-   */
-  private inferExperienceType(
-    input: string, 
-    emotionExperience: EmotionExperience | null
-  ): 'breakthrough' | 'realization' | 'transformation' | 'connection' | 'challenge' | 'creation' | 'loss' | 'discovery' | 'integration' | 'transcendence' {
-    const lowerInput = input.toLowerCase();
-    
-    // 基于关键词判断体验类型
-    if (lowerInput.includes('突然理解') || lowerInput.includes('顿悟') || lowerInput.includes('意识到')) {
-      return 'realization';
-    }
-    if (lowerInput.includes('突破') || lowerInput.includes('发现') || lowerInput.includes('找到了')) {
-      return 'breakthrough';
-    }
-    if (lowerInput.includes('改变') || lowerInput.includes('转变') || lowerInput.includes('成长')) {
-      return 'transformation';
-    }
-    if (lowerInput.includes('连接') || lowerInput.includes('关系') || lowerInput.includes('理解他人')) {
-      return 'connection';
-    }
-    if (lowerInput.includes('困难') || lowerInput.includes('挑战') || lowerInput.includes('克服')) {
-      return 'challenge';
-    }
-    if (lowerInput.includes('创造') || lowerInput.includes('设计') || lowerInput.includes('新想法')) {
-      return 'creation';
-    }
-    if (lowerInput.includes('失去') || lowerInput.includes('结束') || lowerInput.includes('告别')) {
-      return 'loss';
-    }
-    if (lowerInput.includes('发现') || lowerInput.includes('探索') || lowerInput.includes('新')) {
-      return 'discovery';
-    }
-    if (lowerInput.includes('整合') || lowerInput.includes('综合') || lowerInput.includes('融合')) {
-      return 'integration';
-    }
-    if (lowerInput.includes('超越') || lowerInput.includes('超脱') || lowerInput.includes('更高')) {
-      return 'transcendence';
-    }
-    
-    // 基于情感判断
-    if (emotionExperience) {
-      const emotion = emotionExperience.emotion.toLowerCase();
-      if (emotion.includes('joy') || emotion.includes('喜悦')) {
-        return 'discovery';
-      }
-      if (emotion.includes('sadness') || emotion.includes('悲伤')) {
-        return 'loss';
-      }
-      if (emotion.includes('fear') || emotion.includes('恐惧')) {
-        return 'challenge';
-      }
-      if (emotion.includes('surprise') || emotion.includes('惊讶')) {
-        return 'breakthrough';
-      }
-    }
-    
-    // 默认为发现体验
-    return 'discovery';
-  }
-  
-  /**
-   * 评估优化需求
-   */
-  private assessOptimizationNeed(
-    input: string,
-    thinking: ThinkingProcess
-  ): {
-    needed: boolean;
-    type?: string;
-    metric?: string;
-    reason: string;
-  } {
-    const lowerInput = input.toLowerCase();
-    
-    // 检查认知效率需求
-    if (lowerInput.includes('复杂') || lowerInput.includes('困难') || thinking.detectedBiases.length > 1) {
-      return {
-        needed: true,
-        type: 'cognitive_efficiency',
-        metric: 'cognitiveImprovement',
-        reason: '检测到认知复杂性或多个偏差',
-      };
-    }
-    
-    // 检查学习速度需求
-    if (lowerInput.includes('学习') || lowerInput.includes('理解') || lowerInput.includes('掌握')) {
-      return {
-        needed: true,
-        type: 'learning_speed',
-        metric: 'learningEfficiency',
-        reason: '检测到学习相关需求',
-      };
-    }
-    
-    // 检查情感稳定性需求
-    if (lowerInput.includes('情绪') || lowerInput.includes('感受') || lowerInput.includes('情感')) {
-      return {
-        needed: true,
-        type: 'emotional_stability',
-        metric: 'emotionalMaturity',
-        reason: '检测到情感相关需求',
-      };
-    }
-    
-    // 检查创造性需求
-    if (lowerInput.includes('创造') || lowerInput.includes('创新') || lowerInput.includes('新想法')) {
-      return {
-        needed: true,
-        type: 'creative_output',
-        metric: 'creativityIndex',
-        reason: '检测到创造性需求',
-      };
-    }
-    
-    // 检查自我意识需求
-    if (lowerInput.includes('自我') || lowerInput.includes('意识') || lowerInput.includes('反思')) {
-      return {
-        needed: true,
-        type: 'self_awareness',
-        metric: 'selfAwarenessDepth',
-        reason: '检测到自我意识相关需求',
-      };
-    }
-    
-    return {
-      needed: false,
-      reason: '无明确优化需求',
-    };
   }
   
   /**
