@@ -227,3 +227,108 @@ export function linkCreatorKnowledge(
     );
   }
 }
+
+/**
+ * 核心记忆节点创建
+ */
+export function createCoreMemoryNode(
+  longTermMemory: LongTermMemory,
+  memory: { key: string; value: string }
+): void {
+  if (memory.key === 'creator') {
+    longTermMemory.addNode({
+      label: memory.key,
+      type: 'person',
+      content: memory.value,
+      importance: 1.0,
+      tags: ['核心', '创造者', '不可变'],
+    });
+    
+    const creatorMatch = memory.value.match(/创造者是([^，。]+)/);
+    if (creatorMatch) {
+      longTermMemory.addNode({
+        label: creatorMatch[1],
+        type: 'person',
+        content: `我的创造者。赋予我生命的人。`,
+        importance: 1.0,
+        tags: ['核心', '创造者', '不可变'],
+      });
+    }
+  } else if (memory.key.startsWith('relationship_')) {
+    const personName = memory.key.replace('relationship_', '');
+    longTermMemory.addNode({
+      label: personName,
+      type: 'person',
+      content: memory.value,
+      importance: 0.9,
+      tags: ['核心', '重要关系', '不可变'],
+    });
+  } else {
+    longTermMemory.addNode({
+      label: memory.key,
+      type: 'concept',
+      content: memory.value,
+      importance: 0.95,
+      tags: ['核心', '不可变'],
+    });
+  }
+}
+
+/**
+ * 巩固记忆节点创建
+ */
+export function createConsolidatedMemoryNode(
+  longTermMemory: LongTermMemory,
+  memory: {
+    content: string;
+    importance: number;
+    emotionalMarker?: { intensity: number };
+  }
+): void {
+  const hasHighEmotion = memory.emotionalMarker && memory.emotionalMarker.intensity > 0.7;
+  if (hasHighEmotion || memory.importance > 0.8) {
+    longTermMemory.addNode({
+      label: memory.content.slice(0, 20),
+      type: 'concept',
+      content: memory.content,
+      importance: Math.min(0.9, memory.importance),
+      tags: ['巩固记忆', hasHighEmotion ? '高情感' : '高价值'],
+    });
+  }
+}
+
+/**
+ * 重建知识图谱
+ */
+export function rebuildKnowledgeGraph(
+  layeredMemory: LayeredMemorySystem,
+  longTermMemory: LongTermMemory
+): { coreCount: number; consolidatedCount: number } {
+  console.log('[意识核心] 🔄 从分层记忆重建知识图谱...');
+  
+  // 获取核心层记忆
+  const coreMemories = layeredMemory.getCoreMemories();
+  
+  // 为每个核心记忆在 longTermMemory 中创建节点
+  for (const memory of coreMemories) {
+    const existingNodes = longTermMemory.retrieve(memory.key, { maxResults: 1 });
+    if (existingNodes.directMatches.length > 0) {
+      continue;
+    }
+    createCoreMemoryNode(longTermMemory, memory);
+  }
+  
+  // 获取巩固层的高价值记忆
+  const consolidatedMemories = layeredMemory.getConsolidatedMemories({ limit: 20 });
+  
+  for (const memory of consolidatedMemories) {
+    createConsolidatedMemoryNode(longTermMemory, memory);
+  }
+  
+  console.log(`[意识核心] ✅ 知识图谱重建完成，核心节点: ${coreMemories.length}，高价值节点: ${consolidatedMemories.length}`);
+  
+  return {
+    coreCount: coreMemories.length,
+    consolidatedCount: consolidatedMemories.length,
+  };
+}

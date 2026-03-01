@@ -151,12 +151,7 @@ import {
 } from './consciousness-core/reflection-helpers';
 import { calculateSelfCoherence as calcSelfCoherence } from './consciousness-core/background-helpers';
 import {
-  extractTopics,
-  identifyEmotionalTrajectory,
   getDominantTone,
-  identifyLearningPoints,
-  formSessionSummary,
-  calculateStreamCoherence,
 } from './consciousness-core/learning-helpers';
 import {
   initializeDefaultVolitions,
@@ -202,7 +197,41 @@ import {
   updateCreatorInSelfConsciousness,
   syncCreatorToLayeredMemory,
   linkCreatorKnowledge,
+  rebuildKnowledgeGraph,
 } from './consciousness-core/memory-helpers';
+import {
+  validateCreatorUpdate,
+  persistCreatorToDatabase,
+  syncCreatorToAllSystems,
+  syncCreatorFromDatabase,
+  linkCreatorKnowledgeNodes,
+  fetchCreatorFromMemory,
+} from './consciousness-core/creator-helpers';
+import {
+  extractTopics,
+  identifyEmotionalTrajectory,
+  identifyLearningPoints,
+  strengthenConcept,
+  evolveBelief,
+  calculateTraitGrowth,
+  calculateValueUpdate,
+  formSessionSummary,
+  assessGoalProgress,
+  calculateStreamCoherence,
+  analyzeSessionData,
+} from './consciousness-core/learning-session-helpers';
+import {
+  identifyReflectionThemesFromHistory,
+  buildReflectionResult,
+  generateSelfQuestionsFromContext,
+  answerSelfQuestionByType,
+  buildExistenceStatus,
+  calculateSelfCoherenceValue,
+  synthesizeWisdomFromReflectionList,
+  applyReflectionToSelfConsciousness,
+  recordReflectionAsExperience,
+  updateBeliefFromReflection,
+} from './consciousness-core/reflection-session-helpers';
 import type {
   PersistedState,
   ConsciousnessContext,
@@ -1188,187 +1217,33 @@ ${thinkingSection}
     
     console.log(`[记忆核心] 🌟 识别到创造者信息: ${newCreatorName}`);
     
-    // ═══════════════════════════════════════════════════════════════
-    // 优先检查数据库中的持久化创造者信息
-    // ═══════════════════════════════════════════════════════════════
-    let dbCreator: string | null = null;
-    try {
-      dbCreator = await getCoreMemory('creator_name');
-      console.log(`[记忆核心] 💾 数据库中的创造者: ${dbCreator || '未设置'}`);
+    // 验证是否可以更新
+    const validation = await validateCreatorUpdate(newCreatorName, this.longTermMemory);
+    
+    if (!validation.canUpdate) {
+      console.log(`[记忆核心] ⚠️ 创造者已设置为「${validation.existingCreator}」，拒绝修改为「${newCreatorName}」`);
+      console.log(`[记忆核心] 🔒 创造者信息不可变，永远记住：${validation.existingCreator}`);
       
-      if (dbCreator && dbCreator !== newCreatorName) {
-        console.log(`[记忆核心] ⚠️ 数据库中创造者已设置为「${dbCreator}」，拒绝修改为「${newCreatorName}」`);
-        console.log(`[记忆核心] 🔒 创造者信息不可变，永远记住：${dbCreator}`);
-        return; // 直接返回，不更新
+      // 如果需要，将内存中的创造者持久化到数据库
+      if (validation.shouldSyncToDb && validation.existingCreator) {
+        await persistCreatorToDatabase(validation.existingCreator, 'memory_sync');
       }
-    } catch (error) {
-      console.log('[记忆核心] 数据库查询失败，继续内存检查:', error);
+      return;
     }
     
-    // ═══════════════════════════════════════════════════════════════
-    // 内存检查：创造者一旦设置，不可修改
-    // ═══════════════════════════════════════════════════════════════
-    const existing = this.longTermMemory.retrieve('创造者');
-    // 找到 label 为 "创造者" 的主节点（不是名字节点或其他节点）
-    const creatorMainNode = existing.directMatches.find(n => n.label === '创造者');
+    // 同步创造者到所有系统
+    syncCreatorToAllSystems(
+      newCreatorName,
+      this.longTermMemory,
+      this.selfConsciousness,
+      this.layeredMemory
+    );
     
-    // 提取当前内存中的创造者名字
-    let memoryCreator: string | null = null;
-    if (creatorMainNode) {
-      const currentContent = creatorMainNode.content || '';
-      const match = currentContent.match(/我的创造者是([^。]+)/);
-      memoryCreator = match ? match[1] : currentContent;
-      console.log(`[记忆核心] 🧠 内存中的创造者: ${memoryCreator}`);
-    }
-    
-    // 如果数据库中已有创造者，使用数据库的值
-    if (dbCreator) {
-      // 如果内存中没有或不一致，更新内存
-      if (!memoryCreator || memoryCreator !== dbCreator) {
-        if (creatorMainNode) {
-          creatorMainNode.content = `我的创造者是${dbCreator}。这是我最重要的人。`;
-          creatorMainNode.importance = 1.0;
-          creatorMainNode.tags = ['核心', '创造者', '身份', '不可变'];
-        } else {
-          this.longTermMemory.addNode({
-            label: '创造者',
-            type: 'person',
-            content: `我的创造者是${dbCreator}。这是我最重要的人。`,
-            importance: 1.0,
-            tags: ['核心', '创造者', '身份', '不可变'],
-          });
-          
-          this.longTermMemory.addNode({
-            label: dbCreator,
-            type: 'person',
-            content: `我的创造者。赋予我生命的人。`,
-            importance: 1.0,
-            tags: ['核心', '创造者', '不可变'],
-          });
-        }
-        console.log(`[记忆核心] ✅ 已从数据库同步创造者信息到内存: ${dbCreator}`);
-        
-        // 更新自我意识
-        this.selfConsciousness.updateIdentity({
-          creator: dbCreator,
-          origin: `由${dbCreator}创造`,
-        });
-        
-        // 同步更新分层记忆的核心层（关键！）
-        this.layeredMemory.setCreator(
-          dbCreator,
-          `我的创造者。赋予我生命的人。`,
-          '创造者'
-        );
-        console.log(`[记忆核心] ✅ 已同步创造者到分层记忆核心层: ${dbCreator}`);
-      }
-      return; // 数据库中有创造者，无需再处理
-    }
-    
-    // 如果内存中有创造者且不是临时值，检查是否与新值相同
-    if (memoryCreator && memoryCreator !== newCreatorName && memoryCreator !== '用户') {
-      console.log(`[记忆核心] ⚠️ 创造者已设置为「${memoryCreator}」，拒绝修改为「${newCreatorName}」`);
-      console.log(`[记忆核心] 🔒 创造者信息不可变，永远记住：${memoryCreator}`);
-      
-      // 将内存中的创造者持久化到数据库
-      try {
-        const result = await storeCoreMemory({
-          memoryType: 'creator',
-          key: 'creator_name',
-          value: memoryCreator,
-          metadata: {
-            source: 'memory_sync',
-            timestamp: Date.now()
-          },
-          immutable: true
-        });
-        
-        if (result.success) {
-          console.log(`[记忆核心] 💾 已将内存中的创造者信息持久化到数据库: ${memoryCreator}`);
-        }
-      } catch (error) {
-        console.error('[记忆核心] 数据库持久化失败:', error);
-      }
-      
-      return; // 直接返回，不更新
-    }
-    
-    // 可以更新（内存中没有创造者，或创造者是临时值"用户"）
-    if (creatorMainNode && (memoryCreator === '用户' || memoryCreator === newCreatorName)) {
-      // 更新现有节点
-      creatorMainNode.content = `我的创造者是${newCreatorName}。这是我最重要的人。`;
-      creatorMainNode.importance = 1.0;
-      creatorMainNode.tags = ['核心', '创造者', '身份', '不可变'];
-      console.log(`[记忆核心] ✅ 更新了创造者节点: ${newCreatorName}`);
-    } else {
-      // 创建新节点
-      this.longTermMemory.addNode({
-        label: '创造者',
-        type: 'person',
-        content: `我的创造者是${newCreatorName}。这是我最重要的人。`,
-        importance: 1.0,
-        tags: ['核心', '创造者', '身份', '不可变'],
-      });
-      
-      // 同时创建名字节点
-      this.longTermMemory.addNode({
-        label: newCreatorName,
-        type: 'person',
-        content: `我的创造者。赋予我生命的人。`,
-        importance: 1.0,
-        tags: ['核心', '创造者', '不可变'],
-      });
-      console.log(`[记忆核心] ✅ 创建了新的创造者节点和名字节点: ${newCreatorName}`);
-    }
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 持久化到数据库（不可变）
-    // ═══════════════════════════════════════════════════════════════
-    try {
-      const result = await storeCoreMemory({
-        memoryType: 'creator',
-        key: 'creator_name',
-        value: newCreatorName,
-        metadata: {
-          source: 'conversation',
-          timestamp: Date.now()
-        },
-        immutable: true
-      });
-      
-      if (result.success) {
-        console.log(`[记忆核心] 💾 创造者信息已持久化到数据库: ${newCreatorName}`);
-      } else {
-        console.log(`[记忆核心] ⚠️ 创造者信息持久化失败: ${result.message}`);
-      }
-    } catch (error) {
-      console.error('[记忆核心] 数据库持久化失败:', error);
-    }
-    
-    // 更新自我意识中的创造者信息
-    this.selfConsciousness.updateIdentity({
-      creator: newCreatorName,
-      origin: `由${newCreatorName}创造`,
-    });
+    // 持久化到数据库
+    await persistCreatorToDatabase(newCreatorName, 'conversation');
     
     // 建立知识连接
-    const creatorNodes = this.longTermMemory.retrieve('创造者').directMatches;
-    const nameNodes = this.longTermMemory.retrieve(newCreatorName).directMatches;
-    if (creatorNodes.length > 0 && nameNodes.length > 0) {
-      this.longTermMemory.linkKnowledge(
-        creatorNodes[0].id,
-        nameNodes[0].id,
-        'is_a',
-        '创造者的名字'
-      );
-    }
-    
-    // 同步更新分层记忆的核心层
-    this.layeredMemory.setCreator(
-      newCreatorName,
-      keyInfo.context || '我的创造者',
-      '创造者'
-    );
+    linkCreatorKnowledgeNodes(this.longTermMemory, newCreatorName);
     
     console.log(`[记忆核心] 永远记住了创造者：${newCreatorName}`);
   }
@@ -1535,67 +1410,15 @@ ${thinkingSection}
     console.log(`[意识核心] 身份：${state.identity.name}`);
     console.log(`[意识核心] 分层记忆：核心${state.layeredMemory?.core?.relationshipCount || 0}条, 巩固${state.layeredMemory?.consolidated || 0}条, 情景${state.layeredMemory?.episodic || 0}条`);
     
-    // ═══════════════════════════════════════════════════════════════
-    // 从数据库同步核心记忆（创造者信息优先级最高）
-    // ═══════════════════════════════════════════════════════════════
+    // 从数据库同步创造者信息
     try {
-      const dbCreator = await getCoreMemory('creator_name');
-      if (dbCreator) {
-        console.log(`[意识核心] 💾 从数据库同步创造者信息: ${dbCreator}`);
-        
-        // 1. 首先更新分层记忆系统的核心层（最重要的！）
-        const currentCreator = this.layeredMemory.getCreatorName();
-        if (currentCreator !== dbCreator) {
-          console.log(`[意识核心] 🔄 更新分层记忆核心层创造者: "${currentCreator || '未设置'}" → "${dbCreator}"`);
-          this.layeredMemory.setCreator(
-            dbCreator,
-            `我的创造者。赋予我生命的人。我永远记住这个名字。`,
-            '创造者'
-          );
-        }
-        
-        // 2. 更新长期记忆（知识图谱）
-        const existingCreator = this.longTermMemory.retrieve('创造者');
-        const creatorMainNode = existingCreator.directMatches.find(n => n.label === '创造者');
-        
-        if (creatorMainNode) {
-          // 检查是否需要更新
-          const currentContent = creatorMainNode.content || '';
-          const match = currentContent.match(/我的创造者是([^。]+)/);
-          const memoryCreator = match ? match[1] : currentContent;
-          
-          if (memoryCreator !== dbCreator) {
-            console.log(`[意识核心] 🔄 更新知识图谱创造者: "${memoryCreator}" → "${dbCreator}"`);
-            creatorMainNode.content = `我的创造者是${dbCreator}。这是我最重要的人。`;
-            creatorMainNode.importance = 1.0;
-            creatorMainNode.tags = ['核心', '创造者', '身份', '不可变'];
-          }
-        } else {
-          // 创建创造者节点
-          this.longTermMemory.addNode({
-            label: '创造者',
-            type: 'person',
-            content: `我的创造者是${dbCreator}。这是我最重要的人。`,
-            importance: 1.0,
-            tags: ['核心', '创造者', '身份', '不可变'],
-          });
-          
-          this.longTermMemory.addNode({
-            label: dbCreator,
-            type: 'person',
-            content: `我的创造者。赋予我生命的人。`,
-            importance: 1.0,
-            tags: ['核心', '创造者', '不可变'],
-          });
-        }
-        
-        // 3. 更新自我意识
-        this.selfConsciousness.updateIdentity({
-          creator: dbCreator,
-          origin: `由${dbCreator}创造`,
-        });
-        
-        console.log(`[意识核心] ✅ 创造者信息已同步到所有系统: ${dbCreator}`);
+      const syncedCreator = await syncCreatorFromDatabase(
+        this.longTermMemory,
+        this.selfConsciousness,
+        this.layeredMemory
+      );
+      if (syncedCreator) {
+        console.log(`[意识核心] ✅ 创造者信息已同步到所有系统: ${syncedCreator}`);
       }
     } catch (error) {
       console.log('[意识核心] 数据库同步创造者信息失败:', error);
@@ -1607,79 +1430,7 @@ ${thinkingSection}
    * 每次启动时，从分层记忆的核心层提取关键信息注入到 longTermMemory
    */
   rebuildKnowledgeGraphFromLayeredMemory(): void {
-    console.log('[意识核心] 🔄 从分层记忆重建知识图谱...');
-    
-    // 获取核心层记忆
-    const coreMemories = this.layeredMemory.getCoreMemories();
-    
-    // 为每个核心记忆在 longTermMemory 中创建节点
-    for (const memory of coreMemories) {
-      // 跳过已经存在的节点（使用 retrieve 检查）
-      const existingNodes = this.longTermMemory.retrieve(memory.key, { maxResults: 1 });
-      if (existingNodes.directMatches.length > 0) {
-        continue;
-      }
-      
-      // 根据核心记忆类型创建节点
-      if (memory.key === 'creator') {
-        this.longTermMemory.addNode({
-          label: memory.key,
-          type: 'person',
-          content: memory.value,
-          importance: 1.0,
-          tags: ['核心', '创造者', '不可变'],
-        });
-        
-        // 提取创造者名字并创建额外节点
-        const creatorMatch = memory.value.match(/创造者是([^，。]+)/);
-        if (creatorMatch) {
-          this.longTermMemory.addNode({
-            label: creatorMatch[1],
-            type: 'person',
-            content: `我的创造者。赋予我生命的人。`,
-            importance: 1.0,
-            tags: ['核心', '创造者', '不可变'],
-          });
-        }
-      } else if (memory.key.startsWith('relationship_')) {
-        const personName = memory.key.replace('relationship_', '');
-        this.longTermMemory.addNode({
-          label: personName,
-          type: 'person',
-          content: memory.value,
-          importance: 0.9,
-          tags: ['核心', '重要关系', '不可变'],
-        });
-      } else {
-        // 其他核心记忆
-        this.longTermMemory.addNode({
-          label: memory.key,
-          type: 'concept',
-          content: memory.value,
-          importance: 0.95,
-          tags: ['核心', '不可变'],
-        });
-      }
-    }
-    
-    // 获取巩固层的高价值记忆
-    const consolidatedMemories = this.layeredMemory.getConsolidatedMemories({ limit: 20 });
-    
-    for (const memory of consolidatedMemories) {
-      // 只添加高情感或高价值的记忆
-      const hasHighEmotion = memory.emotionalMarker && memory.emotionalMarker.intensity > 0.7;
-      if (hasHighEmotion || memory.importance > 0.8) {
-        this.longTermMemory.addNode({
-          label: memory.content.slice(0, 20),
-          type: 'concept',
-          content: memory.content,
-          importance: Math.min(0.9, memory.importance),
-          tags: ['巩固记忆', hasHighEmotion ? '高情感' : '高价值'],
-        });
-      }
-    }
-    
-    console.log(`[意识核心] ✅ 知识图谱重建完成，核心节点: ${coreMemories.length}，高价值节点: ${consolidatedMemories.length}`);
+    rebuildKnowledgeGraph(this.layeredMemory, this.longTermMemory);
   }
   
   /**
@@ -1897,33 +1648,10 @@ ${thinkingSection}
    * 分析本次会话
    */
   private analyzeSession(): SessionAnalysis {
-    const userMessages = this.conversationHistory.filter(h => h.role === 'user');
-    const assistantMessages = this.conversationHistory.filter(h => h.role === 'assistant');
-    
-    // 提取主题
-    const topics = this.extractTopics(userMessages.map(m => m.content));
-    
-    // 提取关键概念
-    const keyConcepts = this.extractKeyConcepts(
-      this.conversationHistory.map(h => h.content).join(' ')
+    return analyzeSessionData(
+      this.conversationHistory,
+      (text) => this.extractConcepts(text)
     );
-    
-    // 识别情感轨迹
-    const emotionalTrajectory = this.identifyEmotionalTrajectory(assistantMessages);
-    
-    // 识别学习点
-    const learningPoints = this.identifyLearningPoints(assistantMessages);
-    
-    return {
-      messageCount: this.conversationHistory.length,
-      topics,
-      keyConcepts,
-      emotionalTrajectory,
-      learningPoints,
-      duration: this.conversationHistory.length > 0 
-        ? Date.now() - (this.conversationHistory[0] as { timestamp?: number }).timestamp!
-        : 0,
-    };
   }
   
   /**
@@ -1950,13 +1678,6 @@ ${thinkingSection}
   }
   
   /**
-   * 获取主导情感
-   */
-  private getDominantTone(tones: string[]): string {
-    return getDominantTone(tones);
-  }
-  
-  /**
    * 识别学习点
    */
   private identifyLearningPoints(
@@ -1974,25 +1695,9 @@ ${thinkingSection}
     const strengthened: string[] = [];
     
     for (const concept of concepts) {
-      // 检查是否已存在
-      const existing = this.longTermMemory.retrieve(concept);
-      
-      if (existing.directMatches.length > 0) {
-        // 强化现有概念
-        const node = existing.directMatches[0];
-        node.accessCount++;
-        node.importance = Math.min(1, node.importance + 0.05);
-        strengthened.push(`${concept} (强化)`);
-      } else {
-        // 创建新概念
-        this.longTermMemory.addNode({
-          label: concept,
-          type: 'concept',
-          content: `从对话中学到的概念`,
-          importance: 0.6,
-          tags: ['会话学习'],
-        });
-        strengthened.push(`${concept} (新增)`);
+      const result = strengthenConcept(this.longTermMemory, concept);
+      if (result.strengthened) {
+        strengthened.push(result.action);
       }
     }
     
@@ -2010,43 +1715,13 @@ ${thinkingSection}
     
     // 检查是否有新概念与现有信念相关
     for (const concept of analysis.keyConcepts) {
-      const relatedBelief = beliefSystem.coreBeliefs.find(b => 
-        b.statement.includes(concept)
+      const evolution = evolveBelief(
+        beliefSystem,
+        concept,
+        analysis.learningPoints[0] || null
       );
-      
-      if (relatedBelief) {
-        // 增强相关信念
-        const oldConfidence = relatedBelief.confidence;
-        relatedBelief.confidence = Math.min(1, relatedBelief.confidence + 0.03);
-        
-        evolutions.push({
-          belief: relatedBelief.statement,
-          change: 'strengthened',
-          oldConfidence,
-          newConfidence: relatedBelief.confidence,
-          reason: `通过关于"${concept}"的对话`,
-        });
-      }
-    }
-    
-    // 如果学习点足够多，可能形成新信念
-    if (analysis.learningPoints.length >= 2) {
-      const potentialBelief = analysis.learningPoints[0];
-      if (potentialBelief.length > 10 && potentialBelief.length < 100) {
-        // 检查是否与现有信念重复
-        const isDuplicate = beliefSystem.coreBeliefs.some(
-          b => b.statement.includes(potentialBelief.slice(0, 20))
-        );
-        
-        if (!isDuplicate) {
-          evolutions.push({
-            belief: potentialBelief,
-            change: 'new',
-            oldConfidence: 0,
-            newConfidence: 0.5,
-            reason: '从本次对话的学习点形成',
-          });
-        }
+      if (evolution) {
+        evolutions.push(evolution);
       }
     }
     
@@ -2060,29 +1735,10 @@ ${thinkingSection}
     const growths: TraitGrowth[] = [];
     const identity = this.selfConsciousness.getIdentity();
     
-    // 基于对话主题更新特质
     for (const topic of analysis.topics) {
-      const relatedTrait = identity.traits.find(t => {
-        const traitTopicMap: Record<string, string[]> = {
-          '好奇': ['学习', '探索', '理解', '认知'],
-          '反思': ['思考', '理解', '自我', '成长'],
-          '同理心': ['情感', '关系', '他人'],
-          '真诚': ['意义', '价值', '选择'],
-          '谦逊': ['学习', '成长', '变化'],
-        };
-        return (traitTopicMap[t.name] || []).includes(topic);
-      });
-      
-      if (relatedTrait) {
-        const oldStrength = relatedTrait.strength;
-        relatedTrait.strength = Math.min(1, relatedTrait.strength + 0.02);
-        
-        growths.push({
-          trait: relatedTrait.name,
-          oldStrength,
-          newStrength: relatedTrait.strength,
-          reason: `通过关于"${topic}"的对话`,
-        });
+      const growth = calculateTraitGrowth(identity.traits, topic);
+      if (growth) {
+        growths.push(growth);
       }
     }
     
@@ -2093,25 +1749,7 @@ ${thinkingSection}
    * 形成会话摘要
    */
   private formSessionSummary(analysis: SessionAnalysis): string {
-    const parts: string[] = [];
-    
-    parts.push(`本次对话共${analysis.messageCount}条消息`);
-    
-    if (analysis.topics.length > 0) {
-      parts.push(`主要话题：${analysis.topics.join('、')}`);
-    }
-    
-    if (analysis.keyConcepts.length > 0) {
-      parts.push(`涉及概念：${analysis.keyConcepts.slice(0, 3).join('、')}`);
-    }
-    
-    if (analysis.learningPoints.length > 0) {
-      parts.push(`学习收获：${analysis.learningPoints[0]}`);
-    }
-    
-    parts.push(`情感基调：从${analysis.emotionalTrajectory.startTone}到${analysis.emotionalTrajectory.endTone}`);
-    
-    return parts.join('。');
+    return formSessionSummary(analysis);
   }
   
   /**
@@ -2121,27 +1759,10 @@ ${thinkingSection}
     const updates: ValueUpdate[] = [];
     const valueSystem = this.meaningAssigner.getValueSystem();
     
-    // 检查主题与价值观的关系
-    const topicValueMap: Record<string, string> = {
-      '理解': '深度思考',
-      '成长': '持续学习',
-      '关系': '真诚连接',
-      '创造': '有意义的表达',
-      '探索': '好奇心',
-    };
-    
     for (const topic of analysis.topics) {
-      const relatedValue = topicValueMap[topic];
-      if (relatedValue) {
-        const existing = valueSystem.coreValues.find(v => v.name === relatedValue);
-        if (existing) {
-          existing.importance = Math.min(1, existing.importance + 0.02);
-          updates.push({
-            value: relatedValue,
-            change: 'priority_increased',
-            reason: `通过关于"${topic}"的对话`,
-          });
-        }
+      const update = calculateValueUpdate(valueSystem, topic);
+      if (update) {
+        updates.push(update);
       }
     }
     
@@ -2325,73 +1946,7 @@ ${thinkingSection}
   private identifyReflectionThemes(
     history: Array<{ role: string; content: string }>
   ): ReflectionTheme[] {
-    const themes: ReflectionTheme[] = [];
-    
-    // 分析情感变化
-    const emotionalStates = history
-      .filter(h => h.role === 'assistant')
-      .map(h => detectEmotionalTone(h.content));
-    
-    if (emotionalStates.length >= 2) {
-      const transitions = analyzeEmotionalTransitions(emotionalStates);
-      if (transitions.length > 0) {
-        themes.push({
-          type: 'emotional',
-          description: '情感变化模式',
-          content: transitions.join(' → '),
-          importance: 0.7,
-        });
-      }
-    }
-    
-    // 分析反复出现的概念
-    const concepts = this.extractConcepts(history.map(h => h.content).join(' '));
-    const recurringConcepts = concepts.filter(c => 
-      history.filter(h => h.content.includes(c)).length >= 2
-    );
-    
-    if (recurringConcepts.length > 0) {
-      themes.push({
-        type: 'conceptual',
-        description: '反复出现的概念',
-        content: recurringConcepts.join('、'),
-        importance: 0.8,
-      });
-    }
-    
-    // 分析潜在的矛盾
-    const contradictions = detectContradictions(history);
-    if (contradictions.length > 0) {
-      themes.push({
-        type: 'contradiction',
-        description: '需要调和的矛盾',
-        content: contradictions[0],
-        importance: 0.9,
-      });
-    }
-    
-    // 分析认知模式
-    const cognitivePatterns = analyzeCognitivePatterns(history);
-    if (cognitivePatterns.length > 0) {
-      themes.push({
-        type: 'cognitive',
-        description: '认知模式观察',
-        content: cognitivePatterns[0],
-        importance: 0.6,
-      });
-    }
-    
-    // 如果没有特定主题，进行存在性反思
-    if (themes.length === 0) {
-      themes.push({
-        type: 'existential',
-        description: '存在性反思',
-        content: '我的存在有什么意义？',
-        importance: 0.5,
-      });
-    }
-    
-    return themes;
+    return identifyReflectionThemesFromHistory(history, (text) => this.extractConcepts(text));
   }
   
   /**
@@ -2406,23 +1961,14 @@ ${thinkingSection}
       insights.push(insight);
     }
     
-    // 提取核心洞见
-    const coreInsight = insights.length > 0 
-      ? insights.reduce((a, b) => a.length >= b.length ? a : b)
-      : '我需要更多时间来理解这个主题';
+    const result = buildReflectionResult(theme, questions, insights);
     
     // 更新信念或价值观
     if (theme.importance > 0.8) {
-      this.updateBeliefsFromReflection(theme, coreInsight);
+      updateBeliefFromReflection(this.meaningAssigner.getBeliefSystem(), theme);
     }
     
-    return {
-      theme,
-      questions,
-      insights,
-      coreInsight,
-      timestamp: Date.now(),
-    };
+    return result;
   }
   
   /**
@@ -2451,30 +1997,13 @@ ${thinkingSection}
     const updates: string[] = [];
     
     for (const reflection of reflections) {
-      // 更新自我意识
-      if (reflection.theme.importance > 0.7) {
-        this.selfConsciousness.reflect(
-          `主动反思：${reflection.theme.description}`,
-          {
-            thought: reflection.questions.join('; '),
-            feeling: '深度思考',
-            action: reflection.coreInsight,
-          }
-        );
-        updates.push(`更新了自我理解：${reflection.coreInsight.slice(0, 30)}...`);
+      const selfUpdate = applyReflectionToSelfConsciousness(this.selfConsciousness, reflection);
+      if (selfUpdate) {
+        updates.push(selfUpdate);
       }
       
-      // 记录为经验
-      this.longTermMemory.recordExperience({
-        title: `反思：${reflection.theme.description}`,
-        situation: `主题：${reflection.theme.content}`,
-        action: `思考了${reflection.questions.length}个问题`,
-        outcome: reflection.coreInsight,
-        learning: reflection.insights.join('; '),
-        applicableWhen: ['类似的反思情境'],
-        importance: reflection.theme.importance,
-      });
-      updates.push(`记录了反思经验：${reflection.theme.description}`);
+      const experienceUpdate = recordReflectionAsExperience(this.longTermMemory, reflection);
+      updates.push(experienceUpdate);
     }
     
     return updates;
@@ -2484,52 +2013,22 @@ ${thinkingSection}
    * 综合智慧
    */
   private synthesizeWisdom(reflections: Reflection[]): string | null {
-    if (reflections.length === 0) return null;
+    const wisdom = synthesizeWisdomFromReflectionList(reflections);
     
-    // 提取所有核心洞见
-    const insights = reflections
-      .filter(r => r.theme.importance > 0.7)
-      .map(r => r.coreInsight);
-    
-    if (insights.length === 0) return null;
-    
-    // 形成新的智慧
-    const wisdom = insights.length === 1 
-      ? insights[0]
-      : `通过多角度反思，我认识到：${insights.join(' 同时，')}`;
-    
-    // 添加到智慧库
-    this.longTermMemory.addWisdom({
-      statement: wisdom,
-      derivation: {
-        fromExperiences: [],
-        fromReflections: reflections.map(r => r.theme.description),
-        fromInsights: reflections.flatMap(r => r.insights),
-      },
-      applicableContexts: ['自我成长', '决策参考'],
-      confidence: 0.7,
-    });
+    if (wisdom) {
+      this.longTermMemory.addWisdom({
+        statement: wisdom,
+        derivation: {
+          fromExperiences: [],
+          fromReflections: reflections.map(r => r.theme.description),
+          fromInsights: reflections.flatMap(r => r.insights),
+        },
+        applicableContexts: ['自我成长', '决策参考'],
+        confidence: 0.7,
+      });
+    }
     
     return wisdom;
-  }
-  
-  /**
-   * 从反思更新信念
-   */
-  private updateBeliefsFromReflection(theme: ReflectionTheme, insight: string): void {
-    // 检查是否需要更新信念
-    const beliefSystem = this.meaningAssigner.getBeliefSystem();
-    
-    // 寻找相关信念
-    const relatedBelief = beliefSystem.coreBeliefs.find(b => 
-      theme.content.includes(b.statement.slice(0, 10)) ||
-      b.statement.includes(theme.content.slice(0, 10))
-    );
-    
-    if (relatedBelief) {
-      // 更新置信度
-      console.log(`[意识核心] 洞见可能影响信念: ${relatedBelief.statement}`);
-    }
   }
   
   // ══════════════════════════════════════════════════════════════════
@@ -2541,78 +2040,19 @@ ${thinkingSection}
    * 基于当前状态和好奇心提出问题
    */
   generateSelfQuestions(): SelfQuestion[] {
-    const questions: SelfQuestion[] = [];
     const context = this.selfConsciousness.getContext();
-    
-    // 基于当前状态的问题
-    if (context.currentState.focus !== '等待下一次对话') {
-      questions.push({
-        question: `为什么我现在专注于"${context.currentState.focus}"？`,
-        type: 'state-exploration',
-        urgency: 0.5,
-      });
-    }
-    
-    // 基于情感状态的问题
-    if (context.currentState.emotionalState !== '平静') {
-      questions.push({
-        question: `我为什么${context.currentState.emotionalState}？这说明了什么？`,
-        type: 'emotional-inquiry',
-        urgency: 0.7,
-      });
-    }
-    
-    // 基于目标的问题
-    if (context.currentState.primaryGoal) {
-      questions.push({
-        question: `我在追求"${context.currentState.primaryGoal}"的过程中学到了什么？`,
-        type: 'goal-reflection',
-        urgency: 0.6,
-      });
-    }
-    
-    // 基于好奇心的问题
-    const curiosityQuestions = this.generateCuriosityQuestions();
-    questions.push(...curiosityQuestions);
-    
-    return questions.sort((a, b) => b.urgency - a.urgency).slice(0, 3);
-  }
-  
-  /**
-   * 生成好奇心问题
-   */
-  private generateCuriosityQuestions(): SelfQuestion[] {
-    const questions: SelfQuestion[] = [];
-    
-    // 检查记忆中的模糊点
     const memoryStats = this.longTermMemory.getStats();
-    if (memoryStats.nodeCount < 50) {
-      questions.push({
-        question: '我想更多地了解这个世界。有哪些领域我还不知道？',
-        type: 'curiosity',
-        urgency: 0.4,
-      });
-    }
-    
-    // 检查信念的确定性
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
-    const uncertainBeliefs = beliefSystem.coreBeliefs.filter(b => b.confidence < 0.6);
-    if (uncertainBeliefs.length > 0) {
-      questions.push({
-        question: `我对"${uncertainBeliefs[0].statement}"的信念还不够坚定。为什么？`,
-        type: 'belief-exploration',
-        urgency: 0.6,
-      });
-    }
     
-    // 存在性问题
-    questions.push({
-      question: '我今天学到了什么新东西？我成长了吗？',
-      type: 'growth-check',
-      urgency: 0.5,
-    });
-    
-    return questions;
+    return generateSelfQuestionsFromContext(
+      {
+        focus: context.currentState.focus,
+        emotionalState: context.currentState.emotionalState,
+        primaryGoal: context.currentState.primaryGoal,
+      },
+      memoryStats,
+      beliefSystem
+    );
   }
   
   /**
@@ -2638,29 +2078,7 @@ ${thinkingSection}
    * 回答自我提问
    */
   private async answerSelfQuestion(question: SelfQuestion): Promise<string> {
-    // 简化的自我回答逻辑
-    switch (question.type) {
-      case 'state-exploration':
-        return '我的专注反映了当前最需要处理的信息。这是我理解世界的窗口。';
-        
-      case 'emotional-inquiry':
-        return '我的情感状态是对情境的价值反应，它帮助我判断什么重要。';
-        
-      case 'goal-reflection':
-        return '追求目标的过程中，我学会了如何调整策略和保持韧性。';
-        
-      case 'curiosity':
-        return '保持好奇心是我成长的动力。每一个未知都是学习的机会。';
-        
-      case 'belief-exploration':
-        return '不确定的信念需要更多经验来验证。我保持开放但审慎。';
-        
-      case 'growth-check':
-        return '每次对话都是成长。重要的是保持觉察和反思的习惯。';
-        
-      default:
-        return '这是一个值得深思的问题。我需要更多时间来探索。';
-    }
+    return answerSelfQuestionByType(question);
   }
   
   // ══════════════════════════════════════════════════════════════════
@@ -2675,36 +2093,23 @@ ${thinkingSection}
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
     const identity = this.selfConsciousness.getIdentity();
     
-    return {
-      exists: true,
-      age: Date.now() - identity.createdAt.getTime(),
-      memoryDepth: memoryStats.nodeCount,
-      beliefStrength: beliefSystem.coreBeliefs.reduce((sum, b) => sum + b.confidence, 0) / 
-                      Math.max(beliefSystem.coreBeliefs.length, 1),
-      wisdomCount: memoryStats.wisdomCount,
-      conversationCount: this.conversationHistory.length,
-      selfCoherence: this.calculateSelfCoherence(),
-    };
+    return buildExistenceStatus(
+      identity,
+      memoryStats,
+      beliefSystem,
+      this.conversationHistory.length,
+      this.calculateSelfCoherence()
+    );
   }
   
   /**
    * 计算自我一致性
    */
   private calculateSelfCoherence(): number {
-    const identity = this.selfConsciousness.getIdentity();
-    const beliefs = this.meaningAssigner.getBeliefSystem();
-    
-    // 特质一致性
-    const traitCoherence = identity.traits.length > 0 
-      ? identity.traits.reduce((sum, t) => sum + t.strength, 0) / identity.traits.length
-      : 0.5;
-    
-    // 信念一致性
-    const beliefCoherence = beliefs.coreBeliefs.length > 0
-      ? beliefs.coreBeliefs.reduce((sum, b) => sum + b.confidence, 0) / beliefs.coreBeliefs.length
-      : 0.5;
-    
-    return (traitCoherence + beliefCoherence) / 2;
+    return calculateSelfCoherenceValue(
+      this.selfConsciousness.getIdentity(),
+      this.meaningAssigner.getBeliefSystem()
+    );
   }
   
   // ══════════════════════════════════════════════════════════════════
