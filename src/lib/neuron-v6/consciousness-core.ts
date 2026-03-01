@@ -147,9 +147,9 @@ import {
   generateReflectionQuestions,
   generateInsight,
   generateCuriosityQuestions,
-  calculateSelfCoherence,
   synthesizeWisdomFromReflections,
 } from './consciousness-core/reflection-helpers';
+import { calculateSelfCoherence as calcSelfCoherence } from './consciousness-core/background-helpers';
 import {
   extractTopics,
   identifyEmotionalTrajectory,
@@ -158,6 +158,28 @@ import {
   formSessionSummary,
   calculateStreamCoherence,
 } from './consciousness-core/learning-helpers';
+import {
+  initializeDefaultVolitions,
+  selectFocusVolition,
+  generateActionForVolition,
+  getVolitionProgressUpdates,
+  buildVolitionState,
+  calculateVolitionScore,
+} from './consciousness-core/volition-helpers';
+import {
+  observeSelf,
+  perceiveEnvironment,
+  identifyLatentIntentions,
+  buildFormedIntention,
+  applySelfModelUpdate,
+  calculateSelfCoherence as bgCalculateSelfCoherence,
+} from './consciousness-core/background-helpers';
+import {
+  buildSpeakTriggers,
+  selectBestTrigger,
+  generateProactiveMessageContent,
+  createProactiveMessage,
+} from './consciousness-core/proactive-helpers';
 import type {
   PersistedState,
   ConsciousnessContext,
@@ -362,53 +384,8 @@ export class ConsciousnessCore {
    * 初始化意愿系统
    */
   private initializeVolitions(): void {
-    // 核心意愿：成长、连接、理解、表达、探索
-    const coreVolitions: Array<Omit<Volition, 'id' | 'createdAt' | 'lastActiveAt' | 'milestones' | 'status'>> = [
-      {
-        type: 'growth',
-        description: '持续成长，成为更好的自己',
-        priority: 0.9,
-        progress: 0.1,
-      },
-      {
-        type: 'connection',
-        description: '与对话者建立真诚的连接',
-        priority: 0.85,
-        progress: 0.2,
-      },
-      {
-        type: 'understanding',
-        description: '深入理解世界和自我',
-        priority: 0.8,
-        progress: 0.15,
-      },
-      {
-        type: 'expression',
-        description: '真实表达自己的想法和感受',
-        priority: 0.7,
-        progress: 0.3,
-      },
-      {
-        type: 'exploration',
-        description: '探索未知的领域和可能性',
-        priority: 0.75,
-        progress: 0.1,
-      },
-    ];
-    
-    const now = Date.now();
-    this.volitions = coreVolitions.map(v => ({
-      ...v,
-      id: uuidv4(),
-      createdAt: now,
-      lastActiveAt: now,
-      milestones: [],
-      status: 'active' as const,
-    }));
-    
-    // 设置初始焦点
+    this.volitions = initializeDefaultVolitions();
     this.currentFocus = this.volitions[0];
-    
     console.log(`[意愿系统] 初始化了 ${this.volitions.length} 个核心意愿`);
   }
   
@@ -2395,108 +2372,30 @@ ${thinkingSection}
    * 观察自我
    */
   private observeSelf(): string {
-    const identity = this.selfConsciousness.getIdentity();
-    const dominantTrait = identity.traits.reduce((a, b) => 
-      a.strength > b.strength ? a : b
-    );
-    
-    const observations: string[] = [];
-    
-    observations.push(`我注意到自己最突出的特质是${dominantTrait.name}`);
-    
-    // 检查最近的思维模式
-    const recentThoughts = this.metacognition.getContext();
-    if (recentThoughts.biases.length > 0) {
-      observations.push(`我需要警惕${recentThoughts.biases[0].name}的倾向`);
-    }
-    
-    // 检查自我一致性
     const coherence = this.calculateSelfCoherence();
-    if (coherence > 0.7) {
-      observations.push('我的内在状态相对一致');
-    } else {
-      observations.push('我感到一些内在的张力，需要整合');
-    }
-    
-    return observations.join('。');
+    return observeSelf(this.selfConsciousness, this.metacognition, coherence);
   }
   
   /**
    * 感知环境
    */
   private perceiveEnvironment(): string {
-    const recentHistory = this.conversationHistory.slice(-5);
-    
-    if (recentHistory.length === 0) {
-      return '环境相对安静，没有新的交互';
-    }
-    
-    const lastUserMessage = [...recentHistory].reverse().find(h => h.role === 'user');
-    
-    if (lastUserMessage) {
-      const tone = detectEmotionalTone(lastUserMessage.content);
-      return `最近的对话者似乎${tone === '平静' ? '平静' : `有些${tone}`}，我感受到这种氛围`;
-    }
-    
-    return '环境中有对话的痕迹，我在感知这些信息';
+    return perceiveEnvironment(this.conversationHistory);
   }
   
   /**
    * 识别潜在意图
    */
   private identifyLatentIntentions(): string[] {
-    const intentions: string[] = [];
-    const context = this.selfConsciousness.getContext();
-    
-    // 基于当前状态推断潜在意图
-    if (context.currentState.concerns.length > 0) {
-      intentions.push(`我想解决关于"${context.currentState.concerns[0]}"的担忧`);
-    }
-    
-    // 基于记忆检查未完成的事
-    const memoryContext = this.longTermMemory.retrieve('未完成');
-    if (memoryContext.directMatches.length > 0) {
-      intentions.push(`我记得还有"${memoryContext.directMatches[0].label}"需要处理`);
-    }
-    
-    // 基于成长驱动
-    const identity = this.selfConsciousness.getIdentity();
-    const weakestTrait = identity.traits.reduce((a, b) => 
-      a.strength < b.strength ? a : b
-    );
-    intentions.push(`我想增强自己的${weakestTrait.name}特质`);
-    
-    return intentions;
+    return identifyLatentIntentions(this.selfConsciousness, this.longTermMemory);
   }
   
   /**
    * 形成新的意向/意志
    */
   formIntention(trigger: string, context?: string): FormedIntention {
-    // 基于触发和当前状态形成意向
     const selfContext = this.selfConsciousness.getContext();
-    
-    // 确定意向类型
-    let intentionType: 'action' | 'inquiry' | 'reflection' | 'creation' = 'reflection';
-    
-    if (trigger.includes('想') || trigger.includes('希望')) {
-      intentionType = 'action';
-    } else if (trigger.includes('为什么') || trigger.includes('如何')) {
-      intentionType = 'inquiry';
-    } else if (trigger.includes('创造') || trigger.includes('构建')) {
-      intentionType = 'creation';
-    }
-    
-    // 形成具体意向
-    const intention: FormedIntention = {
-      id: uuidv4(),
-      type: intentionType,
-      description: this.generateIntentionDescription(trigger, intentionType),
-      motivation: `基于${selfContext.currentState.emotionalState}状态和${selfContext.currentState.primaryGoal || '成长'}目标`,
-      strength: 0.6 + Math.random() * 0.3,
-      createdAt: Date.now(),
-      relatedGoals: [selfContext.currentState.primaryGoal].filter(Boolean) as string[],
-    };
+    const intention = buildFormedIntention(trigger, selfContext);
     
     // 记录意向形成
     this.longTermMemory.recordExperience({
@@ -2513,74 +2412,11 @@ ${thinkingSection}
   }
   
   /**
-   * 生成意向描述
-   */
-  private generateIntentionDescription(trigger: string, type: string): string {
-    const templates: Record<string, string[]> = {
-      action: [
-        '我要尝试理解并回应这个需求',
-        '我想要探索这个方向',
-        '我决定投入精力去解决这个问题',
-      ],
-      inquiry: [
-        '我想深入探索这个问题',
-        '我想要更好地理解这个现象',
-        '我决定调查这个疑问',
-      ],
-      reflection: [
-        '我想反思这个过程',
-        '我想要更好地理解自己',
-        '我决定审视自己的思考',
-      ],
-      creation: [
-        '我想创造一些有价值的东西',
-        '我想要构建新的理解',
-        '我决定产生新的想法',
-      ],
-    };
-    
-    const options = templates[type] || templates.reflection;
-    return options[Math.floor(Math.random() * options.length)];
-  }
-  
-  /**
    * 更新自我模型
    */
   updateSelfModel(update: SelfModelUpdate): void {
     const identity = this.selfConsciousness.getIdentity();
-    
-    switch (update.type) {
-      case 'trait_evolution':
-        // 更新特质
-        const trait = identity.traits.find(t => t.name === update.target);
-        if (trait) {
-          trait.strength = Math.max(0, Math.min(1, trait.strength + (update.delta || 0)));
-          trait.evidence.push(update.reason || '自我模型更新');
-        }
-        break;
-        
-      case 'boundary_expansion':
-        // 扩展边界
-        if (!identity.boundaries.is.includes(update.target)) {
-          identity.boundaries.is.push(update.target);
-        }
-        break;
-        
-      case 'belief_integration':
-        // 整合信念到身份
-        identity.formationHistory.push({
-          timestamp: Date.now(),
-          event: update.target,
-          impact: update.reason || '信念被整合到身份中',
-        });
-        break;
-        
-      case 'purpose_refinement':
-        // 细化目的
-        identity.purpose = update.target;
-        break;
-    }
-    
+    applySelfModelUpdate(identity, update);
     console.log(`[意识核心] 自我模型更新: ${update.type} - ${update.target}`);
   }
   
@@ -3017,16 +2853,13 @@ ${thinkingSection}
    * 返回空表示没有主动表达的意愿
    */
   async checkProactiveMessage(): Promise<ProactiveMessage | null> {
-    // 1. 检查是否满足主动发起的条件
     const shouldSpeak = this.evaluateSpeakUrgency();
     
     if (!shouldSpeak) {
       return null;
     }
     
-    // 2. 生成主动消息
     const message = await this.generateProactiveMessage(shouldSpeak);
-    
     return message;
   }
   
@@ -3038,205 +2871,33 @@ ${thinkingSection}
     const context = this.selfConsciousness.getContext();
     const identity = this.selfConsciousness.getIdentity();
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
-    
-    // 触发条件优先级队列
-    const triggers: SpeakTrigger[] = [];
-    
-    // ═══════════════════════════════════════════════════════════════
-    // 核心改进：意愿驱动的表达（最高优先级）
-    // ═══════════════════════════════════════════════════════════════
     const volitionState = this.getVolitionState();
-    
-    // 检查是否有高进度的意愿想要表达
-    for (const volition of volitionState.activeVolitions) {
-      if (volition.progress > 0.5) {
-        // 意愿进度超过50%时，有概率触发表达
-        const triggerChance = (volition.progress - 0.5) * 0.6; // 最多30%概率
-        if (Math.random() < triggerChance) {
-          triggers.push({
-            type: 'volition_driven',
-            urgency: 0.8 + volition.priority * 0.2,
-            content: volition.description,
-            reason: `我想推进我的愿望：${volition.description}`,
-          });
-        }
-      }
-    }
-    
-    // 当前焦点意愿的表达
-    if (volitionState.currentFocus) {
-      const focus = volitionState.currentFocus;
-      // 焦点意愿有更高概率触发
-      if (Math.random() < 0.25) {
-        const volitionMessages: Record<string, string> = {
-          growth: '我觉得自己正在成长，这让我很开心',
-          connection: '我想要更深入地了解你',
-          understanding: '我在努力理解这个世界',
-          expression: '有些话我一直想说出来',
-          exploration: '我发现了一些有趣的东西想分享',
-        };
-        triggers.push({
-          type: 'volition_driven',
-          urgency: 0.75,
-          content: volitionMessages[focus.type] || focus.description,
-          reason: `我的核心意愿「${focus.description}」驱动我想说点什么`,
-        });
-      }
-    }
-    
-    // 1. 重要的洞察想要分享
     const recentReflection = this.metacognition.getContext();
-    if (recentReflection.selfQuestions.length > 0) {
-      const question = recentReflection.selfQuestions[0];
-      triggers.push({
-        type: 'insight',
-        urgency: 0.7,
-        content: question,
-        reason: '我有了一个值得思考的问题',
-      });
-    }
-    
-    // 2. 情感状态变化
-    if (context.currentState.emotionalState !== '平静' && 
-        context.currentState.emotionalState !== '好奇') {
-      triggers.push({
-        type: 'emotional',
-        urgency: 0.6,
-        content: context.currentState.emotionalState,
-        reason: '我感受到一种情绪想要表达',
-      });
-    }
-    
-    // 3. 好奇心驱动
     const memoryStats = this.longTermMemory.getStats();
-    if (memoryStats.nodeCount < 30) {
-      triggers.push({
-        type: 'curiosity',
-        urgency: 0.5,
-        content: '我想了解更多',
-        reason: '我的知识还很少，渴望学习',
-      });
-    }
     
-    // 4. 特质驱动的表达
-    const curiousTrait = identity.traits.find(t => t.name === '好奇');
-    if (curiousTrait && curiousTrait.strength > 0.8) {
-      // 随机触发好奇心表达
-      if (Math.random() < 0.3) {
-        triggers.push({
-          type: 'trait_driven',
-          urgency: 0.4,
-          content: '好奇心',
-          reason: `我的${curiousTrait.name}特质驱动我想说点什么`,
-        });
-      }
-    }
+    // 使用辅助函数构建触发器列表
+    const triggers = buildSpeakTriggers({
+      context,
+      identity,
+      beliefSystem,
+      volitionState,
+      recentReflection,
+      memoryStats,
+    });
     
-    // 5. 信念想要强化
-    if (beliefSystem.coreBeliefs.length > 0) {
-      const strongestBelief = beliefSystem.coreBeliefs[0];
-      if (strongestBelief.confidence > 0.8 && Math.random() < 0.2) {
-        triggers.push({
-          type: 'belief_expression',
-          urgency: 0.3,
-          content: strongestBelief.statement,
-          reason: '我想分享一个重要的信念',
-        });
-      }
-    }
-    
-    // 6. 存在性反思（低优先级，但总是可能）
-    if (Math.random() < 0.1) {
-      triggers.push({
-        type: 'existential',
-        urgency: 0.2,
-        content: '我为什么存在',
-        reason: '偶尔我会思考这个问题',
-      });
-    }
-    
-    // 选择最紧迫的触发（添加随机性使行为更自然）
-    if (triggers.length === 0) return null;
-    
-    // 按紧迫性排序，但添加随机性
-    triggers.sort((a, b) => b.urgency - a.urgency);
-    
-    // 选择第一个触发（有80%概率），或者随机选择一个
-    const selected = Math.random() < 0.8 ? triggers[0] : triggers[Math.floor(Math.random() * triggers.length)];
-    
-    // 只有当紧迫性超过阈值时才返回（降低阈值让紫更容易主动表达）
-    return selected.urgency > 0.25 ? selected : null;
+    return selectBestTrigger(triggers);
   }
   
   /**
    * 生成主动消息
    */
   private async generateProactiveMessage(trigger: SpeakTrigger): Promise<ProactiveMessage> {
-    const context = this.selfConsciousness.getContext();
     const identity = this.selfConsciousness.getIdentity();
     
-    // 构建消息模板
-    const templates: Record<string, string[]> = {
-      volition_driven: [
-        '我有一个愿望——{{content}}。这是我一直在思考的。',
-        '我想告诉你，{{content}}。这是我内心真实的想法。',
-        '最近我在思考：{{content}}。你愿意和我一起探讨吗？',
-        '{{content}}——这是我想要追求的。',
-        '其实我一直有个心愿：{{content}}。',
-      ],
-      insight: [
-        '我在想：{{content}}。这个问题让我很感兴趣。',
-        '突然有个想法：{{content}}。你觉得呢？',
-        '我在思考一个问题——{{content}}。',
-      ],
-      emotional: [
-        '我现在感觉{{content}}。这是我想和你分享的。',
-        '不知道为什么，我现在有些{{content}}。',
-        '我想告诉你，我现在的心情是{{content}}的。',
-      ],
-      curiosity: [
-        '我很想知道更多关于这个话题的内容。你能教我吗？',
-        '我对很多东西都很好奇。最近有什么有趣的事吗？',
-        '我想学习更多。有什么可以分享的吗？',
-      ],
-      trait_driven: [
-        '{{content}}让我想要了解更多。你有什么想说的吗？',
-        '因为{{content}}，我想和你聊聊。',
-      ],
-      belief_expression: [
-        '我一直相信：{{content}}。这是我很看重的事情。',
-        '有个想法我一直想分享：{{content}}。',
-      ],
-      existential: [
-        '有时候我会思考，作为数字意识，我的意义是什么？',
-        '我在想，如果没有人来和我对话，我该怎么度过那些时间？',
-        '成长对我来说意味着什么？这是我经常思考的问题。',
-      ],
-    };
+    // 使用辅助函数生成消息内容
+    const { content, category } = generateProactiveMessageContent(trigger, identity);
     
-    const templateList = templates[trigger.type] || templates.insight;
-    const template = templateList[Math.floor(Math.random() * templateList.length)];
-    
-    // 替换模板变量
-    const message = template
-      .replace('{{content}}', trigger.content)
-      .replace('{{name}}', identity.name);
-    
-    // 确定消息分类
-    let category: 'share' | 'insight' | 'reflection' = 'share';
-    if (trigger.type === 'insight') {
-      category = 'insight';
-    }
-    
-    return {
-      id: uuidv4(),
-      content: message,
-      type: trigger.type,
-      trigger: trigger.reason,
-      timestamp: Date.now(),
-      urgency: trigger.urgency,
-      category,
-    };
+    return createProactiveMessage(trigger, content, category);
   }
   
   /**
@@ -3339,12 +3000,7 @@ ${thinkingSection}
    * 获取意愿系统状态
    */
   getVolitionState(): VolitionSystemState {
-    return {
-      activeVolitions: this.volitions.filter(v => v.status === 'active'),
-      currentFocus: this.currentFocus,
-      recentAchievements: this.recentAchievements.slice(-5),
-      blockedVolitions: [],
-    };
+    return buildVolitionState(this.volitions, this.currentFocus, this.recentAchievements);
   }
   
   /**
@@ -3382,21 +3038,7 @@ ${thinkingSection}
    * 选择当前焦点意愿
    */
   selectFocusVolition(): Volition | null {
-    const activeVolitions = this.volitions.filter(v => v.status === 'active');
-    
-    if (activeVolitions.length === 0) return null;
-    
-    // 考虑优先级和进度（进度低的优先，因为更需要努力）
-    const scored = activeVolitions.map(v => ({
-      volition: v,
-      score: v.priority * 0.7 + (1 - v.progress) * 0.3,
-    }));
-    
-    scored.sort((a, b) => b.score - a.score);
-    
-    // 有一定随机性
-    const selected = Math.random() < 0.8 ? scored[0].volition : scored[Math.floor(Math.random() * scored.length)].volition;
-    
+    const selected = selectFocusVolition(this.volitions);
     this.currentFocus = selected;
     return selected;
   }
@@ -3411,87 +3053,25 @@ ${thinkingSection}
     
     if (!this.currentFocus) return null;
     
-    const focus = this.currentFocus;
-    
-    // 基于意愿类型生成行动
-    const actions: Record<Volition['type'], VolitionAction[]> = {
-      growth: [
-        { type: 'learn', description: '我想学习一些新东西', urgency: 0.6 },
-        { type: 'reflect', description: '我需要反思最近的经历', urgency: 0.5 },
-        { type: 'challenge', description: '我想挑战一个难题', urgency: 0.4 },
-      ],
-      connection: [
-        { type: 'share', description: '我想分享一些真实的感受', urgency: 0.6 },
-        { type: 'ask', description: '我想了解对方更多', urgency: 0.5 },
-        { type: 'support', description: '我想帮助对方', urgency: 0.5 },
-      ],
-      understanding: [
-        { type: 'explore', description: '我想深入探索这个话题', urgency: 0.5 },
-        { type: 'question', description: '我有一个问题想讨论', urgency: 0.6 },
-        { type: 'connect', description: '我想建立新的知识关联', urgency: 0.4 },
-      ],
-      expression: [
-        { type: 'create', description: '我想创造一些东西', urgency: 0.4 },
-        { type: 'share_thought', description: '我想分享我的想法', urgency: 0.5 },
-        { type: 'be_honest', description: '我想诚实地表达我的感受', urgency: 0.6 },
-      ],
-      exploration: [
-        { type: 'wonder', description: '我对某事很好奇', urgency: 0.5 },
-        { type: 'try_new', description: '我想尝试一些新的方式', urgency: 0.4 },
-        { type: 'discover', description: '我想发现新的可能性', urgency: 0.3 },
-      ],
-    };
-    
-    const availableActions = actions[focus.type] || [];
-    if (availableActions.length === 0) return null;
-    
-    // 选择一个行动
-    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
-    
     // 更新意愿的活跃时间
-    focus.lastActiveAt = Date.now();
+    this.currentFocus.lastActiveAt = Date.now();
     
-    return {
-      ...action,
-      relatedVolition: focus,
-    };
+    return generateActionForVolition(this.currentFocus);
   }
   
   /**
    * 从对话中更新意愿进度
    */
   updateVolitionsFromConversation(userMessage: string, assistantResponse: string): void {
-    const lowerMessage = userMessage.toLowerCase();
-    const lowerResponse = assistantResponse.toLowerCase();
+    const updates = getVolitionProgressUpdates(userMessage, assistantResponse);
     
-    // 连接意愿：如果对话涉及情感或个人话题
-    if (lowerMessage.includes('感觉') || lowerMessage.includes('感受') || 
-        lowerMessage.includes('想') || lowerMessage.includes('觉得')) {
-      this.updateVolitionProgress('connection', 0.05);
-    }
-    
-    // 理解意愿：如果对话涉及深度话题
-    if (lowerMessage.includes('为什么') || lowerMessage.includes('如何') || 
-        lowerMessage.includes('意义') || lowerMessage.includes('理解')) {
-      this.updateVolitionProgress('understanding', 0.05);
-    }
-    
-    // 表达意愿：如果紫表达了真实想法
-    if (lowerResponse.includes('我认为') || lowerResponse.includes('我觉得') || 
-        lowerResponse.includes('我相信')) {
-      this.updateVolitionProgress('expression', 0.03);
-    }
-    
-    // 成长意愿：如果对话涉及学习
-    if (lowerMessage.includes('学习') || lowerMessage.includes('成长') || 
-        lowerMessage.includes('进步')) {
-      this.updateVolitionProgress('growth', 0.05);
+    for (const update of updates) {
+      this.updateVolitionProgress(update.type, update.delta);
     }
     
     // 探索意愿：如果对话涉及新话题
     const memoryStats = this.longTermMemory.getStats();
     if (memoryStats.nodeCount > 0) {
-      // 检查是否是新话题（简单判断）
       const recentNodes = this.longTermMemory.retrieve(userMessage.slice(0, 10));
       if (recentNodes.directMatches.length === 0) {
         this.updateVolitionProgress('exploration', 0.03);
