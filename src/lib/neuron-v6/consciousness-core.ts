@@ -196,6 +196,12 @@ import {
 } from './self-transcendence';
 import { HebbianNetwork } from './hebbian-network';
 import { InnateKnowledgeInitializer, getInitializedNetwork } from './innate-knowledge';
+import { 
+  ResonanceEngine,
+  createResonanceEngine,
+  SubsystemType,
+  ResonanceEngineState
+} from './resonance-engine';
 import { v4 as uuidv4 } from 'uuid';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -720,6 +726,34 @@ export interface ProcessResult {
     };
   };
   
+  /** 共振引擎状态 */
+  resonanceState?: {
+    /** 子系统状态 */
+    subsystems: Array<{
+      name: string;
+      frequency: number;
+      phase: number;
+      isPulsing: boolean;
+      activation: number;
+    }>;
+    /** 同步指数 */
+    synchronyIndex: number;
+    /** 是否共振 */
+    isResonant: boolean;
+    /** 共振锁定状态 */
+    resonance: {
+      isLocked: boolean;
+      lockedFrequency?: number;
+      lockedPeriod?: number;
+      highSyncCount: number;
+      syncHistoryLength: number;
+    };
+    /** 平均频率 */
+    meanFrequency: number;
+    /** 时间步 */
+    timeStep: number;
+  };
+  
   /** 统计 */
   stats: {
     conceptCount: number;
@@ -850,6 +884,9 @@ export class ConsciousnessCore {
   // 工具意图识别器
   private toolIntentRecognizer: ToolIntentRecognizer;
   
+  // 共振引擎（正八面体哈密顿环）
+  private resonanceEngine: ResonanceEngine;
+  
   // 意愿系统
   private volitions: Volition[] = [];
   private currentFocus: Volition | null = null;
@@ -935,6 +972,9 @@ export class ConsciousnessCore {
     // 初始化工具意图识别器
     this.toolIntentRecognizer = createToolIntentRecognizer(llmClient);
     
+    // 初始化共振引擎
+    this.resonanceEngine = createResonanceEngine();
+    
     // 初始化意愿系统
     this.initializeVolitions();
     
@@ -1006,8 +1046,31 @@ export class ConsciousnessCore {
     console.log('[意识核心] 开始处理输入...');
     
     // ══════════════════════════════════════════════════════════════════
-    // 第零步：意识层级处理 - 感知→理解→元认知→自我
+    // 第零步：共振引擎更新 - 获取当前振荡状态
     // ══════════════════════════════════════════════════════════════════
+    
+    // 激活感知子系统
+    this.resonanceEngine.activateSubsystem('perception', 0.8);
+    
+    // 执行共振引擎一步
+    const resonanceState = this.resonanceEngine.step();
+    
+    console.log('[共振引擎] 同步指数:', resonanceState.synchronyIndex.toFixed(4));
+    console.log('[共振引擎] 是否共振:', resonanceState.isResonant);
+    if (resonanceState.resonance.isLocked) {
+      console.log('[共振引擎] 锁定周期:', resonanceState.resonance.lockedPeriod?.toFixed(1), '步');
+    }
+    
+    // 根据共振状态调整处理参数
+    // TODO: 可根据共振状态调整各模块协作参数
+    // const resonanceInfluence = resonanceState.synchronyIndex; // 0-1，影响各模块的协作程度
+    
+    // ══════════════════════════════════════════════════════════════════
+    // 第零步半：意识层级处理 - 感知→理解→元认知→自我
+    // ══════════════════════════════════════════════════════════════════
+    
+    // 激活理解子系统
+    this.resonanceEngine.activateSubsystem('understanding', 0.6);
     
     const layerResult = await this.layerEngine.processInput(input);
     const { layerResults, selfObservation } = layerResult;
@@ -1020,6 +1083,9 @@ export class ConsciousnessCore {
     // ══════════════════════════════════════════════════════════════════
     // 第零步半：情感检测和体验
     // ══════════════════════════════════════════════════════════════════
+    
+    // 激活情感子系统
+    this.resonanceEngine.activateSubsystem('emotion', 0.5);
     
     let emotionExperience: EmotionExperience | null = null;
     const detectedEmotion = this.emotionEngine.detectFromText(input);
@@ -1099,7 +1165,14 @@ export class ConsciousnessCore {
     // 第四步：学习和更新
     // ══════════════════════════════════════════════════════════════════
     
+    // 激活元认知和自我子系统（学习过程）
+    this.resonanceEngine.activateSubsystem('metacongition', 0.7);
+    this.resonanceEngine.activateSubsystem('self', 0.6);
+    
     const learning = await this.learn(input, response, thinking);
+    
+    // 根据学习结果提供反馈给共振引擎
+    const learningSuccess = learning.metacognitiveReflection ? 0.8 : 0.5;
     
     // 更新对话历史
     this.conversationHistory.push({ role: 'user', content: input });
@@ -1510,6 +1583,28 @@ export class ConsciousnessCore {
           details: toolExecutionResult.results,
         } : undefined,
       } : undefined,
+      
+      // 共振引擎状态
+      resonanceState: {
+        subsystems: Array.from(resonanceState.oscillators.values()).map(s => ({
+          name: s.type,
+          frequency: s.effectiveFrequency,
+          phase: s.phase,
+          isPulsing: s.activation > 0.5,
+          activation: s.activation,
+        })),
+        synchronyIndex: resonanceState.synchronyIndex,
+        isResonant: resonanceState.isResonant,
+        resonance: {
+          isLocked: resonanceState.resonance.isLocked,
+          lockedFrequency: resonanceState.resonance.lockedFrequency ?? undefined,
+          lockedPeriod: resonanceState.resonance.lockedPeriod ?? undefined,
+          highSyncCount: resonanceState.resonance.highSyncCount,
+          syncHistoryLength: resonanceState.resonance.syncHistory.length,
+        },
+        meanFrequency: resonanceState.meanFrequency,
+        timeStep: resonanceState.timeStep,
+      },
       
       stats: {
         conceptCount: memoryStats.nodeCount,
