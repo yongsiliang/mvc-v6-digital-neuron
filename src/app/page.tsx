@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye, Hexagon, Triangle } from 'lucide-react';
+import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye, Hexagon, Triangle, Activity } from 'lucide-react';
 
 /**
  * 首页 - 功能导航
@@ -126,6 +126,42 @@ export default function Home() {
                     </div>
                   </div>
                   <ArrowRight className="w-6 h-6 text-amber-400 group-hover:translate-x-2 transition-transform" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+        
+        {/* 推荐入口 - 共振引擎 */}
+        <div className="max-w-2xl mx-auto mb-6">
+          <Link href="/resonance">
+            <Card className="bg-gradient-to-r from-fuchsia-500/10 via-pink-500/10 to-rose-500/10 border-fuchsia-500/30 hover:border-fuchsia-500/50 transition-all hover:shadow-xl hover:shadow-fuchsia-500/10 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl bg-fuchsia-500/20 flex items-center justify-center flex-shrink-0">
+                    <Activity className="w-8 h-8 text-fuchsia-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h2 className="text-xl font-bold">共振引擎</h2>
+                      <span className="text-xs bg-fuchsia-500/20 text-fuchsia-300 px-2 py-0.5 rounded">V6核心</span>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      通过共振涌现意识周期：学习期 → 共振 → 锁定。各子系统频率自组织同步。
+                    </p>
+                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Activity className="w-3 h-3" /> Kuramoto模型
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> 共振涌现
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Zap className="w-3 h-3" /> 周期锁定
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-fuchsia-400 group-hover:translate-x-2 transition-transform" />
                 </div>
               </CardContent>
             </Card>
