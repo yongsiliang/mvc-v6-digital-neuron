@@ -5,8 +5,6 @@
  * 整合：
  * - wisdom-crystal.ts (智慧结晶存储)
  * - crystallization-engine.ts (结晶引擎)
- * - wisdom-space.ts (智慧空间)
- * - wisdom-evolution.ts (智慧演化)
  * 
  * 设计原则：
  * - 单一入口，职责清晰
@@ -29,28 +27,6 @@ export {
   createEmptyCrystal,
   DEFAULT_CRYSTALLIZATION_CONFIG,
 } from '../wisdom-crystal';
-
-export type {
-  WisdomVector,
-  WisdomGuidance,
-} from '../wisdom-space';
-
-export {
-  WisdomSpace,
-  createWisdomSpace,
-} from '../wisdom-space';
-
-export type {
-  EvolutionResult,
-  ActionGuidance,
-  EvolutionConfig,
-  SystemStatus as WisdomSystemStatus,
-} from '../wisdom-evolution';
-
-export {
-  WisdomEvolutionSystem,
-  createWisdomEvolutionSystem,
-} from '../wisdom-evolution';
 
 export {
   CrystallizationEngine,

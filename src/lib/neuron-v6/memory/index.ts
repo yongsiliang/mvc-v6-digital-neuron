@@ -37,6 +37,3 @@ export { MemoryClassifier } from '../memory-classifier';
 
 // 记忆管理
 export { MemoryManager } from '../memory-manager';
-
-// 记忆监控
-export { MemoryMonitor } from '../memory-monitor';

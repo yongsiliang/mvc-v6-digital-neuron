@@ -32,9 +32,6 @@ export * from './self';
 // 智慧模块
 export * from './wisdom';
 
-// 链接场模块
-export * from './link-field-module';
-
 // 其他独立模块
 export { HebbianNetwork } from './hebbian-network';
 

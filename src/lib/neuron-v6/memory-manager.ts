@@ -2,7 +2,7 @@
  * ═══════════════════════════════════════════════════════════════════════
  * Memory Manager - 内存管理器
  * 
- * 整合重要性计算、分类、监控和清理功能
+ * 整合重要性计算、分类和清理功能
  * 提供智能的内存生命周期管理
  * ═══════════════════════════════════════════════════════════════════════
  */
@@ -20,18 +20,36 @@ import {
   type ClassificationContext,
   type ClassificationResult,
 } from './memory-classifier';
-import { 
-  MemoryMonitor, 
-  createMemoryMonitor,
-  type MemoryHealthReport,
-  type CleanupReport,
-} from './memory-monitor';
 
 // ─────────────────────────────────────────────────────────────────────
 // 类型定义
 // ─────────────────────────────────────────────────────────────────────
 
-/** 处理结果 */
+/** 内存健康报告 */
+export interface MemoryHealthReport {
+  status: 'healthy' | 'warning' | 'critical';
+  episodic: {
+    count: number;
+    avgImportance: number;
+    oldestAge: number;
+  };
+  consolidated: {
+    count: number;
+    avgImportance: number;
+  };
+  recommendations: string[];
+}
+
+/** 清理报告 */
+export interface CleanupReport {
+  success: boolean;
+  removed: { episodic: number; consolidated: number };
+  archived: number;
+  downgraded: number;
+  freedSpace: { bytes: number; humanReadable: string };
+  errors: string[];
+  duration: number;
+}
 export interface ProcessResult {
   /** 存储层级 */
   layer: 'core' | 'consolidated' | 'episodic' | 'rejected';
@@ -87,7 +105,6 @@ export class MemoryManager {
   private memory: LayeredMemorySystem;
   private calculator: ImportanceCalculator;
   private classifier: MemoryClassifier;
-  private monitor: MemoryMonitor;
   private config: MemoryManagerConfig;
   
   private cleanupTimer: NodeJS.Timeout | null = null;
@@ -103,7 +120,6 @@ export class MemoryManager {
     // 初始化组件
     this.calculator = getImportanceCalculator();
     this.classifier = getMemoryClassifier();
-    this.monitor = createMemoryMonitor(memory);
     
     // 设置核心关系（用于关系评分）
     const coreRelations = this.memory.getCoreSummary().coreRelationships
@@ -444,21 +460,113 @@ export class MemoryManager {
    * 获取健康报告
    */
   getHealthReport(): MemoryHealthReport {
-    return this.monitor.checkHealth();
+    const stats = this.memory.getStats();
+    const now = Date.now();
+    
+    // 计算情景记忆的平均重要性和最老年龄
+    let episodicAvgImportance = 0;
+    let episodicOldestAge = 0;
+    const episodicMemories = (this.memory as any).episodic;
+    if (episodicMemories) {
+      const memories = [...episodicMemories.values()] as EpisodicMemory[];
+      if (memories.length > 0) {
+        episodicAvgImportance = memories.reduce((sum, m) => sum + (m.importance || 0), 0) / memories.length;
+        const oldest = memories.reduce((min, m) => Math.min(min, m.timestamp), Infinity);
+        episodicOldestAge = oldest !== Infinity ? (now - oldest) / (24 * 60 * 60 * 1000) : 0;
+      }
+    }
+    
+    // 计算巩固记忆的平均重要性
+    let consolidatedAvgImportance = 0;
+    const consolidatedMemories = (this.memory as any).consolidated;
+    if (consolidatedMemories) {
+      const memories = [...consolidatedMemories.values()] as ConsolidatedMemory[];
+      if (memories.length > 0) {
+        consolidatedAvgImportance = memories.reduce((sum, m) => sum + (m.importance || 0), 0) / memories.length;
+      }
+    }
+    
+    // 生成建议
+    const recommendations: string[] = [];
+    if (stats.episodicCount > 200) {
+      recommendations.push('情景记忆过多，建议执行清理');
+    }
+    if (stats.consolidatedCount > 80) {
+      recommendations.push('巩固记忆接近上限，建议执行清理');
+    }
+    if (episodicOldestAge > 30) {
+      recommendations.push('存在过旧的情景记忆，建议清理或归档');
+    }
+    
+    // 判断状态
+    let status: MemoryHealthReport['status'] = 'healthy';
+    if (stats.episodicCount > 300 || stats.consolidatedCount > 90) {
+      status = 'critical';
+    } else if (stats.episodicCount > 200 || stats.consolidatedCount > 80) {
+      status = 'warning';
+    }
+    
+    return {
+      status,
+      episodic: {
+        count: stats.episodicCount,
+        avgImportance: episodicAvgImportance,
+        oldestAge: episodicOldestAge,
+      },
+      consolidated: {
+        count: stats.consolidatedCount,
+        avgImportance: consolidatedAvgImportance,
+      },
+      recommendations,
+    };
   }
   
   /**
    * 检查是否需要清理
    */
   needsCleanup(): boolean {
-    return this.monitor.needsCleanup();
+    const stats = this.memory.getStats();
+    return stats.episodicCount > 200 || stats.consolidatedCount > 80;
   }
   
   /**
    * 获取清理优先级
    */
-  getCleanupPriority(): ReturnType<MemoryMonitor['getCleanupPriority']> {
-    return this.monitor.getCleanupPriority();
+  getCleanupPriority(): Array<{ type: 'episodic' | 'consolidated'; priority: number; reason: string }> {
+    const stats = this.memory.getStats();
+    const priorities: Array<{ type: 'episodic' | 'consolidated'; priority: number; reason: string }> = [];
+    
+    // 情景记忆优先级
+    if (stats.episodicCount > 250) {
+      priorities.push({
+        type: 'episodic',
+        priority: 1,
+        reason: '情景记忆严重超标，需要立即清理',
+      });
+    } else if (stats.episodicCount > 200) {
+      priorities.push({
+        type: 'episodic',
+        priority: 2,
+        reason: '情景记忆过多，建议清理',
+      });
+    }
+    
+    // 巩固记忆优先级
+    if (stats.consolidatedCount > 90) {
+      priorities.push({
+        type: 'consolidated',
+        priority: 1,
+        reason: '巩固记忆接近上限，需要清理',
+      });
+    } else if (stats.consolidatedCount > 80) {
+      priorities.push({
+        type: 'consolidated',
+        priority: 2,
+        reason: '巩固记忆较多，建议清理',
+      });
+    }
+    
+    return priorities.sort((a, b) => a.priority - b.priority);
   }
   
   // ═══════────────────────────────────────────────────────────────────
