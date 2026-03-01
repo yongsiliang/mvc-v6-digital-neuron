@@ -2009,11 +2009,11 @@ export default function ExperimentPage() {
                         </div>
                         <div className="mt-1 text-gray-400">
                           胜者: <span className={
-                            record.analysis.comparison.winner === 'boundary' ? 'text-cyan-400' :
-                            record.analysis.comparison.winner === 'node' ? 'text-orange-400' : 'text-gray-400'
+                            record.analysis.comparison?.winner === 'boundary' ? 'text-cyan-400' :
+                            record.analysis.comparison?.winner === 'node' ? 'text-orange-400' : 'text-gray-400'
                           }>
-                            {record.analysis.comparison.winner === 'boundary' ? '边界网络' :
-                             record.analysis.comparison.winner === 'node' ? '节点网络' : '平局'}
+                            {record.analysis.comparison?.winner === 'boundary' ? '边界网络' :
+                             record.analysis.comparison?.winner === 'node' ? '节点网络' : '平局'}
                           </span>
                         </div>
                       </div>

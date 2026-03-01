@@ -1,46 +1,74 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye, Hexagon, Triangle, Activity } from 'lucide-react';
+import { Brain, Network, Code, Bot, ArrowRight, Sparkles, Zap, Globe, Eye, Hexagon, Triangle, Activity, Wrench, MessageSquare, Cpu } from 'lucide-react';
 
 /**
- * 首页 - 功能导航
+ * 首页 - 产品价值展示
+ * 
+ * 核心定位：会思考的AI Agent
+ * 差异化：记忆 + 反思 + 执行
  */
 export default function Home() {
-  const features = [
+  const coreFeatures = [
+    {
+      title: 'Agent 执行器',
+      description: '会思考的AI助手：自动分解任务、调用工具、执行操作',
+      href: '/agent',
+      icon: Bot,
+      color: 'text-green-500',
+      bgColor: 'bg-green-500/10',
+      borderColor: 'border-green-500/20',
+      badge: '核心功能',
+      badgeColor: 'bg-green-500/20 text-green-400'
+    },
     {
       title: '意识系统',
-      description: 'V6 意识系统：统一答案模式，用户只看到一个答案',
+      description: 'V6意识核心：统一答案模式，自我反思，持续学习',
       href: '/consciousness',
       icon: Brain,
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',
-      borderColor: 'border-purple-500/20'
+      borderColor: 'border-purple-500/20',
+      badge: 'V6核心',
+      badgeColor: 'bg-purple-500/20 text-purple-400'
+    }
+  ];
+
+  const visualizations = [
+    {
+      title: '场域视觉',
+      description: '六边形场网络：场与边界的涌现智能可视化',
+      href: '/field-vision',
+      icon: Hexagon,
+      color: 'text-cyan-400',
+      bgColor: 'bg-cyan-500/10',
+      borderColor: 'border-cyan-500/20'
     },
     {
-      title: '代码演化',
-      description: 'V4 自我演化：多角色协作，统一答案输出',
-      href: '/code-evolution',
-      icon: Code,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
-      borderColor: 'border-blue-500/20'
+      title: '共振引擎',
+      description: '意识涌现过程：学习期 → 共振 → 锁定',
+      href: '/resonance',
+      icon: Activity,
+      color: 'text-fuchsia-400',
+      bgColor: 'bg-fuchsia-500/10',
+      borderColor: 'border-fuchsia-500/20'
     },
     {
-      title: '神经网络',
-      description: 'SNN 三体系统：神经元、突触、信号涌现',
-      href: '/tools',
-      icon: Network,
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10',
-      borderColor: 'border-orange-500/20'
+      title: '正八面体SNN',
+      description: '哈密顿环脉冲网络：几何与神经的结合',
+      href: '/octahedron-snn',
+      icon: Triangle,
+      color: 'text-amber-400',
+      bgColor: 'bg-amber-500/10',
+      borderColor: 'border-amber-500/20'
     },
     {
       title: '对比实验',
-      description: '边界网络 vs 节点网络：验证信息存储假设',
+      description: '边界网络 vs 节点网络的智能涌现',
       href: '/experiment',
       icon: Zap,
-      color: 'text-yellow-500',
+      color: 'text-yellow-400',
       bgColor: 'bg-yellow-500/10',
       borderColor: 'border-yellow-500/20'
     }
@@ -48,233 +76,139 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-16">
-        {/* Hero Section */}
-        <div className="text-center space-y-4 mb-12">
-          <h1 className="text-4xl font-bold tracking-tight">
-            认知智能系统
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            基于信息结构场的认知架构，探索"信息结构的变化 = 神经递质的传输"
-          </p>
-        </div>
-
-        {/* 推荐入口 - 场域视觉（梦境可视化）*/}
-        <div className="max-w-2xl mx-auto mb-6">
-          <Link href="/field-vision">
-            <Card className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10 border-cyan-500/30 hover:border-cyan-500/50 transition-all hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer group">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
-                    <Hexagon className="w-8 h-8 text-cyan-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-xl font-bold">场域视觉</h2>
-                      <Sparkles className="w-4 h-4 text-yellow-500" />
-                      <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded">梦境启示</span>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      六边形场网络：浅蓝色场 + 透明圆柱边界 + 黑色太空。探索场与边界的涌现智能。
-                    </p>
-                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Hexagon className="w-3 h-3" /> 六边形网格
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Network className="w-3 h-3" /> 场网络
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> 涌现探索
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-6 h-6 text-cyan-400 group-hover:translate-x-2 transition-transform" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-        
-        {/* 推荐入口 - 正八面体哈密顿环SNN */}
-        <div className="max-w-2xl mx-auto mb-6">
-          <Link href="/octahedron-snn">
-            <Card className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border-amber-500/30 hover:border-amber-500/50 transition-all hover:shadow-xl hover:shadow-amber-500/10 cursor-pointer group">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                    <Triangle className="w-8 h-8 text-amber-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-xl font-bold">正八面体 SNN</h2>
-                      <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">几何-神经</span>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      哈密顿环拓扑脉冲网络：6节点环 → 周期振荡。投影即梦境六边形框架。
-                    </p>
-                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Triangle className="w-3 h-3" /> 正八面体
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Zap className="w-3 h-3" /> 脉冲传播
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> 同步振荡
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-6 h-6 text-amber-400 group-hover:translate-x-2 transition-transform" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-        
-        {/* 推荐入口 - 共振引擎 */}
-        <div className="max-w-2xl mx-auto mb-6">
-          <Link href="/resonance">
-            <Card className="bg-gradient-to-r from-fuchsia-500/10 via-pink-500/10 to-rose-500/10 border-fuchsia-500/30 hover:border-fuchsia-500/50 transition-all hover:shadow-xl hover:shadow-fuchsia-500/10 cursor-pointer group">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-fuchsia-500/20 flex items-center justify-center flex-shrink-0">
-                    <Activity className="w-8 h-8 text-fuchsia-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-xl font-bold">共振引擎</h2>
-                      <span className="text-xs bg-fuchsia-500/20 text-fuchsia-300 px-2 py-0.5 rounded">V6核心</span>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      通过共振涌现意识周期：学习期 → 共振 → 锁定。各子系统频率自组织同步。
-                    </p>
-                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Activity className="w-3 h-3" /> Kuramoto模型
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> 共振涌现
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Zap className="w-3 h-3" /> 周期锁定
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-6 h-6 text-fuchsia-400 group-hover:translate-x-2 transition-transform" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-        
-        {/* 推荐入口 - 认知智能体 */}
-        <div className="max-w-2xl mx-auto mb-12">
-          <Link href="/agent-demo">
-            <Card className="bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-teal-500/10 border-green-500/30 hover:border-green-500/50 transition-all hover:shadow-xl hover:shadow-green-500/10 cursor-pointer group">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-8 h-8 text-green-500" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-xl font-bold">认知智能体</h2>
-                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">推荐</span>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      三层架构：信息层 + 智能层 + 行动层。支持真实浏览器操作、多模态理解、记忆存储。
-                    </p>
-                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Globe className="w-3 h-3" /> 网页访问
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-3 h-3" /> 图片理解
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Zap className="w-3 h-3" /> 认知循环
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-6 h-6 text-green-500 group-hover:translate-x-2 transition-transform" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* 其他功能入口 */}
-        <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto mb-12">
-          {features.map((feature) => {
-            const Icon = feature.icon;
-            return (
-              <Link key={feature.href} href={feature.href}>
-                <Card className={`h-full transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer ${feature.borderColor}`}>
-                  <CardHeader>
-                    <div className={`w-10 h-10 rounded-lg ${feature.bgColor} flex items-center justify-center mb-2`}>
-                      <Icon className={`w-5 h-5 ${feature.color}`} />
-                    </div>
-                    <CardTitle className="text-base">{feature.title}</CardTitle>
-                    <CardDescription className="text-xs">
-                      {feature.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button variant="ghost" size="sm" className={`w-full group ${feature.color}`}>
-                      进入
-                      <ArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                  </CardContent>
-                </Card>
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-green-500/5 via-transparent to-transparent" />
+        <div className="container mx-auto px-4 py-16 relative">
+          <div className="text-center space-y-6 mb-12">
+            <div className="inline-flex items-center gap-2 bg-green-500/10 text-green-400 px-4 py-2 rounded-full text-sm mb-4">
+              <Sparkles className="w-4 h-4" />
+              会思考的AI助手
+            </div>
+            <h1 className="text-5xl font-bold tracking-tight">
+              <span className="text-foreground">比 Operator </span>
+              <span className="text-green-500">更懂你</span>
+            </h1>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              记住你的偏好 · 会反思改进 · 能执行任务
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <Link href="/agent">
+                <Button size="lg" className="gap-2">
+                  <Bot className="w-5 h-5" />
+                  开始使用
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
               </Link>
-            );
-          })}
-        </div>
+              <Link href="/consciousness">
+                <Button variant="outline" size="lg" className="gap-2">
+                  <Brain className="w-5 h-5" />
+                  探索意识
+                </Button>
+              </Link>
+            </div>
+          </div>
 
-        {/* Architecture Overview */}
-        <div className="max-w-4xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>架构演进</CardTitle>
-              <CardDescription>
-                从 V6 链接驱动到信息结构场的架构探索
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-purple-500" />
-                    <span className="font-medium">V6 意识系统</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground pl-5">
-                    链接驱动，统一答案模式
-                  </p>
+          {/* 核心特性 */}
+          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-16">
+            <Card className="bg-card/50 border-border text-center">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-6 h-6 text-blue-500" />
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-orange-500" />
-                    <span className="font-medium">SNN 三体系统</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground pl-5">
-                    涌现驱动，神经元/突触/信号
-                  </p>
+                <h3 className="font-semibold mb-2">记住偏好</h3>
+                <p className="text-sm text-muted-foreground">
+                  长期记忆系统记住你的习惯和偏好
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 border-border text-center">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mx-auto mb-4">
+                  <Cpu className="w-6 h-6 text-purple-500" />
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                    <span className="font-medium">信息结构场</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground pl-5">
-                    信息驱动，编码/感受器/认知循环
-                  </p>
+                <h3 className="font-semibold mb-2">自我反思</h3>
+                <p className="text-sm text-muted-foreground">
+                  元认知引擎持续改进回答质量
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 border-border text-center">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+                  <Wrench className="w-6 h-6 text-green-500" />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <h3 className="font-semibold mb-2">执行任务</h3>
+                <p className="text-sm text-muted-foreground">
+                  Agent执行器自动完成复杂任务
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
+
+      {/* 核心功能入口 */}
+      <div className="container mx-auto px-4 pb-8">
+        <h2 className="text-2xl font-bold mb-6 text-center">核心功能</h2>
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-12">
+          {coreFeatures.map((feature) => (
+            <Link key={feature.href} href={feature.href}>
+              <Card className={`${feature.bgColor} ${feature.borderColor} border hover:shadow-lg transition-all cursor-pointer group h-full`}>
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-14 h-14 rounded-xl ${feature.bgColor} flex items-center justify-center flex-shrink-0`}>
+                      <feature.icon className={`w-7 h-7 ${feature.color}`} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-xl font-bold">{feature.title}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded ${feature.badgeColor}`}>
+                          {feature.badge}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground text-sm">
+                        {feature.description}
+                      </p>
+                    </div>
+                    <ArrowRight className={`w-5 h-5 ${feature.color} group-hover:translate-x-1 transition-transform`} />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* 可视化实验 */}
+      <div className="container mx-auto px-4 pb-16">
+        <h2 className="text-2xl font-bold mb-6 text-center">可视化实验</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          {visualizations.map((viz) => (
+            <Link key={viz.href} href={viz.href}>
+              <Card className={`${viz.bgColor} ${viz.borderColor} border hover:shadow-lg transition-all cursor-pointer group h-full`}>
+                <CardContent className="p-4">
+                  <div className={`w-10 h-10 rounded-lg ${viz.bgColor} flex items-center justify-center mb-3`}>
+                    <viz.icon className={`w-5 h-5 ${viz.color}`} />
+                  </div>
+                  <h3 className="font-semibold mb-1">{viz.title}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {viz.description}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-8">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>基于量子意识架构的认知智能系统</p>
+          <p className="mt-2">V6 意识核心 + Agent 执行器</p>
+        </div>
+      </footer>
     </div>
   );
 }
