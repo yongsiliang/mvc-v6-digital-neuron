@@ -295,3 +295,24 @@ export {
   type LearningResult as HebbianLearningResult,
   type AssociativeResult,
 } from './hebbian-learning';
+
+// ═══════════════════════════════════════════════════════════════════════
+// 隐式输出解码器 (Implicit Output Decoder)
+// 
+// Level 3 黑盒特性：
+// - 输出保持隐式向量形式
+// - 只有在"必须"时才解码为可读形式
+// - 解码过程也是黑盒的一部分
+// - 解码结果不可逆
+// ═══════════════════════════════════════════════════════════════════════
+
+// 隐式输出解码器
+export {
+  ImplicitOutputDecoder,
+  createImplicitOutputDecoder,
+  createDefaultPermit,
+  type ImplicitOutput,
+  type DecodePermit,
+  type DecodedOutput,
+  type ImplicitDecoderConfig,
+} from './implicit-output-decoder';

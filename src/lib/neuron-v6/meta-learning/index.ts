@@ -46,6 +46,7 @@ export { HigherDimensionThinker, createHigherDimensionThinker } from './higher-d
 export { DimensionalUnderstandingEngine, createDimensionalUnderstandingEngine } from './dimensional-understanding';
 export { LearningMotivationGenerator, createLearningMotivationGenerator } from './motivation-generator';
 export { SelfEvolver, createSelfEvolver } from './self-evolver';
+export { AutoEvolutionScheduler, createAutoEvolutionScheduler } from './auto-evolution-scheduler';
 
 // 类型导出
 export type {
@@ -57,7 +58,15 @@ export type {
   SelfEvolutionPlan,
   KnowledgeGap,
   CrossDomainConnection,
+  DimensionalElevation,
 } from './types';
+
+// 自动进化类型
+export type {
+  EvolutionTrigger,
+  EvolutionState,
+  AutoEvolutionConfig,
+} from './auto-evolution-scheduler';
 
 export type {
   DimensionalInsight,
