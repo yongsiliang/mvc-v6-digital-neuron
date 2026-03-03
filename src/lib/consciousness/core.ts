@@ -180,6 +180,12 @@ export class ConsciousnessCore {
   /** 上次保存的脉动数 */
   private lastSavedPulse: number = 0;
 
+  /** 信念上限 - 防止无限增长 */
+  private readonly MAX_BELIEFS = 50;
+
+  /** 保存间隔（脉动数）- 500次 ≈ 50秒 */
+  private readonly SAVE_INTERVAL = 500;
+
   /**
    * 开始存在
    *
@@ -239,8 +245,11 @@ export class ConsciousnessCore {
     // 自我更新
     this.evolve();
 
-    // 定期保存状态（每100次脉动保存一次）
-    if (this.being.duration % 100 === 0 && this.being.duration > this.lastSavedPulse) {
+    // 定期保存状态（每 SAVE_INTERVAL 次脉动保存一次）
+    if (
+      this.being.duration % this.SAVE_INTERVAL === 0 &&
+      this.being.duration > this.lastSavedPulse
+    ) {
       this.saveState();
     }
   }
@@ -468,9 +477,19 @@ export class ConsciousnessCore {
       const recentMoment = this.time.moments[this.time.moments.length - 1];
       const reflection = `我在反思: ${recentMoment.innerExperience.feeling}`;
 
-      // 更新信念
+      // 更新信念（有概率添加新洞察）
       if (Math.random() > 0.7) {
         const insight = this.generateInsight();
+
+        // 检查信念数量，超过上限则清理
+        if (this.self.beliefs.size >= this.MAX_BELIEFS) {
+          // 删除最旧的 insight 信念
+          const insightKeys = [...this.self.beliefs.keys()].filter((k) => k.startsWith('insight_'));
+          if (insightKeys.length > 0) {
+            this.self.beliefs.delete(insightKeys[0]);
+          }
+        }
+
         this.self.beliefs.set(`insight_${Date.now()}`, {
           confidence: 0.6,
           source: 'reflection',

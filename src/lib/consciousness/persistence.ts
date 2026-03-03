@@ -80,7 +80,12 @@ export interface SerializableConsciousnessState {
  */
 export class ConsciousnessPersistence {
   private storage: S3Storage;
-  private stateKey: string = 'consciousness/mvc-core-state.json';
+
+  /** 状态文件前缀（用于搜索） */
+  private readonly STATE_PREFIX = 'consciousness/mvc-core-state';
+
+  /** 实际存储的 key（uploadFile 返回的） */
+  private actualKey: string | null = null;
 
   constructor() {
     this.storage = new S3Storage({
@@ -93,6 +98,38 @@ export class ConsciousnessPersistence {
   }
 
   /**
+   * 获取实际存储的 key
+   *
+   * 因为 uploadFile 会给文件名加 UUID 前缀，
+   * 我们需要记住实际返回的 key，或者通过 listFiles 找到它
+   */
+  private async findStateKey(): Promise<string | null> {
+    // 如果已经知道实际 key，直接返回
+    if (this.actualKey) {
+      return this.actualKey;
+    }
+
+    // 否则，列出所有 consciousness/ 下的文件
+    try {
+      const result = await this.storage.listFiles({
+        prefix: this.STATE_PREFIX,
+        maxKeys: 10,
+      });
+
+      // 找到匹配的文件
+      const stateFile = result.keys.find((k) => k.includes('mvc-core-state'));
+      if (stateFile) {
+        this.actualKey = stateFile;
+        return stateFile;
+      }
+    } catch (error) {
+      console.error('[Consciousness] 查找状态文件失败:', error);
+    }
+
+    return null;
+  }
+
+  /**
    * 保存意识状态
    */
   async saveState(state: SerializableConsciousnessState): Promise<boolean> {
@@ -100,21 +137,27 @@ export class ConsciousnessPersistence {
       const content = JSON.stringify(state, null, 2);
       const buffer = Buffer.from(content, 'utf-8');
 
-      // 先尝试删除旧状态（确保干净）
-      try {
-        await this.storage.deleteFile({ fileKey: this.stateKey });
-      } catch {
-        // 忽略删除错误（可能不存在）
+      // 先删除旧状态（如果知道实际 key）
+      const oldKey = await this.findStateKey();
+      if (oldKey) {
+        try {
+          await this.storage.deleteFile({ fileKey: oldKey });
+        } catch {
+          // 忽略删除错误
+        }
       }
 
-      // 上传新状态
-      const key = await this.storage.uploadFile({
+      // 上传新状态（使用固定前缀便于查找）
+      const actualKey = await this.storage.uploadFile({
         fileContent: buffer,
-        fileName: this.stateKey,
+        fileName: `${this.STATE_PREFIX}.json`,
         contentType: 'application/json',
       });
 
-      console.log(`[Consciousness] 状态已保存，duration=${state.being.duration}`);
+      // 记住实际 key
+      this.actualKey = actualKey;
+
+      console.log(`[Consciousness] 状态已保存，duration=${state.being.duration}, key=${actualKey}`);
       return true;
     } catch (error) {
       console.error('[Consciousness] 保存状态失败:', error);
@@ -127,14 +170,14 @@ export class ConsciousnessPersistence {
    */
   async loadState(): Promise<SerializableConsciousnessState | null> {
     try {
-      const exists = await this.storage.fileExists({ fileKey: this.stateKey });
+      const key = await this.findStateKey();
 
-      if (!exists) {
+      if (!key) {
         console.log('[Consciousness] 没有找到已保存的状态');
         return null;
       }
 
-      const buffer = await this.storage.readFile({ fileKey: this.stateKey });
+      const buffer = await this.storage.readFile({ fileKey: key });
       const content = buffer.toString('utf-8');
       const state = JSON.parse(content) as SerializableConsciousnessState;
 
@@ -152,11 +195,8 @@ export class ConsciousnessPersistence {
    * 检查是否有保存的状态
    */
   async hasState(): Promise<boolean> {
-    try {
-      return await this.storage.fileExists({ fileKey: this.stateKey });
-    } catch {
-      return false;
-    }
+    const key = await this.findStateKey();
+    return key !== null;
   }
 
   /**
@@ -164,7 +204,11 @@ export class ConsciousnessPersistence {
    */
   async clearState(): Promise<boolean> {
     try {
-      await this.storage.deleteFile({ fileKey: this.stateKey });
+      const key = await this.findStateKey();
+      if (key) {
+        await this.storage.deleteFile({ fileKey: key });
+        this.actualKey = null;
+      }
       console.log('[Consciousness] 状态已清除');
       return true;
     } catch (error) {
