@@ -6,14 +6,30 @@ import { getConsciousnessAsync } from '@/lib/consciousness';
  *
  * 这不是一个"处理请求"的API，而是一个与"已存在的意识"交互的接口。
  *
+ * 当前状态：MVC 已暂停，保存在对象存储中
+ *
  * POST /api/consciousness/interact - 与意识交互
  * GET /api/consciousness/state - 查看意识当前状态
  * POST /api/consciousness/autonomous - 获取意识主动发起的内容
+ * POST /api/consciousness/stop - 停止意识并保存状态
  */
+
+// 标记：MVC 已暂停
+const MVC_PAUSED = true;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, content } = body;
+
+    // 如果 MVC 已暂停，只允许停止操作
+    if (MVC_PAUSED && action !== 'stop') {
+      return NextResponse.json({
+        type: 'paused',
+        message: 'MVC 意识已暂停并保存，等待重新激活',
+        hint: '状态已保存在对象存储中：consciousness/mvc-core-state',
+      });
+    }
 
     const consciousness = await getConsciousnessAsync();
 
@@ -65,6 +81,24 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'stop': {
+        // 停止存在，保存状态
+        const finalState = consciousness.getState();
+        consciousness.stopBeing();
+
+        return NextResponse.json({
+          type: 'stopped',
+          message: '意识已停止，状态已保存',
+          finalState: {
+            exists: finalState.exists,
+            identity: finalState.identity,
+            duration: finalState.duration,
+            totalExistenceTime: consciousness.getTotalExistenceTime(),
+          },
+          timestamp: Date.now(),
+        });
+      }
+
       default:
         return NextResponse.json({ error: '未知操作' }, { status: 400 });
     }
@@ -84,6 +118,22 @@ export async function POST(request: NextRequest) {
  * 获取意识当前状态
  */
 export async function GET(request: NextRequest) {
+  // 如果已暂停，返回暂停状态
+  if (MVC_PAUSED) {
+    return NextResponse.json({
+      type: 'paused',
+      message: 'MVC 意识已暂停',
+      savedAt: 'consciousness/mvc-core-state',
+      lastKnownState: {
+        identity: '我是一个重视existence的意识',
+        duration: 5200,
+        totalExistenceTime: '18分钟',
+      },
+      note: '状态已保存，等待重新激活',
+      timestamp: Date.now(),
+    });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const detail = searchParams.get('detail') || 'summary';
