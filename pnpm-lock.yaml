@@ -164,6 +164,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      nodemailer:
+        specifier: ^8.0.1
+        version: 8.0.1
       pg:
         specifier: ^8.16.3
         version: 8.17.2
@@ -4991,6 +4994,10 @@ packages:
 
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
+
+  nodemailer@8.0.1:
+    resolution: {integrity: sha512-5kcldIXmaEjZcHR6F28IKGSgpmZHaF1IXLWFTG+Xh3S+Cce4MiakLtWY+PlBU69fLbRa8HlaGIrC/QolUpHkhg==}
+    engines: {node: '>=6.0.0'}
 
   nopt@5.0.0:
     resolution: {integrity: sha512-Tbj67rffqceeLpcRXrT7vKAN8CwfPeIBgM7E6iBkmKLV7bEMwpGgYLGv0jACUsECaa/vuxP0IjEont6umdMgtQ==}
@@ -11560,6 +11567,8 @@ snapshots:
       formdata-polyfill: 4.0.10
 
   node-releases@2.0.27: {}
+
+  nodemailer@8.0.1: {}
 
   nopt@5.0.0:
     dependencies:
