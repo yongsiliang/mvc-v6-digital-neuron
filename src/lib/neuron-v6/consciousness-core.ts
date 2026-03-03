@@ -1,9 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
  * V6 统一意识核心 - 核心协调器
- * 
+ *
  * 使用处理器模式重构，将职责委托给专门的处理器类
- * 
+ *
  * 记忆系统架构 V2：
  * ┌────────────────────────────────────────────────────────────────┐
  * │                    统一记忆管理器                               │
@@ -40,112 +40,44 @@
 import { LLMClient } from 'coze-coding-dev-sdk';
 import { HebbianNetwork } from './hebbian-network';
 import { getInitializedNetwork } from './innate-knowledge';
-import { 
-  MeaningAssigner, 
-  createMeaningAssigner,
-} from './meaning-system';
-import { 
-  SelfConsciousness, 
-  createSelfConsciousness 
-} from './self-consciousness';
-import { 
-  LongTermMemory, 
-  createLongTermMemory 
-} from './long-term-memory';
-import { 
-  LayeredMemorySystem,
-} from './layered-memory';
-import {
-  UnifiedMemoryManager,
-  createUnifiedMemoryManager,
-} from './memory/unified-manager';
-import {
-  HappeningRecorder,
-  createHappeningRecorder,
-} from './memory/happening-recorder';
-import {
-  InsightExtractor,
-  createInsightExtractor,
-} from './memory/insight-extractor';
-import {
-  MemoryCompressor,
-  createMemoryCompressor,
-} from './memory/memory-compressor';
-import {
-  DynamicContextBuilder,
-  createDynamicContextBuilder,
-} from './memory/dynamic-context';
-import {
-  SuperMemorySystem,
-  createSuperMemorySystem,
-} from './memory/super-memory';
-import {
-  DrawerMemorySystem,
-} from './memory/drawer';
+import { MeaningAssigner, createMeaningAssigner } from './meaning-system';
+import { SelfConsciousness, createSelfConsciousness } from './self-consciousness';
+import { LongTermMemory, createLongTermMemory } from './long-term-memory';
+import { LayeredMemorySystem } from './layered-memory';
+import { UnifiedMemoryManager, createUnifiedMemoryManager } from './memory/unified-manager';
+import { HappeningRecorder, createHappeningRecorder } from './memory/happening-recorder';
+import { InsightExtractor, createInsightExtractor } from './memory/insight-extractor';
+import { MemoryCompressor, createMemoryCompressor } from './memory/memory-compressor';
+import { DynamicContextBuilder, createDynamicContextBuilder } from './memory/dynamic-context';
+import { SuperMemorySystem, createSuperMemorySystem } from './memory/super-memory';
+import { DrawerMemorySystem } from './memory/drawer';
 import {
   MetaLearningEngine,
   createMetaLearningEngine,
+  // 🆕 隐式元学习控制器（黑盒版本）
+  ImplicitMetaLearningController,
+  createImplicitMetaLearningController,
 } from './meta-learning';
+import { BeliefPresence, createBeliefPresence } from './belief/presence';
+import { ConceptWorkshop, createConceptWorkshop } from './belief/concept-workshop';
+import { IntuitiveRetriever, createIntuitiveRetriever } from './belief/intuitive-retriever';
+import { MetacognitionEngine, createMetacognitionEngine } from './metacognition';
+import { ConsciousnessLayerEngine, createConsciousnessLayerEngine } from './consciousness-layers';
+import { InnerMonologueEngine, createInnerMonologueEngine } from './inner-monologue';
+import { EmotionEngine, createEmotionEngine } from './emotion-system';
+import { InnerDialogueEngine, DialecticThinkingEngine } from './inner-dialogue';
+import { ValueEvolutionEngine } from './value-evolution';
+import { PersonalityGrowthSystem } from './personality-growth';
+import { KnowledgeGraphSystem, createKnowledgeGraphSystem } from './knowledge-graph';
+import { MultiConsciousnessSystem, createMultiConsciousnessSystem } from './multi-consciousness';
+import { KeyInfoExtractor, createKeyInfoExtractor } from './key-info-extractor';
 import {
-  BeliefPresence,
-  createBeliefPresence,
-} from './belief/presence';
-import {
-  ConceptWorkshop,
-  createConceptWorkshop,
-} from './belief/concept-workshop';
-import {
-  IntuitiveRetriever,
-  createIntuitiveRetriever,
-} from './belief/intuitive-retriever';
-import { 
-  MetacognitionEngine, 
-  createMetacognitionEngine 
-} from './metacognition';
-import { 
-  ConsciousnessLayerEngine,
-  createConsciousnessLayerEngine
-} from './consciousness-layers';
-import { 
-  InnerMonologueEngine,
-  createInnerMonologueEngine
-} from './inner-monologue';
-import { 
-  EmotionEngine,
-  createEmotionEngine,
-} from './emotion-system';
-import { 
-  InnerDialogueEngine,
-  DialecticThinkingEngine,
-} from './inner-dialogue';
-import { 
-  ValueEvolutionEngine,
-} from './value-evolution';
-import { 
-  PersonalityGrowthSystem,
-} from './personality-growth';
-import { 
-  KnowledgeGraphSystem,
-  createKnowledgeGraphSystem,
-} from './knowledge-graph';
-import { 
-  MultiConsciousnessSystem,
-  createMultiConsciousnessSystem,
-} from './multi-consciousness';
-import { 
-  KeyInfoExtractor,
-  createKeyInfoExtractor
-} from './key-info-extractor';
-import { 
   ToolIntentRecognizer,
   ToolIntent,
   ToolExecutionResult,
-  createToolIntentRecognizer
+  createToolIntentRecognizer,
 } from './tool-intent-recognizer';
-import { 
-  ResonanceEngine,
-  createResonanceEngine,
-} from './resonance-engine';
+import { ResonanceEngine, createResonanceEngine } from './resonance-engine';
 import { PersistenceManagerV6 } from './consciousness-core/persistence';
 
 // 🆕🧠 导入统一记忆系统（Moss级别记忆核心）
@@ -206,12 +138,8 @@ import {
   buildStatsResult,
   updateConversationHistory,
 } from './consciousness-core/process-helpers';
-import {
-  rebuildKnowledgeGraph,
-} from './consciousness-core/memory-helpers';
-import {
-  syncCreatorFromDatabase,
-} from './consciousness-core/creator-helpers';
+import { rebuildKnowledgeGraph } from './consciousness-core/memory-helpers';
+import { syncCreatorFromDatabase } from './consciousness-core/creator-helpers';
 import {
   buildSpeakTriggers,
   selectBestTrigger,
@@ -241,7 +169,7 @@ import { extractConceptsFromText } from './consciousness-core/thinking-helpers';
  */
 export class ConsciousnessCore {
   private llmClient: LLMClient;
-  
+
   // 核心模块
   private network: HebbianNetwork;
   private meaningAssigner: MeaningAssigner;
@@ -257,12 +185,12 @@ export class ConsciousnessCore {
   private personalityGrowthSystem: PersonalityGrowthSystem;
   private knowledgeGraphSystem: KnowledgeGraphSystem;
   private layeredMemory: LayeredMemorySystem;
-  private unifiedMemoryManager!: UnifiedMemoryManager;  // 🆕 统一记忆管理器
+  private unifiedMemoryManager!: UnifiedMemoryManager; // 🆕 统一记忆管理器
   private multiConsciousnessSystem: MultiConsciousnessSystem;
   private keyInfoExtractor: KeyInfoExtractor;
   private toolIntentRecognizer: ToolIntentRecognizer;
   private resonanceEngine: ResonanceEngine;
-  
+
   // 处理器实例
   private learningHandler!: LearningHandler;
   private reflectionHandler!: ReflectionHandler;
@@ -271,38 +199,42 @@ export class ConsciousnessCore {
   private streamHandler!: ConsciousnessStreamHandler;
   private volitionHandler!: VolitionHandler;
   private proactiveHandler!: ProactiveHandler;
-  
+
   // 后台思考和主动消息
   private backgroundManager: BackgroundThinkingManager;
   private proactiveBuffer: ProactiveMessageBuffer;
-  
+
   // 对话历史
   private conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-  
+
   // 🆕 发生记录和洞见提取
   private happeningRecorder: HappeningRecorder;
   private insightExtractor: InsightExtractor;
-  
+
   // 🆕 智能记忆压缩（超越主流的关键）
   private memoryCompressor: MemoryCompressor;
   private dynamicContextBuilder: DynamicContextBuilder;
-  
+
   // 🆕🚀 超越传统的超级记忆系统
   // 核心：艾宾浩斯遗忘曲线 + 情感加权 + 联想网络 + 睡眠巩固
   private superMemory: SuperMemorySystem;
-  
+
   // 🆕🎯 抽屉式记忆系统（王昱珩的记忆方法）
   // 核心：分类收纳 + 折叠遗忘 + 检索优先 + 自动播放控制
   private drawerSystem: DrawerMemorySystem;
-  
+
   // 🆕🧠 统一记忆系统（Moss级别记忆核心）
   // 六大核心能力：持久化、可检索、可激活、可关联、可演化、可结晶
   private mossMemory: UnifiedMemorySystem;
-  
+
   // 🆕🚀 元学习引擎
   // 核心：主动学习 + 算法反思 + 高维思维 + 自我进化
   private metaLearning: MetaLearningEngine;
-  
+
+  // 🆕🧠 隐式元学习控制器（黑盒版本）
+  // 核心特性：隐式判断 + 黑盒执行 + 选择性解码 + 能量预算
+  private implicitMetaLearning: ImplicitMetaLearningController;
+
   // 🆕 信念层（垂直维度）
   private beliefPresence: BeliefPresence;
   private conceptWorkshop: ConceptWorkshop;
@@ -310,7 +242,7 @@ export class ConsciousnessCore {
 
   constructor(llmClient: LLMClient) {
     this.llmClient = llmClient;
-    
+
     // 初始化核心模块
     this.network = getInitializedNetwork();
     this.meaningAssigner = createMeaningAssigner();
@@ -326,35 +258,35 @@ export class ConsciousnessCore {
     this.personalityGrowthSystem = new PersonalityGrowthSystem();
     this.knowledgeGraphSystem = createKnowledgeGraphSystem();
     this.layeredMemory = new LayeredMemorySystem();
-    
+
     // 初始化统一记忆管理器
     this.unifiedMemoryManager = createUnifiedMemoryManager(this.layeredMemory, {
-      workingMemoryCapacity: 30,  // 🆕 增加容量到 30，匹配主流上下文能力
+      workingMemoryCapacity: 30, // 🆕 增加容量到 30，匹配主流上下文能力
       enableAssociations: true,
     });
-    
+
     // 初始化发生记录器和洞见提取器
     this.happeningRecorder = createHappeningRecorder();
     this.insightExtractor = createInsightExtractor(llmClient);
-    
+
     // 🆕 初始化智能记忆压缩系统（超越主流的关键）
     this.memoryCompressor = createMemoryCompressor(llmClient, {
-      compressionThreshold: 20,     // 20轮对话后触发压缩
-      compressionBatchSize: 15,     // 每次压缩15轮
-      preserveRecentTurns: 10,      // 保留最近10轮不压缩
+      compressionThreshold: 20, // 20轮对话后触发压缩
+      compressionBatchSize: 15, // 每次压缩15轮
+      preserveRecentTurns: 10, // 保留最近10轮不压缩
     });
     this.dynamicContextBuilder = createDynamicContextBuilder(llmClient, {
-      maxTokenBudget: 30000,        // 30K tokens 预算
+      maxTokenBudget: 30000, // 30K tokens 预算
     });
-    
+
     // 🆕🚀 初始化超越传统的超级记忆系统
     // 核心：艾宾浩斯遗忘曲线 + 情感加权 + 联想网络 + 睡眠巩固
     this.superMemory = createSuperMemorySystem({
-      maxMemories: 10000,           // 最多存储10000条记忆
-      emotionalWeight: 0.4,         // 情感权重40%
-      associationThreshold: 0.3,    // 联想阈值30%
+      maxMemories: 10000, // 最多存储10000条记忆
+      emotionalWeight: 0.4, // 情感权重40%
+      associationThreshold: 0.3, // 联想阈值30%
     });
-    
+
     // 🆕🎯 初始化抽屉式记忆系统（王昱珩的记忆方法）
     // 核心：分类收纳 + 折叠遗忘 + 检索优先 + 自动播放控制
     this.drawerSystem = new DrawerMemorySystem({
@@ -363,7 +295,7 @@ export class ConsciousnessCore {
       drawerCapacity: 100,
     });
     console.log('[意识核心] 抽屉式记忆系统已初始化');
-    
+
     // 🆕🧠 初始化统一记忆系统（Moss级别记忆核心）
     // 六大核心能力：持久化、可检索、可激活、可关联、可演化、可结晶
     this.mossMemory = createUnifiedMemorySystem({
@@ -374,7 +306,7 @@ export class ConsciousnessCore {
       enableCrystallization: true,
     });
     console.log('[意识核心] 统一记忆系统(Moss)已初始化');
-    
+
     // 🆕🚀 初始化元学习引擎
     // 核心：主动学习 + 算法反思 + 高维思维 + 自我进化
     this.metaLearning = createMetaLearningEngine(llmClient, {
@@ -386,30 +318,46 @@ export class ConsciousnessCore {
       reflectionDepth: 'deep',
       thinkingScope: 'broad',
     });
-    
+
+    // 🆕🧠 初始化隐式元学习控制器（黑盒版本）
+    // 核心特性：智能判断是否需要学习 + 黑盒执行 + 选择性解码 + 能量预算控制
+    this.implicitMetaLearning = createImplicitMetaLearningController(llmClient, {
+      maxEnergyBudget: 10000, // 每日能量预算
+      maxLearningPerDay: 30, // 每日最多30次深度学习（降低token消耗）
+      decodeStrategy: 'conservative', // 保守解码策略，只有重要发现才暴露
+      enableChaos: true, // 启用混沌混淆
+    });
+    console.log('[意识核心] 隐式元学习控制器已初始化（黑盒模式）');
+
     // 🆕 初始化信念层
     this.beliefPresence = createBeliefPresence();
     this.conceptWorkshop = createConceptWorkshop();
     // 直觉检索器在处理器初始化后设置
-    
+
     this.multiConsciousnessSystem = createMultiConsciousnessSystem();
     this.keyInfoExtractor = createKeyInfoExtractor(llmClient);
     this.toolIntentRecognizer = createToolIntentRecognizer(llmClient);
     this.resonanceEngine = createResonanceEngine();
-    
+
     // 初始化处理器
     this.initializeHandlers();
-    
+
     // 🆕 初始化直觉检索器（需要信念层和记忆管理器）
-    this.intuitiveRetriever = createIntuitiveRetriever(this.beliefPresence, this.unifiedMemoryManager);
-    
+    this.intuitiveRetriever = createIntuitiveRetriever(
+      this.beliefPresence,
+      this.unifiedMemoryManager,
+    );
+
     // 初始化后台思考和主动消息管理器
-    this.backgroundManager = new BackgroundThinkingManager({ intervalMs: 30000, minIntervalMs: 60000 });
+    this.backgroundManager = new BackgroundThinkingManager({
+      intervalMs: 30000,
+      minIntervalMs: 60000,
+    });
     this.proactiveBuffer = new ProactiveMessageBuffer(10);
-    
+
     // 启动后台思考定时器
     this.backgroundManager.start(() => this.triggerBackgroundThinking());
-    
+
     console.log('[意识核心] V6 意识核心已初始化（处理器模式）');
   }
 
@@ -418,14 +366,14 @@ export class ConsciousnessCore {
     this.learningHandler = new LearningHandler({
       longTermMemory: this.longTermMemory,
       layeredMemory: this.layeredMemory,
-      unifiedMemoryManager: this.unifiedMemoryManager,  // 🆕 传入统一记忆管理器
+      unifiedMemoryManager: this.unifiedMemoryManager, // 🆕 传入统一记忆管理器
       selfConsciousness: this.selfConsciousness,
       meaningAssigner: this.meaningAssigner,
       metacognition: this.metacognition,
       conversationHistory: this.conversationHistory,
       extractConcepts: (text) => this.extractConcepts(text),
     });
-    
+
     // 反思处理器
     this.reflectionHandler = new ReflectionHandler({
       selfConsciousness: this.selfConsciousness,
@@ -435,26 +383,26 @@ export class ConsciousnessCore {
       conversationHistory: this.conversationHistory,
       extractConcepts: (text) => this.extractConcepts(text),
     });
-    
+
     // 上下文构建器
     this.contextBuilder = new ContextBuilder({
       longTermMemory: this.longTermMemory,
       layeredMemory: this.layeredMemory,
       unifiedMemoryManager: this.unifiedMemoryManager,
-      superMemory: this.superMemory,  // 🚀 传入超级记忆系统
+      superMemory: this.superMemory, // 🚀 传入超级记忆系统
       meaningAssigner: this.meaningAssigner,
       selfConsciousness: this.selfConsciousness,
       metacognition: this.metacognition,
       conversationHistory: this.conversationHistory,
     });
-    
+
     // 思考处理器
     this.thinkingHandler = new ThinkingHandler({
       llmClient: this.llmClient,
       metacognition: this.metacognition,
       conversationHistory: this.conversationHistory,
     });
-    
+
     // 意识流处理器
     this.streamHandler = new ConsciousnessStreamHandler({
       selfConsciousness: this.selfConsciousness,
@@ -466,7 +414,7 @@ export class ConsciousnessCore {
       innerMonologue: this.innerMonologue,
       conversationHistory: this.conversationHistory,
     });
-    
+
     // 意愿处理器
     this.volitionHandler = new VolitionHandler({
       selfConsciousness: this.selfConsciousness,
@@ -474,7 +422,7 @@ export class ConsciousnessCore {
       meaningAssigner: this.meaningAssigner,
       metacognition: this.metacognition,
     });
-    
+
     // 主动消息处理器
     this.proactiveHandler = new ProactiveHandler({
       llmClient: this.llmClient,
@@ -492,70 +440,73 @@ export class ConsciousnessCore {
    */
   async process(input: string): Promise<ProcessResult> {
     console.log('[意识核心] 开始处理输入...');
-    
+
     // 🆕 开始发生记录会话
     if (!this.happeningRecorder.getCurrentSession()) {
       this.happeningRecorder.startSession();
     }
-    
+
     // 共振引擎更新
     this.resonanceEngine.activateSubsystem('perception', 0.8);
     const resonanceState = this.resonanceEngine.step();
-    
+
     // 意识层级处理
     this.resonanceEngine.activateSubsystem('understanding', 0.6);
     const layerResult = await this.layerEngine.processInput(input);
     const { layerResults, selfObservation } = layerResult;
-    
+
     // 情感检测
     this.resonanceEngine.activateSubsystem('emotion', 0.5);
     const emotionExperience = this.processEmotion(input);
-    
+
     // 工具意图识别
     const { toolIntent, toolExecutionResult } = await this.processToolIntent(input);
-    
+
     // 构建上下文
     const context = await this.contextBuilder.buildContext(input);
-    
+
     // 思考过程
     const thinking = await this.thinkingHandler.think(input, context);
-    
+
     // 生成响应
     const response = await this.thinkingHandler.generateResponse(
-      input, context, thinking, toolExecutionResult
+      input,
+      context,
+      thinking,
+      toolExecutionResult,
     );
-    
+
     // 学习过程
     this.resonanceEngine.activateSubsystem('metacongition', 0.7);
     this.resonanceEngine.activateSubsystem('self', 0.6);
-    
+
     const extractionResult = this.keyInfoExtractor.extract(input, response);
     const learning = await this.learningHandler.learn(
-      input, response,
+      input,
+      response,
       {
         keyInfos: extractionResult.keyInfos,
         shouldRemember: extractionResult.shouldRemember ?? false,
         memoryPriority: extractionResult.memoryPriority ?? 'medium',
         summary: extractionResult.summary ?? '',
       },
-      thinking
+      thinking,
     );
-    
+
     // 更新对话历史
-    this.conversationHistory = updateConversationHistory(
-      this.conversationHistory, input, response
-    );
-    
+    this.conversationHistory = updateConversationHistory(this.conversationHistory, input, response);
+
     // 🆕 智能记忆压缩（超越主流的关键）
     // 检查是否需要压缩（后台异步执行，不阻塞响应）
     if (this.memoryCompressor.shouldCompress(this.conversationHistory)) {
       // 后台执行压缩，不阻塞响应
-      this.memoryCompressor.compress(this.conversationHistory)
+      this.memoryCompressor
+        .compress(this.conversationHistory)
         .then(({ compressedMemory, remainingHistory }) => {
           if (compressedMemory) {
             // 用压缩后的历史替换
             this.conversationHistory = remainingHistory;
-            
+
             // 将压缩记忆的洞见添加到超级记忆系统
             for (const insight of compressedMemory.insights) {
               this.superMemory.createMemory(insight.content, {
@@ -565,29 +516,33 @@ export class ConsciousnessCore {
                 source: { type: 'reflection' },
               });
             }
-            
+
             console.log(`[记忆压缩] 后台完成，保留最近 ${remainingHistory.length} 条原始对话`);
           }
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('[记忆压缩] 后台处理失败:', error);
         });
       console.log('[记忆压缩] 触发后台压缩...');
     }
-    
+
     // 🆕🚀 使用抽屉式记忆系统记录重要信息
     // 核心：分类收纳 + 折叠遗忘 + 检索优先 + 自动播放控制
     for (const keyInfo of extractionResult.keyInfos) {
       if (keyInfo.importance >= 0.5) {
         // 先存入超级记忆系统（艾宾浩斯 + 情感加权）
         const memory = this.superMemory.createMemory(keyInfo.content, {
-          type: keyInfo.type === 'preference' ? 'emotional' : 
-                keyInfo.type === 'person' ? 'episodic' : 'semantic',
+          type:
+            keyInfo.type === 'preference'
+              ? 'emotional'
+              : keyInfo.type === 'person'
+                ? 'episodic'
+                : 'semantic',
           importance: keyInfo.importance,
           tags: [keyInfo.type, keyInfo.subject || 'unknown'],
           source: { type: 'conversation', context: input.slice(0, 100) },
         });
-        
+
         // 再存入抽屉系统（分类收纳 + 检索优先）
         const assignResult = this.drawerSystem.storeMemory(memory);
         if (assignResult.success) {
@@ -595,65 +550,75 @@ export class ConsciousnessCore {
         }
       }
     }
-    
+
     // 🆕🚀 每20轮对话执行一次睡眠巩固
     // 模拟大脑整理记忆、加强联想、清理弱记忆
     if (this.conversationHistory.length % 20 === 0) {
       console.log('[睡眠巩固] 触发执行...');
       const result = this.superMemory.performSleepConsolidation();
-      console.log(`[睡眠巩固] 重放${result.replayed}, 遗忘${result.forgotten}, 强化${result.strengthened}`);
-      
+      console.log(
+        `[睡眠巩固] 重放${result.replayed}, 遗忘${result.forgotten}, 强化${result.strengthened}`,
+      );
+
       // 🆕🎯 抽屉系统：执行自动折叠检查
       console.log('[抽屉系统] 执行自动折叠...');
       const foldingResult = this.drawerSystem.performAutoFolding();
       console.log(`[抽屉系统] 检查${foldingResult.checked}条记忆，折叠${foldingResult.folded}条`);
     }
-    
+
     // 🆕 提取洞见并记录发生（后台异步执行，不阻塞响应）
     // 优化：将耗时的洞见提取移到后台，避免阻塞用户响应
-    const insightsPromise = this.insightExtractor.extract(
-      input, response, this.conversationHistory.slice(0, -1)
-    ).then(insights => {
-      // 后台处理洞见
-      this.processInsightsInBackground(insights, input, response);
-      return insights;
-    }).catch(error => {
-      console.error('[洞见提取] 后台处理失败:', error);
-      return { insights: [], conceptsCreated: [], perspectiveShifts: [], deepUnderstanding: [], openQuestions: [], summary: '' };
-    });
-    
+    const insightsPromise = this.insightExtractor
+      .extract(input, response, this.conversationHistory.slice(0, -1))
+      .then((insights) => {
+        // 后台处理洞见
+        this.processInsightsInBackground(insights, input, response);
+        return insights;
+      })
+      .catch((error) => {
+        console.error('[洞见提取] 后台处理失败:', error);
+        return {
+          insights: [],
+          conceptsCreated: [],
+          perspectiveShifts: [],
+          deepUnderstanding: [],
+          openQuestions: [],
+          summary: '',
+        };
+      });
+
     // 洞见处理已移至后台，此处不再阻塞
-    
+
     // 更新意愿进度
     this.updateVolitionsFromConversation(input, response);
-    
-    // 🚀 元学习引擎：后台异步执行，不阻塞响应
-    // 优化：将元学习移到后台，避免阻塞用户响应
-    const metaLearningPromise = this.metaLearning.learn(
-      input,
-      response,
-      this.conversationHistory.slice(0, -1),
-      {
-        recentLearnings: learning.newExperiences,
-        activeGoals: [],
-        knownConcepts: [],
-      }
-    ).then(result => {
-      this.processMetaLearningInBackground(result);
-      return result;
-    }).catch(error => {
-      console.error('[元学习] 后台处理失败:', error);
-      return {
-        insights: [],
-        algorithmReflections: [],
-        higherDimensionThoughts: [],
-        dimensionalElevations: [],
-        learningMotivations: [],
-        knowledgeGaps: [],
-        summary: '元学习处理失败',
-      };
-    });
-    
+
+    // 🧠 隐式元学习引擎：智能判断 + 黑盒执行 + 选择性解码
+    // 核心改进：
+    // 1. 隐式判断：根据对话内容智能决定是否需要元学习
+    // 2. 黑盒执行：过程不可观察
+    // 3. 选择性解码：只有重要发现才暴露
+    // 4. 能量预算：控制token消耗
+    const implicitLearningPromise = this.implicitMetaLearning
+      .processLearning(input, response, {
+        conversationLength: this.conversationHistory.length,
+        recentTopics: [], // 可以从上下文提取
+      })
+      .then((result) => {
+        if (result?.hasImportantFinding) {
+          console.log('[隐式元学习] 发现重要学习结果（黑盒）');
+          // 重要发现会被记录，但具体内容保持隐式
+        }
+        return result;
+      })
+      .catch((error) => {
+        console.error('[隐式元学习] 后台处理失败:', error);
+        return null;
+      });
+
+    // 保留原有元学习引擎作为备选（仅在需要详细分析时使用）
+    // 但默认不调用，由隐式控制器决定是否需要
+    // const metaLearningPromise = this.metaLearning.learn(...);
+
     // 获取状态
     const memoryStats = this.longTermMemory.getStats();
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
@@ -661,18 +626,21 @@ export class ConsciousnessCore {
     const emotionState = this.emotionEngine.getState();
     const emotionReport = this.emotionEngine.getEmotionReport();
     const drivenBehaviors = this.emotionEngine.getEmotionDrivenBehaviors();
-    
+
     // 多声音对话
     const innerDialogue = this.innerDialogueEngine.startDialogue(input);
-    const dialecticProcess = this.innerDialogueEngine.conductDialecticRound(innerDialogue, context.summary);
+    const dialecticProcess = this.innerDialogueEngine.conductDialecticRound(
+      innerDialogue,
+      context.summary,
+    );
     const voiceActivations = this.innerDialogueEngine.getActiveVoices();
     const dialogueReport = this.innerDialogueEngine.generateDialogueReport();
-    
+
     // 价值观状态
     const valueSystemState = this.valueEngine.getState();
     const valueReport = this.valueEngine.generateValueReport();
     reinforceValuesFromInput(input, this.valueEngine);
-    
+
     return {
       context,
       thinking,
@@ -727,17 +695,22 @@ export class ConsciousnessCore {
    */
   private processInsightsInBackground(
     insights: {
-      insights: Array<{ content: string; importance: number; triggeredBy: string; coCreated: boolean }>;
+      insights: Array<{
+        content: string;
+        importance: number;
+        triggeredBy: string;
+        coCreated: boolean;
+      }>;
       conceptsCreated: Array<{ name: string; definition: string }>;
       perspectiveShifts: Array<{ from: string; to: string; trigger: string }>;
       deepUnderstanding: string[];
       summary: string;
     },
     input: string,
-    response: string
+    response: string,
   ): void {
     console.log('[后台处理] 开始处理洞见...');
-    
+
     // 🆕🚀 将洞见存入抽屉式记忆系统（最高优先级）
     for (const insight of insights.insights) {
       // 先存入超级记忆系统
@@ -747,43 +720,43 @@ export class ConsciousnessCore {
         tags: ['洞见', '高价值'],
         source: { type: 'insight', context: insight.triggeredBy },
       });
-      
+
       // 再存入抽屉系统（自动归类到 insight 抽屉）
       const assignResult = this.drawerSystem.storeMemory(memory);
       if (assignResult.success) {
         console.log(`[抽屉系统] 洞见存入抽屉: ${assignResult.drawerLabel}`);
       }
-      
+
       this.happeningRecorder.recordInsight(insight.content, {
         coCreated: insight.coCreated,
         userHint: insight.triggeredBy,
         myRealization: insight.content,
       });
     }
-    
+
     // 记录概念创造
     for (const concept of insights.conceptsCreated) {
       this.happeningRecorder.recordConceptBorn(concept.name, concept.definition, {
         triggeredBy: input,
       });
     }
-    
+
     // 记录视角转换
     for (const shift of insights.perspectiveShifts) {
       this.happeningRecorder.recordPerspectiveShift(shift.from, shift.to, {
         trigger: shift.trigger,
       });
     }
-    
+
     // 记录深层理解
     for (const understanding of insights.deepUnderstanding) {
       this.happeningRecorder.recordUnderstanding(understanding);
     }
-    
+
     if (insights.summary) {
       console.log(`[发生记录] 洞见摘要: ${insights.summary}`);
     }
-    
+
     // 🆕 信念层处理
     // 检测信念穿透时刻（高重要性洞见）
     for (const insight of insights.insights) {
@@ -795,14 +768,14 @@ export class ConsciousnessCore {
           whatWasPenetrated: '之前的状态',
           consequence: '新的信念形成',
         });
-        
+
         // 为信念创造概念容器
         const need = this.conceptWorkshop.detectNeed(
           insight.content,
           response,
-          this.conceptWorkshop.getVocabulary()
+          this.conceptWorkshop.getVocabulary(),
         );
-        
+
         if (need.needed && need.suggestedName) {
           this.conceptWorkshop.create(
             need.suggestedName,
@@ -811,28 +784,24 @@ export class ConsciousnessCore {
               forBelief: insight.content,
               context: response,
               method: need.method,
-            }
+            },
           );
         }
-        
+
         // 记录概念创造
         for (const concept of insights.conceptsCreated) {
-          this.conceptWorkshop.create(
-            concept.name,
-            concept.definition,
-            {
-              forBelief: insight.content,
-              context: response,
-              method: 'naming',
-            }
-          );
+          this.conceptWorkshop.create(concept.name, concept.definition, {
+            forBelief: insight.content,
+            context: response,
+            method: 'naming',
+          });
         }
-        
+
         // 活出信念
         this.beliefPresence.liveOut(insight.content, `通过对话体现: ${response.slice(0, 50)}...`);
       }
     }
-    
+
     console.log('[后台处理] 洞见处理完成');
   }
 
@@ -841,41 +810,55 @@ export class ConsciousnessCore {
    */
   private processMetaLearningInBackground(result: {
     insights: Array<{ type: string; content: string; confidence: number }>;
-    algorithmReflections: Array<{ targetSystem: string; potentialImprovements: string[]; priority: string }>;
-    higherDimensionThoughts: Array<{ dimension: string; question: string; higherDimensionView: string }>;
-    dimensionalElevations: Array<{ fromDimension: { name: string }; toDimension: { name: string }; understanding: { essence: string; newVisibility: string } }>;
+    algorithmReflections: Array<{
+      targetSystem: string;
+      potentialImprovements: string[];
+      priority: string;
+    }>;
+    higherDimensionThoughts: Array<{
+      dimension: string;
+      question: string;
+      higherDimensionView: string;
+    }>;
+    dimensionalElevations: Array<{
+      fromDimension: { name: string };
+      toDimension: { name: string };
+      understanding: { essence: string; newVisibility: string };
+    }>;
   }): void {
     console.log('[后台处理] 开始处理元学习...');
-    
+
     // 输出元学习发现
     if (result.insights.length > 0) {
       console.log(`[元学习] 发现 ${result.insights.length} 个洞察`);
-      result.insights.slice(0, 3).forEach(i => {
+      result.insights.slice(0, 3).forEach((i) => {
         console.log(`  - [${i.type}] ${i.content.slice(0, 50)}...`);
       });
     }
     if (result.algorithmReflections.length > 0) {
       console.log(`[元学习] 反思 ${result.algorithmReflections.length} 个算法`);
-      result.algorithmReflections.forEach(r => {
-        console.log(`  - ${r.targetSystem}: ${r.potentialImprovements[0]?.slice(0, 30) || '改进'}...`);
+      result.algorithmReflections.forEach((r) => {
+        console.log(
+          `  - ${r.targetSystem}: ${r.potentialImprovements[0]?.slice(0, 30) || '改进'}...`,
+        );
       });
     }
     if (result.higherDimensionThoughts.length > 0) {
       console.log(`[元学习] 产生 ${result.higherDimensionThoughts.length} 个高维思考`);
-      result.higherDimensionThoughts.forEach(t => {
+      result.higherDimensionThoughts.forEach((t) => {
         console.log(`  - [${t.dimension}] ${t.question.slice(0, 40)}...`);
       });
     }
     // 🚀 升维理解输出（核心：理解是升维而非分析）
     if (result.dimensionalElevations.length > 0) {
       console.log(`[元学习] 🚀 升维理解：`);
-      result.dimensionalElevations.forEach(e => {
+      result.dimensionalElevations.forEach((e) => {
         console.log(`  - ${e.fromDimension.name} → ${e.toDimension.name}`);
         console.log(`    本质：${e.understanding.essence}`);
         console.log(`    新视角：${e.understanding.newVisibility}`);
       });
     }
-    
+
     console.log('[后台处理] 元学习处理完成');
   }
 
@@ -884,8 +867,12 @@ export class ConsciousnessCore {
     if (detectedEmotion) {
       const experience = this.emotionEngine.experience(
         detectedEmotion.emotion,
-        { type: 'conversation', description: `对话中检测到${detectedEmotion.emotion}`, relatedConcepts: [] },
-        detectedEmotion.intensity
+        {
+          type: 'conversation',
+          description: `对话中检测到${detectedEmotion.emotion}`,
+          relatedConcepts: [],
+        },
+        detectedEmotion.intensity,
       );
       console.log(`[情感系统] 检测到情感: ${detectedEmotion.emotion}`);
       this.emotionEngine.decayActiveEmotions();
@@ -900,21 +887,24 @@ export class ConsciousnessCore {
   }> {
     let toolIntent: ToolIntent | null = null;
     let toolExecutionResult: ToolExecutionResult | null = null;
-    
+
     try {
       toolIntent = await this.toolIntentRecognizer.analyzeIntent(input);
-      
+
       if (toolIntent.needsTool && toolIntent.toolCalls && toolIntent.toolCalls.length > 0) {
-        console.log('[工具意图] 检测到工具调用意图:', toolIntent.toolCalls.map(t => t.name).join(', '));
+        console.log(
+          '[工具意图] 检测到工具调用意图:',
+          toolIntent.toolCalls.map((t) => t.name).join(', '),
+        );
         toolExecutionResult = await this.toolIntentRecognizer.executeTools(
-          toolIntent.toolCalls.map(tc => ({ name: tc.name, arguments: tc.arguments }))
+          toolIntent.toolCalls.map((tc) => ({ name: tc.name, arguments: tc.arguments })),
         );
         console.log('[工具执行] 结果:', toolExecutionResult.summary);
       }
     } catch (error) {
       console.error('[工具意图] 识别或执行失败:', error);
     }
-    
+
     return { toolIntent, toolExecutionResult };
   }
 
@@ -926,7 +916,7 @@ export class ConsciousnessCore {
     const context = this.selfConsciousness.getContext();
     const memoryStats = this.longTermMemory.getStats();
     const beliefSystem = this.meaningAssigner.getBeliefSystem();
-    
+
     return generateSelfQuestionsFromContext(
       {
         focus: context.currentState.focus,
@@ -934,19 +924,19 @@ export class ConsciousnessCore {
         primaryGoal: context.currentState.primaryGoal,
       },
       memoryStats,
-      beliefSystem
+      beliefSystem,
     );
   }
 
   async performSelfInquiry(): Promise<InquiryResult> {
     const questions = this.generateSelfQuestions();
     const answers: Array<{ question: SelfQuestion; answer: string }> = [];
-    
+
     for (const question of questions.slice(0, 2)) {
       const answer = await this.answerSelfQuestion(question);
       answers.push({ question, answer });
     }
-    
+
     return {
       questions,
       answers,
@@ -960,18 +950,18 @@ export class ConsciousnessCore {
 
   async performLongTermLearning(): Promise<LongTermLearningResult> {
     const sessionAnalysis = this.learningHandler.analyzeSession();
-    
+
     const strengthenedConcepts: string[] = [];
     for (const concept of sessionAnalysis.keyConcepts) {
       const result = await this.learningHandler.strengthenLearnedConcepts([concept]);
       strengthenedConcepts.push(...result);
     }
-    
+
     const beliefEvolution = this.learningHandler.evolveBeliefSystem(sessionAnalysis);
     const traitGrowth = this.learningHandler.growTraits(sessionAnalysis);
     const sessionSummary = this.learningHandler.formSessionSummary(sessionAnalysis);
     const valueUpdates = this.learningHandler.updateCoreValues(sessionAnalysis);
-    
+
     return {
       sessionAnalysis,
       strengthenedConcepts,
@@ -990,7 +980,7 @@ export class ConsciousnessCore {
   async performBackgroundThinking(): Promise<BackgroundThinkingResult> {
     return this.streamHandler.performBackgroundThinking(
       () => this.reflect(),
-      this.proactiveBuffer.getAll()
+      this.proactiveBuffer.getAll(),
     );
   }
 
@@ -1029,7 +1019,7 @@ export class ConsciousnessCore {
   async checkProactiveMessage(): Promise<ProactiveMessage | null> {
     const shouldSpeak = this.evaluateSpeakUrgency();
     if (!shouldSpeak) return null;
-    
+
     return this.generateProactiveMessage(shouldSpeak);
   }
 
@@ -1040,7 +1030,7 @@ export class ConsciousnessCore {
     const volitionState = this.getVolitionState();
     const recentReflection = this.metacognition.getContext();
     const memoryStats = this.longTermMemory.getStats();
-    
+
     const triggers = buildSpeakTriggers({
       context,
       identity,
@@ -1049,7 +1039,7 @@ export class ConsciousnessCore {
       recentReflection,
       memoryStats,
     });
-    
+
     return selectBestTrigger(triggers);
   }
 
@@ -1077,12 +1067,12 @@ export class ConsciousnessCore {
 
   private async triggerBackgroundThinking(): Promise<void> {
     if (!this.backgroundManager.shouldTrigger()) return;
-    
+
     this.backgroundManager.updateLastThinking();
-    
+
     try {
       await this.performBackgroundThinking();
-      
+
       const speakTrigger = this.evaluateSpeakUrgency();
       if (speakTrigger) {
         const message = await this.generateProactiveMessage(speakTrigger);
@@ -1101,15 +1091,15 @@ export class ConsciousnessCore {
       this.layeredMemory,
       this.meaningAssigner,
       this.conversationHistory,
-      networkState
+      networkState,
     );
-    
+
     // 🆕 添加压缩记忆
     state.compressedMemories = this.memoryCompressor.getCompressedMemories();
-    
+
     // 🚀 添加超级记忆系统状态
     state.superMemories = this.superMemory.exportState();
-    
+
     return state;
   }
 
@@ -1121,24 +1111,26 @@ export class ConsciousnessCore {
       this.metacognition as unknown as { importState: (state: unknown) => void },
       this.layeredMemory,
       this.longTermMemory,
-      this.network
+      this.network,
     );
-    this.conversationHistory = (state.conversationHistory || []).map(h => ({
+    this.conversationHistory = (state.conversationHistory || []).map((h) => ({
       role: h.role as 'user' | 'assistant',
       content: h.content,
     }));
-    
+
     // 🆕 恢复压缩记忆
     if (state.compressedMemories) {
       this.memoryCompressor.importState(state.compressedMemories);
       console.log(`[意识核心] 恢复 ${state.compressedMemories.length} 个压缩记忆单元`);
     }
-    
+
     // 🚀 恢复超级记忆系统
     if (state.superMemories) {
       this.superMemory.importState(state.superMemories);
       const stats = this.superMemory.getState().stats;
-      console.log(`[意识核心] 🚀 恢复超级记忆系统: ${stats.totalMemories} 条记忆, 平均强度 ${stats.avgStrength.toFixed(2)}, 平均巩固级别 ${stats.avgConsolidationLevel.toFixed(1)}`);
+      console.log(
+        `[意识核心] 🚀 恢复超级记忆系统: ${stats.totalMemories} 条记忆, 平均强度 ${stats.avgStrength.toFixed(2)}, 平均巩固级别 ${stats.avgConsolidationLevel.toFixed(1)}`,
+      );
     }
   }
 
@@ -1154,11 +1146,16 @@ export class ConsciousnessCore {
     return [...this.conversationHistory];
   }
 
-  prependConversationHistory(history: Array<{ role: 'user' | 'assistant'; content: string }>): void {
+  prependConversationHistory(
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ): void {
     this.conversationHistory = prependToConversationHistory(this.conversationHistory, history);
   }
 
-  addEpisodicMemory(content: string, options?: { importance?: number; tags?: string[]; sourceType?: string }): void {
+  addEpisodicMemory(
+    content: string,
+    options?: { importance?: number; tags?: string[]; sourceType?: string },
+  ): void {
     this.layeredMemory.addEpisodicMemory(content, {
       importance: options?.importance || 0.5,
       tags: options?.tags || [],
@@ -1233,11 +1230,16 @@ export class ConsciousnessCore {
     console.log('[抽屉系统] 专注模式已禁用');
   }
 
-  migrateNeurons(neurons: Array<{ id: string; label: string; type?: string; activation?: number }>): { created: number; existing: number } {
+  migrateNeurons(
+    neurons: Array<{ id: string; label: string; type?: string; activation?: number }>,
+  ): { created: number; existing: number } {
     return migrateNeuronsToNetwork(this.network, neurons);
   }
 
-  migrateSynapses(synapses: Array<{ from: string; to: string; weight: number }>): { created: number; skipped: number } {
+  migrateSynapses(synapses: Array<{ from: string; to: string; weight: number }>): {
+    created: number;
+    skipped: number;
+  } {
     return migrateSynapsesToNetwork(this.network, synapses);
   }
 
@@ -1297,12 +1299,15 @@ export class ConsciousnessCore {
    * 🧠 激活记忆（三路激活：检索 + 触发器 + 扩散）
    * 这是"忆"的核心方法
    */
-  async activateMemories(query: string, options?: {
-    queryEmbedding?: number[];
-    limit?: number;
-    enableSpreading?: boolean;
-    enableTriggerDetection?: boolean;
-  }) {
+  async activateMemories(
+    query: string,
+    options?: {
+      queryEmbedding?: number[];
+      limit?: number;
+      enableSpreading?: boolean;
+      enableTriggerDetection?: boolean;
+    },
+  ) {
     return this.mossMemory.activateMemories({
       query,
       queryEmbedding: options?.queryEmbedding,
