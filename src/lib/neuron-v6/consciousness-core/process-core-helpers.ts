@@ -128,7 +128,7 @@ export function updateConversationHistory(
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
   userMessage: string,
   assistantResponse: string,
-  maxLength: number = 100
+  maxLength: number = 500  // 🆕 增加存储上限到 500 条
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
   const newHistory = [
     ...history,

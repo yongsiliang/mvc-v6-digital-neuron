@@ -9,6 +9,7 @@
  * - self/     自我系统
  * - wisdom/   智慧系统
  * - link-field-module/ 链接场系统
+ * - consciousness-compiler/ 意识编译系统（V6新增）
  * 
  * 原则：
  * - 单一职责
@@ -31,6 +32,16 @@ export * from './self';
 
 // 智慧模块
 export * from './wisdom';
+
+// 意识编译系统（V6新增）
+export { 
+  ConsciousnessCompiler, 
+  createConsciousnessCompiler 
+} from './consciousness-compiler';
+export type { 
+  CompilerConfig, 
+  CompilationResult 
+} from './consciousness-compiler';
 
 // 其他独立模块
 export { HebbianNetwork } from './hebbian-network';

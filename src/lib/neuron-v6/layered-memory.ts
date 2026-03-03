@@ -190,7 +190,7 @@ export class LayeredMemorySystem {
   // ────────────────────────────────────────────────────────────────
   
   /** 情景记忆巩固阈值：回忆次数超过此值则考虑巩固 */
-  private static readonly CONSOLIDATION_THRESHOLD = 3;
+  private static readonly CONSOLIDATION_THRESHOLD = 1; // 降低到1次，让重要记忆更容易巩固
   
   /** 情景记忆遗忘阈值：强度低于此值则移除 */
   private static readonly FORGETTING_THRESHOLD = 0.1;
@@ -364,6 +364,30 @@ export class LayeredMemorySystem {
   ): EpisodicMemory {
     const importance = options.importance || 0.5;
     
+    // 🆕 高重要性记忆（>=0.8）直接存储到巩固层
+    if (importance >= 0.8) {
+      const type = this.determineConsolidatedType(options.tags || []);
+      this.addConsolidatedMemory(content, type, {
+        importance,
+        tags: options.tags || [],
+      });
+      console.log(`[分层记忆] 高重要性记忆直接存入巩固层：${content.slice(0, 30)}...`);
+      // 返回一个虚拟的情景记忆对象（实际已存入巩固层）
+      return {
+        id: uuidv4(),
+        content,
+        timestamp: Date.now(),
+        recallCount: 1,
+        lastRecalledAt: Date.now(),
+        timeConstant: 21,
+        initialStrength: importance,
+        tags: options.tags || [],
+        importance,
+        consolidationCandidate: true,
+        source: options.source || { type: 'conversation' },
+      };
+    }
+    
     const memory: EpisodicMemory = {
       id: uuidv4(),
       content,
@@ -390,6 +414,24 @@ export class LayeredMemorySystem {
     
     console.log(`[分层记忆] 情景记忆已添加：${content.slice(0, 30)}...`);
     return memory;
+  }
+  
+  /**
+   * 根据标签确定巩固记忆类型
+   */
+  private determineConsolidatedType(tags: string[]): ConsolidatedMemory['type'] {
+    if (tags.includes('人物') || tags.includes('关系')) {
+      return 'person_fact';
+    } else if (tags.includes('智慧') || tags.includes('洞察')) {
+      return 'wisdom';
+    } else if (tags.includes('事件')) {
+      return 'important_event';
+    } else if (tags.includes('偏好') || tags.includes('兴趣')) {
+      return 'preference';
+    } else if (tags.includes('技能')) {
+      return 'skill';
+    }
+    return 'preference';  // 默认使用 preference 而不是 fact
   }
   
   /**
@@ -433,8 +475,14 @@ export class LayeredMemorySystem {
   
   /**
    * 判断是否应该巩固
+   * 降低阈值：高重要性记忆（>=0.8）直接巩固，其他需要回忆1次
    */
   private shouldConsolidate(memory: EpisodicMemory): boolean {
+    // 高重要性记忆直接巩固
+    if (memory.importance >= 0.8 && memory.consolidationCandidate) {
+      return true;
+    }
+    
     return (
       memory.consolidationCandidate &&
       memory.recallCount >= LayeredMemorySystem.CONSOLIDATION_THRESHOLD &&

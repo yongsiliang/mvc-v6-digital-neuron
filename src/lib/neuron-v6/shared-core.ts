@@ -65,6 +65,20 @@ export async function getSharedCore(headers: Record<string, string>): Promise<Co
     const llmClient = new LLMClient(config, headers);
     store.sharedCore = createConsciousnessCore(llmClient);
     
+    // 🆕 初始化统一记忆系统的持久化层
+    // 从数据库或S3快照恢复记忆
+    try {
+      const mossMemory = store.sharedCore.getMossMemory();
+      const restoredCount = await mossMemory.initialize();
+      if (restoredCount > 0) {
+        console.log(`[SharedCore] 从持久化恢复了 ${restoredCount} 条记忆`);
+      } else {
+        console.log('[SharedCore] 没有找到持久化记忆，将从头开始');
+      }
+    } catch (error) {
+      console.warn('[SharedCore] 记忆持久化初始化失败，将继续使用内存模式:', error);
+    }
+    
     // 检查是否有已保存的状态
     const hasState = await PersistenceManagerV6.exists();
     

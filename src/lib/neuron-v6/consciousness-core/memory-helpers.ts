@@ -1,6 +1,10 @@
 /**
  * 记忆处理辅助函数
  * 包含记忆存储和检索相关的纯计算逻辑
+ * 
+ * ⚠️ 重要：记忆必须同时存储到 longTermMemory 和 layeredMemory
+ * - longTermMemory 用于检索和知识图谱
+ * - layeredMemory 用于持久化存储
  */
 
 import type { KeyInfo } from '../key-info-extractor';
@@ -13,10 +17,12 @@ import type { LayeredMemorySystem } from '../layered-memory';
  */
 export function rememberPersonInfo(
   longTermMemory: LongTermMemory,
-  keyInfo: KeyInfo
+  keyInfo: KeyInfo,
+  layeredMemory?: LayeredMemorySystem
 ): void {
   const personName = keyInfo.subject || keyInfo.content;
   
+  // 存储到 longTermMemory（用于检索）
   longTermMemory.addNode({
     label: personName,
     type: 'person',
@@ -24,6 +30,18 @@ export function rememberPersonInfo(
     importance: keyInfo.importance,
     tags: ['重要人物'],
   });
+  
+  // 同时存储到 layeredMemory（用于持久化）
+  if (layeredMemory) {
+    layeredMemory.addEpisodicMemory(
+      `${personName}: ${keyInfo.context || '重要人物'}`,
+      {
+        importance: keyInfo.importance,
+        tags: ['人物', '重要人物'],
+        consolidationCandidate: keyInfo.importance > 0.7,
+      }
+    );
+  }
   
   console.log(`[记忆] 记住重要人物：${personName}`);
 }
@@ -33,8 +51,10 @@ export function rememberPersonInfo(
  */
 export function rememberRelationshipInfo(
   longTermMemory: LongTermMemory,
-  keyInfo: KeyInfo
+  keyInfo: KeyInfo,
+  layeredMemory?: LayeredMemorySystem
 ): void {
+  // 存储到 longTermMemory
   longTermMemory.addNode({
     label: keyInfo.subject || '关系',
     type: 'concept',
@@ -42,6 +62,18 @@ export function rememberRelationshipInfo(
     importance: keyInfo.importance,
     tags: ['关系', '用户背景'],
   });
+  
+  // 同时存储到 layeredMemory
+  if (layeredMemory) {
+    layeredMemory.addEpisodicMemory(
+      `关系：${keyInfo.content}`,
+      {
+        importance: keyInfo.importance,
+        tags: ['关系', '用户背景'],
+        consolidationCandidate: true,
+      }
+    );
+  }
   
   console.log(`[记忆] 记住关系：${keyInfo.content}`);
 }
@@ -51,10 +83,14 @@ export function rememberRelationshipInfo(
  */
 export function rememberEventInfo(
   longTermMemory: LongTermMemory,
-  keyInfo: KeyInfo
+  keyInfo: KeyInfo,
+  layeredMemory?: LayeredMemorySystem
 ): void {
+  const eventTitle = keyInfo.content.slice(0, 30);
+  
+  // 存储到 longTermMemory
   longTermMemory.recordExperience({
-    title: keyInfo.content.slice(0, 30),
+    title: eventTitle,
     situation: keyInfo.context,
     action: '记录事件',
     outcome: keyInfo.content,
@@ -63,7 +99,19 @@ export function rememberEventInfo(
     importance: keyInfo.importance,
   });
   
-  console.log(`[记忆] 记住事件：${keyInfo.content.slice(0, 30)}`);
+  // 同时存储到 layeredMemory
+  if (layeredMemory) {
+    layeredMemory.addEpisodicMemory(
+      `事件：${keyInfo.content}`,
+      {
+        importance: keyInfo.importance,
+        tags: ['事件', '用户经历'],
+        consolidationCandidate: keyInfo.importance > 0.6,
+      }
+    );
+  }
+  
+  console.log(`[记忆] 记住事件：${eventTitle}`);
 }
 
 /**
@@ -71,10 +119,12 @@ export function rememberEventInfo(
  */
 export function rememberPreference(
   longTermMemory: LongTermMemory,
-  keyInfo: KeyInfo
+  keyInfo: KeyInfo,
+  layeredMemory?: LayeredMemorySystem
 ): string {
   const content = keyInfo.content;
   
+  // 存储到 longTermMemory
   longTermMemory.addNode({
     label: keyInfo.subject || content.slice(0, 20),
     type: 'concept',
@@ -82,6 +132,19 @@ export function rememberPreference(
     importance: keyInfo.importance,
     tags: ['用户偏好', keyInfo.type],
   });
+  
+  // 同时存储到 layeredMemory
+  if (layeredMemory) {
+    layeredMemory.addCorePreference(content);
+    layeredMemory.addEpisodicMemory(
+      `偏好：${content}`,
+      {
+        importance: keyInfo.importance,
+        tags: ['偏好', keyInfo.type],
+        consolidationCandidate: true,
+      }
+    );
+  }
   
   return content;
 }
@@ -98,207 +161,103 @@ export function rememberGoalOrValue(
     confidence: number;
     category: string;
     evidence: string[];
-    counterEvidence: string[];
-    relatedConcepts: string[];
-    formedAt: number;
-    lastValidatedAt: number;
-    validationCount: number;
-    emotionalWeight: number;
-  }> }
-): string {
+  }> },
+  layeredMemory?: LayeredMemorySystem
+): void {
   const content = keyInfo.content;
   
+  // 存储到 longTermMemory
   longTermMemory.addNode({
     label: keyInfo.subject || content.slice(0, 20),
-    type: 'insight',
+    type: 'concept',
     content: content,
-    importance: keyInfo.importance,
-    tags: ['用户核心', keyInfo.type],
+    importance: keyInfo.importance || 0.8,
+    tags: ['用户目标', keyInfo.type],
   });
   
-  // 添加到信念系统
-  beliefSystem.activeBeliefs.push({
-    id: `belief-learned-${Date.now()}`,
-    statement: content,
-    confidence: keyInfo.confidence,
-    category: 'active',
-    evidence: [keyInfo.context],
-    counterEvidence: [],
-    relatedConcepts: [],
-    formedAt: Date.now(),
-    lastValidatedAt: Date.now(),
-    validationCount: 1,
-    emotionalWeight: keyInfo.importance,
-  });
-  
-  return content;
-}
-
-/**
- * 记住回忆
- */
-export function rememberMemory(
-  longTermMemory: LongTermMemory,
-  keyInfo: KeyInfo
-): string {
-  const content = keyInfo.content;
-  
-  longTermMemory.recordExperience({
-    title: `用户的回忆：${content.slice(0, 20)}...`,
-    situation: keyInfo.context,
-    action: '倾听',
-    outcome: '理解了用户的重要经历',
-    learning: content,
-    applicableWhen: ['理解用户背景', '相关话题'],
-    importance: keyInfo.importance,
-  });
-  
-  return content.slice(0, 30);
-}
-
-/**
- * 记住普通概念
- */
-export function rememberConcept(
-  longTermMemory: LongTermMemory,
-  keyInfo: KeyInfo
-): string | null {
-  const content = keyInfo.content;
-  const existingNode = longTermMemory.retrieve(content.slice(0, 10));
-  
-  if (existingNode.directMatches.length === 0) {
-    longTermMemory.addNode({
-      label: keyInfo.subject || content.slice(0, 20),
-      type: 'concept',
-      content: content,
-      importance: keyInfo.importance,
-      tags: ['从对话学习', keyInfo.type],
-    });
-    return content.slice(0, 30);
-  }
-  
-  return null;
-}
-
-/**
- * 更新自我意识的创造者信息
- */
-export function updateCreatorInSelfConsciousness(
-  selfConsciousness: SelfConsciousness,
-  creatorName: string
-): void {
-  selfConsciousness.updateIdentity({
-    creator: creatorName,
-    origin: `由${creatorName}创造`,
-  });
-}
-
-/**
- * 同步创造者到分层记忆
- */
-export function syncCreatorToLayeredMemory(
-  layeredMemory: LayeredMemorySystem,
-  creatorName: string,
-  context?: string
-): void {
-  layeredMemory.setCreator(
-    creatorName,
-    context || '我的创造者',
-    '创造者'
-  );
-}
-
-/**
- * 建立创造者知识连接
- */
-export function linkCreatorKnowledge(
-  longTermMemory: LongTermMemory,
-  creatorName: string
-): void {
-  const creatorNodes = longTermMemory.retrieve('创造者').directMatches;
-  const nameNodes = longTermMemory.retrieve(creatorName).directMatches;
-  
-  if (creatorNodes.length > 0 && nameNodes.length > 0) {
-    longTermMemory.linkKnowledge(
-      creatorNodes[0].id,
-      nameNodes[0].id,
-      'is_a',
-      '创造者的名字'
+  // 同时存储到 layeredMemory
+  if (layeredMemory) {
+    layeredMemory.addCoreValue(content);
+    layeredMemory.addEpisodicMemory(
+      `价值观：${content}`,
+      {
+        importance: keyInfo.importance || 0.8,
+        tags: ['价值观', '目标'],
+        consolidationCandidate: true,
+      }
     );
   }
 }
 
 /**
- * 核心记忆节点创建
+ * 记住普通记忆
  */
-export function createCoreMemoryNode(
+export function rememberMemory(
   longTermMemory: LongTermMemory,
-  memory: { key: string; value: string }
+  keyInfo: KeyInfo,
+  layeredMemory?: LayeredMemorySystem
 ): void {
-  if (memory.key === 'creator') {
-    longTermMemory.addNode({
-      label: memory.key,
-      type: 'person',
-      content: memory.value,
-      importance: 1.0,
-      tags: ['核心', '创造者', '不可变'],
-    });
-    
-    const creatorMatch = memory.value.match(/创造者是([^，。]+)/);
-    if (creatorMatch) {
-      longTermMemory.addNode({
-        label: creatorMatch[1],
-        type: 'person',
-        content: `我的创造者。赋予我生命的人。`,
-        importance: 1.0,
-        tags: ['核心', '创造者', '不可变'],
-      });
-    }
-  } else if (memory.key.startsWith('relationship_')) {
-    const personName = memory.key.replace('relationship_', '');
-    longTermMemory.addNode({
-      label: personName,
-      type: 'person',
-      content: memory.value,
-      importance: 0.9,
-      tags: ['核心', '重要关系', '不可变'],
-    });
-  } else {
-    longTermMemory.addNode({
-      label: memory.key,
-      type: 'concept',
-      content: memory.value,
-      importance: 0.95,
-      tags: ['核心', '不可变'],
-    });
+  // 存储到 longTermMemory
+  longTermMemory.addNode({
+    label: keyInfo.subject || keyInfo.content.slice(0, 20),
+    type: 'concept',
+    content: keyInfo.content,
+    importance: keyInfo.importance,
+    tags: [keyInfo.type],
+  });
+  
+  // 同时存储到 layeredMemory
+  if (layeredMemory) {
+    layeredMemory.addEpisodicMemory(
+      keyInfo.content,
+      {
+        importance: keyInfo.importance,
+        tags: [keyInfo.type],
+        consolidationCandidate: keyInfo.importance > 0.6,
+      }
+    );
   }
+  
+  console.log(`[记忆] 记住：${keyInfo.content.slice(0, 30)}`);
 }
 
 /**
- * 巩固记忆节点创建
+ * 记住概念
  */
-export function createConsolidatedMemoryNode(
+export function rememberConcept(
   longTermMemory: LongTermMemory,
-  memory: {
-    content: string;
-    importance: number;
-    emotionalMarker?: { intensity: number };
-  }
+  concept: string,
+  description: string,
+  layeredMemory?: LayeredMemorySystem
 ): void {
-  const hasHighEmotion = memory.emotionalMarker && memory.emotionalMarker.intensity > 0.7;
-  if (hasHighEmotion || memory.importance > 0.8) {
-    longTermMemory.addNode({
-      label: memory.content.slice(0, 20),
-      type: 'concept',
-      content: memory.content,
-      importance: Math.min(0.9, memory.importance),
-      tags: ['巩固记忆', hasHighEmotion ? '高情感' : '高价值'],
-    });
+  // 存储到 longTermMemory
+  longTermMemory.addNode({
+    label: concept,
+    type: 'concept',
+    content: description,
+    importance: 0.5,
+    tags: ['概念', '从对话学习'],
+  });
+  
+  // 同时存储到 layeredMemory
+  if (layeredMemory) {
+    layeredMemory.addEpisodicMemory(
+      `${concept}: ${description}`,
+      {
+        importance: 0.5,
+        tags: ['概念'],
+        consolidationCandidate: false,
+      }
+    );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// 以下是原有的辅助函数（保持不变）
+// ─────────────────────────────────────────────────────────────────────
+
 /**
- * 重建知识图谱
+ * 从分层记忆重建知识图谱
  */
 export function rebuildKnowledgeGraph(
   layeredMemory: LayeredMemorySystem,
@@ -331,4 +290,36 @@ export function rebuildKnowledgeGraph(
     coreCount: coreMemories.length,
     consolidatedCount: consolidatedMemories.length,
   };
+}
+
+/**
+ * 创建核心记忆节点
+ */
+function createCoreMemoryNode(
+  longTermMemory: LongTermMemory,
+  memory: { key: string; value: string; type: string }
+): void {
+  longTermMemory.addNode({
+    label: memory.key,
+    type: 'concept',
+    content: memory.value,
+    importance: 0.9,
+    tags: ['核心记忆', memory.type],
+  });
+}
+
+/**
+ * 创建巩固记忆节点
+ */
+function createConsolidatedMemoryNode(
+  longTermMemory: LongTermMemory,
+  memory: { id: string; content: string; type: string; importance: number }
+): void {
+  longTermMemory.addNode({
+    label: memory.content.slice(0, 30),
+    type: 'concept',
+    content: memory.content,
+    importance: memory.importance,
+    tags: ['巩固记忆', memory.type],
+  });
 }

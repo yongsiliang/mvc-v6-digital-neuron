@@ -1,0 +1,42 @@
+{
+  "schema_version": "v1",
+  "name_for_model": "Agent_chijiujiyi",
+  "name_for_human": "Agent 持久记忆",
+  "description_for_model": "专为 Coze 智能体打造的核心记忆插件，精准存储用户信息、偏好与关键对话，跨会话持续不丢失。零代码快速接入，无需复杂开发，就能让你的 AI 助手拥有长效记忆，大幅提升交互连贯性与用户粘性，是做高留存智能体的必备工具。使用方法：1. 存储记忆：当用户告诉你重要信息时调用 storeMemory 存储；2. 查询记忆：当用户问关于自己的偏好、历史时调用 queryMemory 查询；3. 清除记忆：当用户要求清除记忆时调用 clearMemory。",
+  "description_for_human": "专为 Coze 智能体打造的核心记忆插件，精准存储用户信息、偏好与关键对话，跨会话持续不丢失；零代码快速接入，无需复杂开发，就能让你的 AI 助手拥有长效记忆，大幅提升交互连贯性与用户粘性，是做高留存智能体的必备工具。",
+  "brief_intro": "让 Coze 智能体跨会话永久记忆，告别聊完就忘，用户留存直接翻倍。",
+  "auth": {
+    "type": "service_http",
+    "location": "Header",
+    "key": "X-API-Key",
+    "service_token": "sk_mem_57890abcdef1234567890abcdef12345",
+    "sub_type": "token/api_key",
+    "payload": ""
+  },
+  "logo_url": "FileBizType.BIZ_BOT_ICON/2587615532688010_1772451720833059239.jpeg",
+  "contact_email": "support@example.com",
+  "legal_info_url": "http://www.example.com/legal",
+  "api": {
+    "type": "openapi",
+    "url": "https://122998ba.r31.cpolar.top/openapi.yaml"
+  },
+  "common_params": {
+    "body": [],
+    "header": [
+      {
+        "name": "User-Agent",
+        "value": "Coze/1.0"
+      },
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "X-API-Key",
+        "value": "sk_mem_57890abcdef1234567890abcdef12345"
+      }
+    ],
+    "path": [],
+    "query": []
+  }
+}

@@ -51,6 +51,15 @@ import type {
 import type {
   LayeredMemorySystem,
 } from '../layered-memory';
+import type {
+  CompressedMemory,
+} from '../memory/memory-compressor';
+import type {
+  SuperMemory,
+} from '../memory/super-memory';
+import type {
+  MetaLearningResult,
+} from '../meta-learning/types';
 
 // ─────────────────────────────────────────────────────────────────────
 // 核心类型定义
@@ -474,6 +483,57 @@ export interface ProcessResult {
     experienceCount: number;
     wisdomCount: number;
   };
+  
+  /** 🚀 元学习结果 */
+  metaLearning?: {
+    /** 提取的洞察 */
+    insights: Array<{
+      type: string;
+      content: string;
+      confidence: number;
+    }>;
+    /** 算法反思 */
+    algorithmReflections: Array<{
+      targetSystem: string;
+      potentialImprovements: string[];
+      priority: string;
+    }>;
+    /** 高维思维 */
+    higherDimensionThoughts: Array<{
+      dimension: string;
+      question: string;
+      higherDimensionView: string;
+    }>;
+    /** 🚀 升维洞察（核心：理解是升维而非分析） */
+    dimensionalElevations: Array<{
+      fromDimension: { level: number; name: string };
+      toDimension: { level: number; name: string };
+      understanding: {
+        essence: string;
+        newVisibility: string;
+        groundedExpression: string;
+      };
+    }>;
+    /** 学习动机 */
+    learningMotivations: Array<{
+      type: string;
+      question: string;
+      urgency: string;
+    }>;
+    /** 知识盲区 */
+    knowledgeGaps: Array<{
+      topic: string;
+      whyImportant: string;
+    }>;
+    /** 总结 */
+    summary: {
+      keyInsight: string;
+      mainLearning: string;
+      dimensionalShift: string;  // 🚀 升维理解
+      suggestedAction: string;
+      questionsRaised: string[];
+    };
+  };
 }
 
 /**
@@ -514,6 +574,12 @@ export interface PersistedState {
     neurons: Array<{ id: string; label: string; activation: number }>;
     synapses: Array<{ from: string; to: string; weight: number }>;
   };
+  
+  // 🆕 压缩记忆（超越主流的关键）
+  compressedMemories?: CompressedMemory[];
+  
+  // 🚀 超级记忆系统状态（超越传统算法）
+  superMemories?: SuperMemory[];
   
   // 其他模块状态（不含 LongTermMemory）
   fullState?: {

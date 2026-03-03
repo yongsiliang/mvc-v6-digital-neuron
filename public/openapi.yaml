@@ -1,0 +1,259 @@
+openapi: 3.0.1
+info:
+  title: Agent 持久记忆
+  description: 专为 Coze 智能体打造的核心记忆插件，精准存储用户信息、偏好与关键对话，跨会话持续不丢失；零代码快速接入，无需复杂开发，就能让你的 AI 助手拥有长效记忆，大幅提升交互连贯性与用户粘性，是做高留存智能体的必备工具。
+  version: v1
+  contact:
+    email: support@example.com
+
+servers:
+  - url: https://122998ba.r31.cpolar.top/api/coze
+    description: cpolar内网穿透
+
+paths:
+  /memory/store:
+    post:
+      operationId: storeMemory
+      summary: 存储记忆
+      description: 将信息存入用户的长期记忆中，支持标签和重要性设置
+      tags:
+        - 记忆管理
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - content
+              properties:
+                user_id:
+                  type: string
+                  description: 用户唯一标识
+                  example: user_12345
+                content:
+                  type: string
+                  description: 要存储的记忆内容
+                  example: 用户喜欢吃辣，特别爱吃川菜
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: 记忆标签，便于后续检索
+                  example: ["偏好", "饮食", "辣味"]
+                importance:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  default: 0.5
+                  description: 记忆重要性，0-1之间，越高越重要
+                  example: 0.8
+                type:
+                  type: string
+                  enum: [preference, event, fact, skill]
+                  default: fact
+                  description: 记忆类型
+                  example: preference
+      responses:
+        '200':
+          description: 存储成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      memory_id:
+                        type: string
+                        description: 记忆ID
+                      content:
+                        type: string
+                        description: 存储的内容摘要
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                      importance:
+                        type: number
+                      created_at:
+                        type: string
+                        format: date-time
+                  message:
+                    type: string
+                    example: 记忆已存储
+        '401':
+          description: 认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /memory/query:
+    post:
+      operationId: queryMemory
+      summary: 查询记忆
+      description: 根据关键词或问题检索用户的长期记忆
+      tags:
+        - 记忆管理
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - query
+              properties:
+                user_id:
+                  type: string
+                  description: 用户唯一标识
+                  example: user_12345
+                query:
+                  type: string
+                  description: 查询关键词或问题
+                  example: 用户喜欢吃什么
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 5
+                  description: 返回结果数量限制
+                  example: 5
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            content:
+                              type: string
+                              description: 记忆内容
+                            relevance:
+                              type: number
+                              description: 相关度分数 0-1
+                            type:
+                              type: string
+                              description: 记忆类型
+                            created_at:
+                              type: string
+                              format: date-time
+                            tags:
+                              type: array
+                              items:
+                                type: string
+                      total:
+                        type: integer
+                        description: 返回结果总数
+                      query:
+                        type: string
+                        description: 原始查询
+        '401':
+          description: 认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /memory/clear:
+    post:
+      operationId: clearMemory
+      summary: 清除记忆
+      description: 清除用户的所有记忆（需要确认）
+      tags:
+        - 记忆管理
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - confirm
+              properties:
+                user_id:
+                  type: string
+                  description: 用户唯一标识
+                  example: user_12345
+                confirm:
+                  type: boolean
+                  description: 确认清除，必须为 true
+                  example: true
+      responses:
+        '200':
+          description: 清除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      cleared:
+                        type: integer
+                        description: 清除的记忆数量
+                      message:
+                        type: string
+        '401':
+          description: 认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key 认证
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: 错误信息

@@ -1,10 +1,14 @@
 /**
  * 学习处理器
  * 处理 ConsciousnessCore 中的学习相关逻辑
+ * 
+ * 记忆学习流程：
+ * 1. 提取关键信息 → 2. 分类处理 → 3. 存储到分层记忆 → 4. 建立关联
  */
 
 import type { LongTermMemory } from '../../long-term-memory';
 import type { LayeredMemorySystem } from '../../layered-memory';
+import type { UnifiedMemoryManager } from '../../memory/unified-manager';
 import type { SelfConsciousness } from '../../self-consciousness';
 import type { MeaningAssigner, BeliefSystem } from '../../meaning-system';
 import type { MetacognitionEngine } from '../../metacognition';
@@ -46,6 +50,7 @@ import {
 export interface LearningHandlerDeps {
   longTermMemory: LongTermMemory;
   layeredMemory: LayeredMemorySystem;
+  unifiedMemoryManager?: UnifiedMemoryManager;  // 🆕 统一记忆管理器
   selfConsciousness: SelfConsciousness;
   meaningAssigner: MeaningAssigner;
   metacognition: MetacognitionEngine;
@@ -95,6 +100,11 @@ export class LearningHandler {
       console.log(`[关键信息] #${idx+1}: type="${info.type}", subject="${info.subject}", content="${info.content?.slice(0, 30)}"`);
     });
     
+    // 🆕 将助手响应添加到工作记忆
+    if (this.deps.unifiedMemoryManager) {
+      this.deps.unifiedMemoryManager.addAssistantResponse(response);
+    }
+    
     if (extractionResult.shouldRemember) {
       console.log(`[关键信息] ${extractionResult.summary}`);
       console.log(`[关键信息] 优先级: ${extractionResult.memoryPriority}`);
@@ -105,6 +115,15 @@ export class LearningHandler {
         if (result.concept) newConcepts.push(result.concept);
         if (result.belief) newBeliefs.push(result.belief);
         if (result.experience) newExperiences.push(result.experience);
+        
+        // 🆕 重要信息同时添加到工作记忆
+        if (this.deps.unifiedMemoryManager && keyInfo.importance >= 0.7) {
+          this.deps.unifiedMemoryManager.addMemory(keyInfo.content, {
+            type: this.mapKeyTypeToMemoryType(keyInfo.type),
+            importance: keyInfo.importance,
+            tags: [keyInfo.type, keyInfo.subject || 'unknown'],
+          });
+        }
       }
     }
     
@@ -188,37 +207,38 @@ export class LearningHandler {
         return { belief: `创造者：${keyInfo.subject || keyInfo.content}` };
         
       case 'person':
-        rememberPersonInfo(this.deps.longTermMemory, keyInfo);
+        rememberPersonInfo(this.deps.longTermMemory, keyInfo, this.deps.layeredMemory);
         return { concept: keyInfo.subject || keyInfo.content };
         
       case 'relationship':
-        rememberRelationshipInfo(this.deps.longTermMemory, keyInfo);
+        rememberRelationshipInfo(this.deps.longTermMemory, keyInfo, this.deps.layeredMemory);
         return { belief: keyInfo.content };
         
       case 'event':
-        rememberEventInfo(this.deps.longTermMemory, keyInfo);
+        rememberEventInfo(this.deps.longTermMemory, keyInfo, this.deps.layeredMemory);
         return { experience: keyInfo.content.slice(0, 30) };
         
       case 'preference':
       case 'interest':
-        return { concept: rememberPreference(this.deps.longTermMemory, keyInfo) };
+        return { concept: rememberPreference(this.deps.longTermMemory, keyInfo, this.deps.layeredMemory) };
         
       case 'goal':
       case 'value':
-        return { 
-          belief: rememberGoalOrValue(
+        rememberGoalOrValue(
             this.deps.longTermMemory,
             keyInfo,
-            this.deps.meaningAssigner.getBeliefSystem()
-          )
-        };
+            this.deps.meaningAssigner.getBeliefSystem(),
+            this.deps.layeredMemory
+          );
+        return { belief: keyInfo.content };
         
       case 'memory':
-        return { experience: rememberMemory(this.deps.longTermMemory, keyInfo) };
+        rememberMemory(this.deps.longTermMemory, keyInfo, this.deps.layeredMemory);
+        return { experience: keyInfo.content.slice(0, 30) };
         
       default:
-        const conceptResult = rememberConcept(this.deps.longTermMemory, keyInfo);
-        return conceptResult ? { concept: conceptResult } : {};
+        rememberConcept(this.deps.longTermMemory, keyInfo.subject || keyInfo.content.slice(0, 20), keyInfo.content, this.deps.layeredMemory);
+        return { concept: keyInfo.subject || keyInfo.content.slice(0, 20) };
     }
   }
 
@@ -335,5 +355,29 @@ export class LearningHandler {
     }
     
     return updates;
+  }
+  
+  /**
+   * 映射关键信息类型到记忆类型
+   */
+  private mapKeyTypeToMemoryType(keyType: string): 'person' | 'preference' | 'event' | 'fact' | 'other' {
+    switch (keyType) {
+      case 'person':
+      case 'creator':
+      case 'relationship':
+        return 'person';
+      case 'preference':
+      case 'interest':
+        return 'preference';
+      case 'event':
+      case 'memory':
+        return 'event';
+      case 'goal':
+      case 'value':
+      case 'fact':
+        return 'fact';
+      default:
+        return 'other';
+    }
   }
 }

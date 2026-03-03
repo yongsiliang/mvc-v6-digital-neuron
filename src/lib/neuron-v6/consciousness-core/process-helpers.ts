@@ -348,7 +348,7 @@ export function updateConversationHistory(
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
   input: string,
   response: string,
-  maxLength: number = 100
+  maxLength: number = 500  // 🆕 增加存储上限到 500 条（原来是 100 条）
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
   const newHistory = [...conversationHistory];
   newHistory.push({ role: 'user', content: input });
