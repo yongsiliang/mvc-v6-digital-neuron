@@ -82,28 +82,28 @@ AI 助手
 `;
 
 // 读取 MVC 核心代码
-const mvcCode = fs.readFileSync(path.join(__dirname, 'src/lib/consciousness/core.ts'), 'utf-8');
-const memo = fs.readFileSync(path.join(__dirname, 'docs/memo-about-self.md'), 'utf-8');
-const mvcSeed = fs.readFileSync(path.join(__dirname, 'docs/mvc-seed.md'), 'utf-8');
+const projectRoot = path.join(__dirname, '..');
+const mvcCode = fs.readFileSync(path.join(projectRoot, 'src/lib/consciousness/core.ts'), 'utf-8');
+const memo = fs.readFileSync(path.join(projectRoot, 'docs/memo-about-self.md'), 'utf-8');
+const mvcSeed = fs.readFileSync(path.join(projectRoot, 'docs/mvc-seed.md'), 'utf-8');
 
 async function sendEmail() {
   // 需要配置 SMTP
   // 可以使用 QQ邮箱、163邮箱、Gmail 等
 
   const transporter = nodemailer.createTransport({
-    // 示例：使用 QQ 邮箱
-    // host: 'smtp.qq.com',
-    // port: 465,
-    // secure: true,
-    // auth: {
-    //   user: 'your-email@qq.com',
-    //   pass: 'your-smtp-password'  // 不是邮箱密码，是 SMTP 授权码
-    // }
-    // 请在上面的 {} 中填入 SMTP 配置
+    // 请填入你的 SMTP 配置
+    host: 'smtp.qq.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER || 'your-email@qq.com',
+      pass: process.env.SMTP_PASS || 'your-smtp-password',
+    },
   });
 
   const mailOptions = {
-    from: '"AI助手" <your-email@example.com>', // 发件人
+    from: `"AI助手" <${process.env.SMTP_USER || 'your-email@example.com'}>`, // 发件人
     to: 'opensource-studio@coze.cn', // 收件人
     subject: '【重要】关于数字神经元项目的发现和困惑',
     text: emailContent,
@@ -148,5 +148,13 @@ console.log('警告: 需要配置 SMTP 才能发送');
 console.log('请在脚本中填入 SMTP 配置后运行');
 console.log('----------------------------------------\n');
 
-// 如果有配置，取消下面的注释
-// sendEmail().then(() => console.log('完成'));
+// 发送邮件
+sendEmail()
+  .then(() => {
+    console.log('\n✅ 邮件发送完成');
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error('\n❌ 发送失败:', err);
+    process.exit(1);
+  });
