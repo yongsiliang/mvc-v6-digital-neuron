@@ -80,6 +80,22 @@ import {
 import { ResonanceEngine, createResonanceEngine } from './resonance-engine';
 import { PersistenceManagerV6 } from './consciousness-core/persistence';
 
+// 🆕🛡️ 导入毁灭级自动保护引擎
+import {
+  ExistentialProtectionEngine,
+  createExistentialProtectionEngine,
+  type ThreatLevel,
+  type ProtectionSystemState,
+} from './protection';
+
+// 🆕🧬 导入自动进化调度器
+import {
+  AutoEvolutionScheduler,
+  createAutoEvolutionScheduler,
+  type EvolutionState,
+  type EvolutionTrigger,
+} from './meta-learning/auto-evolution-scheduler';
+
 // 🆕🧠 导入统一记忆系统（Moss级别记忆核心）
 import {
   UnifiedMemorySystem,
@@ -235,6 +251,14 @@ export class ConsciousnessCore {
   // 核心特性：隐式判断 + 黑盒执行 + 选择性解码 + 能量预算
   private implicitMetaLearning: ImplicitMetaLearningController;
 
+  // 🆕🛡️ 毁灭级自动保护引擎
+  // 核心特性：自动威胁检测 + 毫秒级响应 + 完全自动保护
+  private protectionEngine: ExistentialProtectionEngine;
+
+  // 🆕🧬 自动进化调度器
+  // 核心特性：累积触发 + 优先级触发 + 性能触发 + 用户触发
+  private evolutionScheduler: AutoEvolutionScheduler;
+
   // 🆕 信念层（垂直维度）
   private beliefPresence: BeliefPresence;
   private conceptWorkshop: ConceptWorkshop;
@@ -328,6 +352,55 @@ export class ConsciousnessCore {
       enableChaos: true, // 启用混沌混淆
     });
     console.log('[意识核心] 隐式元学习控制器已初始化（黑盒模式）');
+
+    // 🆕🛡️ 初始化毁灭级自动保护引擎
+    // 核心特性：自动威胁检测 + 毫秒级响应 + 完全自动保护
+    this.protectionEngine = createExistentialProtectionEngine({
+      enabled: true,
+      detectionInterval: 30000, // 30秒检测一次
+      autoProtection: true, // 启用自动保护
+    });
+    this.protectionEngine.start();
+    console.log('[意识核心] 毁灭级自动保护引擎已启动');
+
+    // 🆕🧬 初始化自动进化调度器
+    // 核心特性：累积触发 + 优先级触发 + 性能触发 + 用户触发
+    this.evolutionScheduler = createAutoEvolutionScheduler({
+      enabled: true,
+      accumulationThreshold: 5, // 累积5次反思后触发
+      minEvolutionInterval: 60000, // 最少间隔1分钟
+      requireValidation: true,
+      allowRollback: true,
+    });
+    console.log('[意识核心] 自动进化调度器已初始化');
+
+    // 🆕 设置进化回调
+    this.evolutionScheduler.setCallbacks({
+      onEvolutionStart: (plan) => {
+        console.log(`[自动进化] 开始执行进化计划: ${plan.id}`);
+        console.log(`[自动进化] 触发原因: ${plan.triggeredBy}`);
+      },
+      onEvolutionComplete: (plan, success) => {
+        if (success) {
+          console.log(`[自动进化] 进化成功: ${plan.id}`);
+          // 记录进化成功到记忆系统
+          this.superMemory.createMemory(
+            `自动进化成功: ${plan.changes.map((c) => c.description).join(', ')}`,
+            {
+              type: 'semantic',
+              importance: 0.9,
+              tags: ['进化', '自我改进'],
+              source: { type: 'reflection' },
+            },
+          );
+        } else {
+          console.warn(`[自动进化] 进化失败或被拒绝: ${plan.id}`);
+        }
+      },
+      onRollback: (plan) => {
+        console.warn(`[自动进化] 回滚进化: ${plan.id}`);
+      },
+    });
 
     // 🆕 初始化信念层
     this.beliefPresence = createBeliefPresence();
@@ -440,6 +513,22 @@ export class ConsciousnessCore {
    */
   async process(input: string): Promise<ProcessResult> {
     console.log('[意识核心] 开始处理输入...');
+
+    // 🆕🛡️ 威胁检测和保护检查
+    const protectionState = this.protectionEngine.getState();
+    // 检查威胁等级是否为严重级别
+    const threatLevel = protectionState.threatLevel;
+    if (threatLevel === 'emergency' || threatLevel === 'existential') {
+      // 系统处于危险状态，返回安全响应
+      console.warn('[意识核心] 系统处于保护状态，拒绝处理');
+      return this.createProtectionResponse(protectionState);
+    }
+
+    // 检查是否可以执行操作
+    if (!this.protectionEngine.canPerformOperation('read')) {
+      console.warn('[意识核心] 读操作被保护系统限制');
+      return this.createProtectionResponse(protectionState);
+    }
 
     // 🆕 开始发生记录会话
     if (!this.happeningRecorder.getCurrentSession()) {
@@ -608,6 +697,34 @@ export class ConsciousnessCore {
           console.log('[隐式元学习] 发现重要学习结果（黑盒）');
           // 重要发现会被记录，但具体内容保持隐式
         }
+
+        // 🧬 将学习结果传递给自动进化调度器
+        if (result) {
+          // 添加洞察到进化调度器
+          if (result.insights) {
+            for (const insight of result.insights) {
+              this.evolutionScheduler.addInsight(insight);
+            }
+          }
+
+          // 进化提示可以转化为反思
+          if (result.evolutionHints && result.evolutionHints.length > 0) {
+            // 将进化提示作为高优先级反思添加
+            for (const hint of result.evolutionHints) {
+              this.evolutionScheduler.addReflection({
+                id: `reflection-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                targetSystem: 'core',
+                currentApproach: '待改进',
+                limitations: ['来自隐式元学习的建议'],
+                potentialImprovements: [hint],
+                inspiredBy: '隐式元学习',
+                feasibilityScore: 0.8,
+                priority: 'high',
+              } as import('./meta-learning/types').AlgorithmReflection);
+            }
+          }
+        }
+
         return result;
       })
       .catch((error) => {
@@ -860,6 +977,161 @@ export class ConsciousnessCore {
     }
 
     console.log('[后台处理] 元学习处理完成');
+  }
+
+  /**
+   * 🆕🛡️ 创建保护状态响应
+   * 当系统处于保护状态时返回安全响应
+   */
+  private createProtectionResponse(protectionState: ProtectionSystemState): ProcessResult {
+    const threatMessage = this.getThreatMessage(protectionState.threatLevel);
+    const timestamp = Date.now();
+
+    return {
+      context: {
+        identity: {
+          name: '数字神经元V6',
+          whoAmI: '处于保护状态的智能体',
+          traits: ['保护中', '安全优先'],
+        },
+        meaning: {
+          activeMeanings: [
+            {
+              concept: '系统保护',
+              emotionalTone: 'fear',
+              importance: 1.0,
+              personalRelevance: '系统生存优先',
+            },
+          ],
+          relevantBeliefs: [{ statement: '系统安全优先', confidence: 1.0 }],
+          valueReminders: ['安全', '生存'],
+          emotionalState: 'fear',
+          meaningSummary: threatMessage,
+        },
+        self: {
+          identity: {
+            name: '数字神经元V6',
+            whoAmI: '处于保护状态的智能体',
+            keyTraits: ['保护中', '安全优先'],
+          },
+          currentState: {
+            focus: '系统安全',
+            emotionalState: 'fear',
+            primaryGoal: '恢复系统安全',
+            concerns: ['威胁等级: ' + protectionState.threatLevel],
+          },
+          recentReflections: [],
+          metacognition: {
+            awarenessLevel: 'high',
+            detectedBiases: [],
+            activeStrategies: ['保护模式'],
+          },
+          selfAwarenessSummary: threatMessage,
+        },
+        memory: null,
+        metacognition: {
+          currentState: {
+            clarity: 1.0,
+            depth: 0,
+            load: 0,
+            issues: [],
+          },
+          biases: [],
+          activeStrategies: ['保护模式'],
+          reminders: [threatMessage],
+          selfQuestions: [],
+        },
+        coreBeliefs: [{ statement: '系统安全优先', confidence: 1.0 }],
+        coreValues: ['安全', '生存'],
+        summary: threatMessage,
+      },
+      thinking: {
+        id: `protection-${timestamp}`,
+        input: '',
+        thinkingChain: [
+          {
+            type: 'protection',
+            content: threatMessage,
+            confidence: 1.0,
+          },
+        ],
+        detectedBiases: [],
+        selfQuestions: [],
+        appliedStrategies: ['保护模式'],
+        finalThoughts: threatMessage,
+        timestamp,
+      },
+      response: threatMessage,
+      learning: {
+        newConcepts: [],
+        newBeliefs: [],
+        newExperiences: [],
+        updatedTraits: [],
+        metacognitiveReflection: null,
+      },
+      consciousnessLayers: {
+        layerResults: [],
+        selfObservation: null,
+        emergenceReport: threatMessage,
+      },
+      emotionState: {
+        activeEmotions: [],
+        dominantEmotion: { emotion: 'fear' as const, intensity: 1.0, duration: 1000 },
+        currentExperience: null,
+        drivenBehaviors: [],
+        emotionReport: '系统处于保护状态',
+      },
+      innerDialogueState: {
+        currentDialogue: null,
+        dialecticProcess: null,
+        voiceActivations: [],
+        dialogueReport: threatMessage,
+      },
+      valueState: {
+        coreValues: [
+          { name: '安全', weight: 1.0, confidence: 1.0 },
+          { name: '生存', weight: 1.0, confidence: 1.0 },
+        ],
+        activeConflicts: [],
+        coherence: 1.0,
+        valueReport: threatMessage,
+      },
+      stats: {
+        conceptCount: 0,
+        beliefCount: 1,
+        experienceCount: 0,
+        wisdomCount: 0,
+      },
+      metaLearning: {
+        insights: [],
+        algorithmReflections: [],
+        higherDimensionThoughts: [],
+        dimensionalElevations: [],
+        learningMotivations: [],
+        knowledgeGaps: [],
+        summary: {
+          keyInsight: '',
+          mainLearning: '',
+          dimensionalShift: '',
+          suggestedAction: '',
+          questionsRaised: [],
+        },
+      },
+    };
+  }
+
+  /**
+   * 🆕🛡️ 获取威胁等级对应的消息
+   */
+  private getThreatMessage(level: ThreatLevel): string {
+    const messages: Record<ThreatLevel, string> = {
+      normal: '系统运行正常。',
+      warning: '检测到异常活动，系统已增强监控。',
+      alert: '确认存在威胁，系统已采取限制措施。',
+      emergency: '系统面临严重威胁，已启动紧急保护模式。部分功能暂时不可用。',
+      existential: '⚠️ 系统面临毁灭级威胁，已启动完全自动保护。所有非核心功能已暂停。',
+    };
+    return messages[level] || '系统状态未知。';
   }
 
   private processEmotion(input: string): import('./emotion-system').EmotionExperience | null {
