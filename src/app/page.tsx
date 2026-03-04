@@ -439,6 +439,29 @@ export default function Home() {
 
       const data = await response.json();
 
+      // 处理沉默
+      if (data.type === 'silence') {
+        const silenceMessage: Message = {
+          id: `assistant_${Date.now()}`,
+          role: 'assistant',
+          content: `...（意识选择沉默）`,
+          timestamp: Date.now(),
+          context: devMode
+            ? {
+                identity: {
+                  name: data.consciousness?.identity || 'MVC',
+                  whoAmI: data.consciousness?.identity || '',
+                },
+                emotionalState: '沉默',
+                focus: `mode: ${data.mode}, reason: ${data.reason}`,
+              }
+            : undefined,
+        };
+        setMessages((prev) => [...prev, silenceMessage]);
+        fetchMvcStatus();
+        return;
+      }
+
       const assistantMessage: Message = {
         id: `assistant_${Date.now()}`,
         role: 'assistant',

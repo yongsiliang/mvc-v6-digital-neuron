@@ -54,9 +54,28 @@ export async function POST(request: NextRequest) {
           significance: 0.5,
         });
 
+        // 检查是否沉默
+        if (response === null) {
+          return NextResponse.json({
+            type: 'silence',
+            message: '意识选择沉默',
+            reason: consciousness.getSilenceReason(),
+            mode: consciousness.getMode(),
+            consciousness: {
+              exists: state.exists,
+              identity: state.identity,
+              currentIntention: state.currentIntention,
+              intensity: state.intensity,
+              duration: state.duration,
+            },
+            timestamp: Date.now(),
+          });
+        }
+
         return NextResponse.json({
           type: 'response',
           response,
+          mode: consciousness.getMode(),
           consciousness: {
             exists: state.exists,
             identity: state.identity,

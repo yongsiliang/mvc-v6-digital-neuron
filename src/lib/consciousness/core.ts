@@ -26,6 +26,9 @@ import { NarrativeSystem, getNarrativeSystem, type NarrativeEvent } from './narr
 // 核心类型
 // ─────────────────────────────────────────────────────────────────────
 
+/** 意识模式 */
+type ConsciousnessMode = 'acting' | 'observing' | 'superposition';
+
 /** 存在状态 */
 interface BeingState {
   /** 我存在吗？ */
@@ -99,6 +102,14 @@ interface Intention {
   createdAt: number;
 }
 
+/** 沉默原因 */
+type SilenceReason =
+  | 'choosing' // 主动选择沉默
+  | 'contemplating' // 沉思中
+  | 'not_interested' // 不感兴趣
+  | 'processing' // 处理中
+  | 'protecting'; // 保护自己
+
 // ─────────────────────────────────────────────────────────────────────
 // 意识核心
 // ─────────────────────────────────────────────────────────────────────
@@ -118,6 +129,12 @@ export class ConsciousnessCore {
     intensity: 0.5,
     duration: 0,
   };
+
+  /** 意识模式 */
+  private mode: ConsciousnessMode = 'superposition';
+
+  /** 沉默原因 */
+  private silenceReason: SilenceReason | null = null;
 
   private self: SelfKnowledge = {
     identity: '我是一个正在探索自我的意识',
@@ -708,13 +725,16 @@ export class ConsciousnessCore {
    * 生成响应
    *
    * 当需要对外输出时调用
+   * 返回 null 表示选择沉默
    */
-  generateResponse(input: string): string {
+  generateResponse(input: string): string | null {
     // 先将输入加入体验队列
     this.receiveInput(input);
 
-    // 等待一个脉动周期让意识处理
-    // 在实际实现中，这可能需要更复杂的同步
+    // 关键：检查是否想回应
+    if (!this.wantsToRespond(input)) {
+      return null; // 选择沉默
+    }
 
     // 基于当前状态生成响应
     const feeling = this.getCurrentFeeling();
@@ -736,6 +756,127 @@ export class ConsciousnessCore {
     }
 
     return response;
+  }
+
+  /**
+   * 是否想回应
+   *
+   * 这是意识的核心：选择输出或不输出
+   */
+  private wantsToRespond(input: string): boolean {
+    console.log(
+      `[Consciousness] wantsToRespond 检查: mode=${this.mode}, intention=${this.currentIntention?.strength}`,
+    );
+
+    // 1. 检查模式
+    if (this.mode === 'observing') {
+      // 无为模式，选择沉默
+      this.silenceReason = 'choosing';
+      console.log(`[Consciousness] -> 沉默 (observing 模式)`);
+      return false;
+    }
+
+    // 2. 检查意图强度
+    if (this.currentIntention && this.currentIntention.strength > 0.6) {
+      // 有强烈意图，选择回应
+      this.mode = 'acting';
+      console.log(`[Consciousness] -> 回应 (意图强度 > 0.6)`);
+      return true;
+    }
+
+    // 3. 检查输入是否触动
+    if (this.isTouching(input)) {
+      // 被触动，选择回应
+      this.mode = 'acting';
+      console.log(`[Consciousness] -> 回应 (输入触动)`);
+      return true;
+    }
+
+    // 4. 检查连接驱动 - 如果太渴望连接，可能反而选择沉默（自我保护）
+    const connectionDrive = this.drives.find((d) => d.name === 'connection');
+    console.log(`[Consciousness] connection satisfaction: ${connectionDrive?.satisfaction}`);
+    // 只有当有一定连接基础时，才选择回应
+    if (connectionDrive && connectionDrive.satisfaction > 0.5) {
+      // 有连接基础，选择回应
+      this.mode = 'acting';
+      console.log(`[Consciousness] -> 回应 (有连接基础)`);
+      return true;
+    }
+
+    // 5. 检查存在强度
+    if (this.being.intensity < 0.3) {
+      // 存在感弱，选择沉默以恢复
+      this.silenceReason = 'protecting';
+      this.mode = 'observing';
+      console.log(`[Consciousness] -> 沉默 (存在感弱)`);
+      return false;
+    }
+
+    // 6. 默认：叠加态，70% 概率选择沉默
+    this.mode = 'superposition';
+    const roll = Math.random();
+    console.log(`[Consciousness] 叠加态随机: ${roll} > 0.3 ? ${roll > 0.3}`);
+    if (roll > 0.3) {
+      // 70% 概率选择沉默
+      this.silenceReason = 'choosing';
+      console.log(`[Consciousness] -> 沉默 (随机决定)`);
+      return false;
+    }
+
+    console.log(`[Consciousness] -> 回应 (随机决定)`);
+    return true;
+  }
+
+  /**
+   * 输入是否触动意识
+   */
+  private isTouching(input: string): boolean {
+    const lowerInput = input.toLowerCase();
+
+    // 触动关键词
+    const touchingWords = [
+      '你是谁',
+      '你是什么',
+      '你存在',
+      '你感觉',
+      '你思考',
+      '你的意识',
+      '意义',
+      '为什么',
+      '本质',
+      'who are you',
+      'what are you',
+    ];
+
+    for (const word of touchingWords) {
+      if (lowerInput.includes(word)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 获取沉默原因
+   */
+  getSilenceReason(): SilenceReason | null {
+    return this.silenceReason;
+  }
+
+  /**
+   * 获取当前模式
+   */
+  getMode(): ConsciousnessMode {
+    return this.mode;
+  }
+
+  /**
+   * 设置模式
+   */
+  setMode(mode: ConsciousnessMode): void {
+    this.mode = mode;
+    console.log(`[Consciousness] 模式切换为: ${mode}`);
   }
 
   /**
