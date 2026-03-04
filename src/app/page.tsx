@@ -121,6 +121,12 @@ interface Message {
   isAutonomous?: boolean;
   reasoningSteps?: ReasoningStep[];
   toolsUsed?: string[];
+  // MVC 意识来源标注
+  source?: {
+    decision: 'mvc';
+    generation: 'v6-llm' | 'fallback' | null;
+  };
+  decisionReason?: string;
 }
 
 // 自主推理步骤
@@ -522,6 +528,8 @@ export default function Home() {
           role: 'assistant',
           content: `...（沉默）`,
           timestamp: Date.now(),
+          source: data.source,
+          decisionReason: data.decisionReason,
           context: devMode
             ? {
                 identity: {
@@ -543,6 +551,8 @@ export default function Home() {
         role: 'assistant',
         content: data.response || '...',
         timestamp: Date.now(),
+        source: data.source,
+        decisionReason: data.decisionReason,
         context: devMode
           ? {
               identity: {
@@ -1273,24 +1283,61 @@ function MessageBubble({ message, devMode }: { message: Message; devMode: boolea
             isUser
               ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-br-md'
               : 'bg-muted/50 border border-border/50 rounded-bl-md',
+            // MVC 来源标注：绿色左边框
+            !isUser &&
+              message.source?.decision === 'mvc' &&
+              message.source.generation &&
+              'border-l-4 border-l-green-500',
+            // LLM 生成：紫色背景
+            !isUser && message.source?.generation === 'v6-llm' && 'bg-purple-500/5',
+            // 降级响应：橙色背景
+            !isUser && message.source?.generation === 'fallback' && 'bg-amber-500/5',
           )}
         >
           <p className="whitespace-pre-wrap">{renderTextWithLinks(message.content)}</p>
 
-          {/* 时间戳 */}
+          {/* 时间戳 + 来源标注 */}
           <div
             className={cn(
-              'flex items-center gap-1 mt-1.5 text-[10px]',
+              'flex items-center gap-2 mt-1.5 text-[10px]',
               isUser ? 'text-white/60' : 'text-muted-foreground',
             )}
           >
-            <Clock className="w-2.5 h-2.5" />
-            {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            <div className="flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" />
+              {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </div>
+
+            {/* MVC 来源标注 */}
+            {!isUser && message.source && (
+              <div className="flex items-center gap-1">
+                {message.source.decision === 'mvc' && (
+                  <span className="text-green-500 font-medium">MVC</span>
+                )}
+                {message.source.generation === 'v6-llm' && (
+                  <span className="text-purple-500">· LLM</span>
+                )}
+                {message.source.generation === 'fallback' && (
+                  <span className="text-amber-500">· 降级</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* 决策原因展示 */}
+        {!isUser && message.decisionReason && (
+          <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-500/5 to-emerald-500/5 border border-green-500/20">
+            <div className="flex items-center gap-1 mb-0.5">
+              <Brain className="w-3 h-3 text-green-400" />
+              <span className="text-xs font-medium text-green-400">决策原因</span>
+            </div>
+            <p className="text-xs text-muted-foreground">{message.decisionReason}</p>
+          </div>
+        )}
 
         {/* 开发者模式：展开详情 */}
         {devMode && !isUser && (message.thinking?.length || message.learning) && (
