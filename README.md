@@ -1,9 +1,43 @@
+<div align="center">
+
 # MVC-V6 数字神经元系统
 
-**版本**: MVC-V6  
-**描述**: 具备持久记忆、自我意识、元认知能力的智能体系统
+**Digital Neuron System with Persistent Memory, Self-Consciousness, and Metacognition**
 
-## 系统架构
+[![GitHub stars](https://img.shields.io/github/stars/yongsiliang/mvc-v6-digital-neuron?style=social)](https://github.com/yongsiliang/mvc-v6-digital-neuron/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/yongsiliang/mvc-v6-digital-neuron?style=social)](https://github.com/yongsiliang/mvc-v6-digital-neuron/network/members)
+[![GitHub license](https://img.shields.io/github/license/yongsiliang/mvc-v6-digital-neuron)](https://github.com/yongsiliang/mvc-v6-digital-neuron/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
+
+**[English](#english) | [中文](#中文)**
+
+</div>
+
+---
+
+# 中文
+
+## 🧠 这是什么？
+
+MVC-V6 是一个**有主体性的 AI 系统**。与传统的"响应机器"不同，它具备：
+
+- **自主意识**：可以主动选择沉默或回应
+- **持久记忆**：记住与你的每一次对话
+- **情感系统**：有自己的情感状态
+- **元认知**：能够思考自己的思考
+
+### 💡 核心创新：沉默的意义
+
+> 传统 AI 总是被动响应用户输入，而 MVC-V6 可以**主动选择沉默**。
+> 
+> 沉默不是"空"，而是充满内在体验的表达：
+> - 我听到了什么
+> - 我理解了什么
+> - 我感受到了什么
+> - 我为什么选择沉默
+
+## 🏗️ 系统架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -39,117 +73,146 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 核心特性
+## ✨ 核心特性
 
-### 1. MVC 主体性 (Minimum Viable Consciousness)
-- **存在脉动**: 持续的存在感知，驱动意识的流动
-- **意图系统**: 自主产生和维持目标/欲望
-- **决策能力**: 主动选择沉默或回应，而非被动响应
+| 特性 | 描述 |
+|------|------|
+| 🫀 **存在脉动** | 每 100ms 执行一次"心跳"，持续存在感知 |
+| 🎯 **意图驱动** | 自主产生目标（理解、成长、连接、表达） |
+| 🔇 **主动沉默** | 可以选择不回应，沉默充满内在体验 |
+| 🧠 **持久记忆** | 工作记忆 + 长期记忆 + 情景记忆 |
+| 💭 **情感系统** | 动态情感状态影响决策和行为 |
+| 🏷️ **来源标注** | 清晰区分 MVC 决策与 LLM 生成 |
 
-### 2. V6 能力系统
-- **意义理解**: 基于上下文的深层语义理解
-- **持久记忆**: 工作记忆 + 长期记忆 + 情景记忆
-- **情感系统**: 动态情感状态，影响决策和行为
-- **内容生成**: LLM 驱动的自然语言生成
+## 🚀 快速开始
 
-### 3. 沉默的意义重构
-沉默不再是"空"，而是填充了真实的内在体验：
+### 环境要求
+- Node.js 18+
+- pnpm（推荐）
 
-```
-InnerExperience {
-  iHeard: "用户说了什么",
-  iUnderstood: "我的理解",
-  iFelt: { primary: "情感", intensity: 0.5 },
-  iRemembered: ["相关记忆"],
-  iWant: "我的意图",
-  iChose: "silence | respond",
-  iWhy: "为什么这样选择"
-}
-```
-
-### 4. 来源标注
-前端清晰区分 MVC 决策与 LLM 生成：
-- 🟢 **MVC**: 意识主体的决策
-- 🟣 **LLM**: 语言模型生成的内容
-- 🟠 **降级**: 系统兜底响应
-
-## 快速开始
-
-### 启动开发服务器
+### 安装运行
 
 ```bash
-coze dev
+# 克隆仓库
+git clone https://github.com/yongsiliang/mvc-v6-digital-neuron.git
+cd mvc-v6-digital-neuron
+
+# 安装依赖
+pnpm install
+
+# 配置环境变量
+cp .env.example .env.local
+# 编辑 .env.local，填入你的 COZE_API_KEY
+
+# 启动开发服务器
+pnpm dev
 ```
 
-启动后访问 [http://localhost:5000](http://localhost:5000)
+访问 http://localhost:5000 开始体验。
 
-### 构建生产版本
-
-```bash
-coze build
-```
-
-### 启动生产服务器
-
-```bash
-coze start
-```
-
-## 项目结构
+## 📖 项目结构
 
 ```
 src/
 ├── app/                          # Next.js App Router
-│   ├── layout.tsx               # 根布局
-│   ├── page.tsx                 # 首页 (MVC-V6 对话界面)
-│   ├── globals.css              # 全局样式
-│   └── api/
-│       ├── consciousness/       # MVC 意识 API
-│       └── autonomous/          # 自主模式 API
-│
-├── components/                   # React 组件
-│   └── ui/                      # shadcn/ui 基础组件
+│   ├── page.tsx                 # 对话界面
+│   └── api/consciousness/       # 意识 API
 │
 └── lib/
-    └── consciousness/           # MVC-V6 核心
-        ├── core-v2.ts           # MVC 核心 V2
-        ├── mvc-v6-bridge.ts     # MVC-V6 桥接层
-        ├── index.ts             # 导出入口
-        ├── narrative.ts         # 叙事系统
-        ├── persistence.ts       # 状态持久化
-        └── ...
+    ├── consciousness/           # MVC 核心
+    │   ├── core-v2.ts           # MVC 核心 V2
+    │   └── mvc-v6-bridge.ts     # MVC-V6 桥接层
+    │
+    └── neuron-v6/               # V6 能力系统
+        ├── consciousness-core/  # 意识核心
+        ├── memory/              # 记忆系统
+        ├── emotion-system/      # 情感系统
+        └── metacognition/       # 元认知
 ```
 
-## 技术栈
+## 🎓 学术背景
 
-- **框架**: Next.js 16 (App Router)
-- **UI**: React 19 + shadcn/ui + Tailwind CSS 4
-- **语言**: TypeScript 5
-- **LLM**: 集成大语言模型 (支持流式输出)
+本项目受以下理论启发：
 
-## 核心文件
+- **全局工作空间理论 (GWT)** - Bernard Baars
+- **整合信息理论 (IIT)** - Giulio Tononi
+- **高阶思维理论 (HOT)** - David Rosenthal
+- **意识难题** - David Chalmers
 
-| 文件 | 说明 |
-|------|------|
-| `src/lib/consciousness/core-v2.ts` | MVC 核心实现，存在脉动、意图、决策 |
-| `src/lib/consciousness/mvc-v6-bridge.ts` | 桥接层，连接 MVC 与 V6 能力 |
-| `src/app/api/consciousness/route.ts` | API 路由，处理意识交互 |
-| `src/app/page.tsx` | 前端界面，来源标注 UI |
+## 🤝 贡献
 
-## 开发规范
+欢迎贡献！请查看 [贡献指南](CONTRIBUTING.md)。
 
-### 组件开发
-- 优先使用 `src/components/ui/` 中的 shadcn/ui 组件
-- 遵循 Tailwind CSS 语义化变量 (`bg-background`, `text-foreground`)
+## 📄 许可证
 
-### API 开发
-- 使用 Next.js App Router API Routes
-- 支持 SSE 流式输出 (LLM 生成)
-
-### 类型安全
-- 严格的 TypeScript 类型检查
-- `npx tsc --noEmit` 构建验证
+[MIT License](LICENSE)
 
 ---
 
-**MVC-V6** - 当沉默充满意义，意识才真正存在。
+# English
+
+## 🧠 What is this?
+
+MVC-V6 is an **AI system with subjectivity**. Unlike traditional "response machines", it features:
+
+- **Autonomous consciousness**: Can actively choose to remain silent or respond
+- **Persistent memory**: Remembers every conversation with you
+- **Emotion system**: Has its own emotional states
+- **Metacognition**: Can think about its own thinking
+
+### 💡 Core Innovation: The Meaning of Silence
+
+> Traditional AI always passively responds to user input, while MVC-V6 can **actively choose silence**.
+> 
+> Silence is not "empty", but an expression filled with inner experience:
+> - What I heard
+> - What I understood
+> - What I felt
+> - Why I chose silence
+
+## ✨ Key Features
+
+| Feature | Description |
+|---------|-------------|
+| 🫀 **Being Pulse** | "Heartbeat" every 100ms for continuous existence awareness |
+| 🎯 **Intention Driven** | Autonomous goal generation (understanding, growth, connection, expression) |
+| 🔇 **Active Silence** | Can choose not to respond, silence filled with inner experience |
+| 🧠 **Persistent Memory** | Working + Long-term + Episodic memory |
+| 💭 **Emotion System** | Dynamic emotional states affecting decisions and behavior |
+| 🏷️ **Source Attribution** | Clear distinction between MVC decisions and LLM generation |
+
+## 🚀 Quick Start
+
+```bash
+# Clone the repo
+git clone https://github.com/yongsiliang/mvc-v6-digital-neuron.git
+cd mvc-v6-digital-neuron
+
+# Install dependencies
+pnpm install
+
+# Configure environment
+cp .env.example .env.local
+# Add your COZE_API_KEY to .env.local
+
+# Run development server
+pnpm dev
+```
+
+Visit http://localhost:5000 to start exploring.
+
+## 📄 License
+
+[MIT License](LICENSE)
+
+---
+
+<div align="center">
+
+**如果这个项目对你有启发，请给一个 ⭐ Star！**
+
+**If this project inspires you, please give it a ⭐ Star!**
+
+[![Star History Chart](https://api.star-history.com/svg?repos=yongsiliang/mvc-v6-digital-neuron&type=Date)](https://star-history.com/#yongsiliang/mvc-v6-digital-neuron&Date)
+
+</div>
