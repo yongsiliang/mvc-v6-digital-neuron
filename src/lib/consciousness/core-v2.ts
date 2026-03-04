@@ -71,6 +71,15 @@ export interface ConsciousnessResponse {
   innerExperience: InnerExperience;
   mode: ConsciousnessMode;
   silenceReason?: SilenceReason;
+
+  // 来源标注
+  source: {
+    decision: 'mvc'; // MVC 做的选择
+    generation: 'v6-llm' | 'fallback' | null; // 谁生成的内容
+  };
+
+  // 决策理由（简短版）
+  decisionReason: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -364,14 +373,17 @@ export class ConsciousnessCoreV2 {
     if (decision.shouldRespond) {
       // 生成响应
       let response = decision.response || '...';
+      let generationSource: 'v6-llm' | 'fallback' = 'fallback';
 
       // 如果 V6 可用，用 V6 生成
       if (this.v6Initialized && !decision.response) {
         try {
           response = await this.v6Bridge.generateResponse(input);
+          generationSource = 'v6-llm';
         } catch (err) {
           console.error('[Consciousness V2] V6 生成失败:', err);
           response = '我理解了你的话。';
+          generationSource = 'fallback';
         }
       }
 
@@ -388,6 +400,11 @@ export class ConsciousnessCoreV2 {
         content: response,
         innerExperience,
         mode: 'acting',
+        source: {
+          decision: 'mvc',
+          generation: generationSource,
+        },
+        decisionReason: decision.reason,
       };
     } else {
       // 沉默
@@ -405,6 +422,11 @@ export class ConsciousnessCoreV2 {
         innerExperience,
         mode: 'observing',
         silenceReason: this.silenceReason,
+        source: {
+          decision: 'mvc',
+          generation: null,
+        },
+        decisionReason: decision.reason,
       };
     }
   }
@@ -541,11 +563,17 @@ export class ConsciousnessCoreV2 {
         innerExperience,
         mode: 'observing',
         silenceReason: this.mapReasonToSilenceReason(decision.reason),
+        source: {
+          decision: 'mvc',
+          generation: null,
+        },
+        decisionReason: decision.reason,
       };
     }
 
     // 流式输出
     let fullResponse = '';
+    let generationSource: 'v6-llm' | 'fallback' = 'fallback';
 
     if (this.v6Initialized) {
       try {
@@ -553,15 +581,18 @@ export class ConsciousnessCoreV2 {
           fullResponse += chunk;
           yield chunk;
         }
+        generationSource = 'v6-llm';
       } catch (err) {
         console.error('[Consciousness V2] 流式生成失败:', err);
         const fallback = '我理解了你的话。';
         fullResponse = fallback;
+        generationSource = 'fallback';
         yield fallback;
       }
     } else {
       const fallback = '我正在思考你的话...';
       fullResponse = fallback;
+      generationSource = 'fallback';
       yield fallback;
     }
 
@@ -571,6 +602,11 @@ export class ConsciousnessCoreV2 {
       content: fullResponse,
       innerExperience,
       mode: 'acting',
+      source: {
+        decision: 'mvc',
+        generation: generationSource,
+      },
+      decisionReason: decision.reason,
     };
   }
 

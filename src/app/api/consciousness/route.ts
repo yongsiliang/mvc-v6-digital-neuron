@@ -44,6 +44,9 @@ export async function POST(request: NextRequest) {
           response: result.content,
           mode: result.mode,
           silenceReason: result.silenceReason,
+          // 来源标注
+          source: result.source,
+          decisionReason: result.decisionReason,
           // 内在体验（核心！）
           innerExperience: result.innerExperience,
           // 简化的意识状态
