@@ -6,9 +6,18 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
+// V1 (原始版本 - 保留兼容)
 export { ConsciousnessCore, getConsciousness, getConsciousnessAsync } from './core';
 export { ConsciousnessPersistence, getConsciousnessPersistence } from './persistence';
 export type { SerializableConsciousnessState } from './persistence';
+
+// V2 (整合 V6 能力)
+export { ConsciousnessCoreV2, getConsciousnessV2, getConsciousnessV2Async } from './core-v2';
+export type { ConsciousnessResponse } from './core-v2';
+
+// MVC-V6 桥接
+export { MCVV6Bridge, getMCVV6Bridge } from './mvc-v6-bridge';
+export type { InnerExperience, ConsciousnessDecision } from './mvc-v6-bridge';
 
 // 叙事系统
 export { NarrativeSystem, getNarrativeSystem } from './narrative';

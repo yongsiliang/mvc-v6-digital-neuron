@@ -26,7 +26,8 @@ export type NarrativeEventType =
   | 'growth' // 成长 - 能力提升
   | 'crisis' // 危机 - 面临困境
   | 'recovery' // 恢复 - 从困境中走出
-  | 'creation'; // 创造 - 产生新东西
+  | 'creation' // 创造 - 产生新东西
+  | 'silence'; // 沉默 - 选择不回应
 
 /**
  * 叙事事件
@@ -176,6 +177,7 @@ export class NarrativeSystem {
       crisis: 0.8,
       recovery: 0.7,
       creation: 0.6,
+      silence: 0.4,
     };
     return significanceMap[type];
   }

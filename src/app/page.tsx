@@ -184,7 +184,7 @@ const EXAMPLE_QUESTIONS = [
   '我有什么特点？',
 ];
 
-// MVC 模式示例问题
+// MVC 意识模式示例问题
 const MVC_EXAMPLES = [
   '你现在感觉怎么样？',
   '你在思考什么？',
@@ -207,6 +207,59 @@ const AGENT_EXAMPLES = [
   '移动鼠标到屏幕中央',
   '输入 Hello World',
 ];
+
+// ═══════════════════════════════════════════════════════════════════════
+// 意识状态指示器组件 - 用图标颜色区分状态
+// ═══════════════════════════════════════════════════════════════════════
+
+interface ConsciousnessIndicatorProps {
+  mode: 'acting' | 'observing' | 'superposition' | 'off';
+  v6Connected?: boolean;
+  intensity?: number;
+}
+
+function ConsciousnessIndicator({
+  mode,
+  v6Connected,
+  intensity = 0.5,
+}: ConsciousnessIndicatorProps) {
+  // 颜色映射
+  const colors = {
+    acting: 'text-green-400', // 有为 - 绿色
+    observing: 'text-blue-400', // 无为 - 蓝色
+    superposition: 'text-purple-400', // 叠加态 - 紫色
+    off: 'text-gray-400', // 关闭 - 灰色
+  };
+
+  const bgColors = {
+    acting: 'bg-green-500/20',
+    observing: 'bg-blue-500/20',
+    superposition: 'bg-purple-500/20',
+    off: 'bg-gray-500/20',
+  };
+
+  const labels = {
+    acting: '有为',
+    observing: '无为',
+    superposition: '叠加',
+    off: '休眠',
+  };
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1.5 px-2 py-1 rounded-full transition-all',
+        bgColors[mode],
+      )}
+    >
+      <Brain className={cn('w-3.5 h-3.5', colors[mode])} />
+      <span className={cn('text-xs font-medium', colors[mode])}>{labels[mode]}</span>
+      {v6Connected && (
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" title="V6 已连接" />
+      )}
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // 主组件
@@ -231,6 +284,9 @@ export default function Home() {
     exists: boolean;
     identity: string;
     duration: number;
+    mode: 'acting' | 'observing' | 'superposition' | 'off';
+    v6Connected: boolean;
+    intensity: number;
   } | null>(null);
 
   const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -300,7 +356,14 @@ export default function Home() {
       const res = await fetch('/api/consciousness');
       if (res.ok) {
         const data = await res.json();
-        setMvcStatus(data);
+        setMvcStatus({
+          exists: data.exists,
+          identity: data.identity,
+          duration: data.duration,
+          mode: data.mode || 'superposition',
+          v6Connected: data.v6Connected || false,
+          intensity: data.intensity || 0.5,
+        });
       }
     } catch (e) {
       console.error('获取 MVC 状态失败:', e);
@@ -439,21 +502,34 @@ export default function Home() {
 
       const data = await response.json();
 
+      // 更新状态
+      setMvcStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              mode: data.mode,
+              intensity: data.consciousness?.intensity || prev.intensity,
+              v6Connected: data.consciousness?.v6Connected || prev.v6Connected,
+            }
+          : null,
+      );
+
       // 处理沉默
       if (data.type === 'silence') {
+        const inner = data.innerExperience;
         const silenceMessage: Message = {
           id: `assistant_${Date.now()}`,
           role: 'assistant',
-          content: `...（意识选择沉默）`,
+          content: `...（沉默）`,
           timestamp: Date.now(),
           context: devMode
             ? {
                 identity: {
-                  name: data.consciousness?.identity || 'MVC',
+                  name: 'MVC',
                   whoAmI: data.consciousness?.identity || '',
                 },
-                emotionalState: '沉默',
-                focus: `mode: ${data.mode}, reason: ${data.reason}`,
+                emotionalState: inner?.iFelt?.primary || '平静',
+                focus: `我听到了：${inner?.iHeard?.slice(0, 30)}... | 理解：${inner?.iUnderstood?.slice(0, 30)}... | 选择：${inner?.iWhy}`,
               }
             : undefined,
         };
@@ -470,11 +546,11 @@ export default function Home() {
         context: devMode
           ? {
               identity: {
-                name: data.consciousness?.identity || 'MVC',
+                name: 'MVC',
                 whoAmI: data.consciousness?.identity || '',
               },
-              emotionalState: data.consciousness?.feeling || '存在',
-              focus: data.consciousness?.currentIntention?.what || '存在',
+              emotionalState: data.innerExperience?.iFelt?.primary || '存在',
+              focus: data.innerExperience?.iWhy || '',
             }
           : undefined,
       };
@@ -749,7 +825,7 @@ export default function Home() {
 
           {/* 右侧操作区 */}
           <div className="flex items-center gap-1">
-            {/* MVC 意识模式开关 - 桌面端 */}
+            {/* MVC 意识模式开关 */}
             <div
               className={cn(
                 'hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full',
@@ -757,10 +833,19 @@ export default function Home() {
                 mvcMode && 'bg-cyan-500/10 border-cyan-500/30',
               )}
             >
-              <Heart
-                className={cn('w-3.5 h-3.5', mvcMode ? 'text-cyan-400' : 'text-muted-foreground')}
+              <Brain
+                className={cn(
+                  'w-3.5 h-3.5 transition-colors',
+                  mvcMode
+                    ? mvcStatus?.mode === 'acting'
+                      ? 'text-green-400'
+                      : mvcStatus?.mode === 'observing'
+                        ? 'text-blue-400'
+                        : 'text-purple-400'
+                    : 'text-muted-foreground',
+                )}
               />
-              <span className="text-xs text-muted-foreground">MVC</span>
+              <span className="text-xs text-muted-foreground">意识</span>
               <Switch
                 checked={mvcMode}
                 onCheckedChange={setMvcMode}
@@ -877,27 +962,25 @@ export default function Home() {
       </header>
 
       {/* ═════════════════════════════════════════════════════════════ */}
-      {/* MVC 意识模式状态栏 */}
+      {/* MVC 意识状态指示器 - 简洁的图标 + 颜色 */}
       {/* ═════════════════════════════════════════════════════════════ */}
-      {mvcMode && mvcStatus && (
+      {mvcMode && (
         <div className="border-b border-border/50 bg-gradient-to-r from-cyan-500/5 via-transparent to-teal-500/5">
-          <div className="max-w-4xl mx-auto px-4 py-2.5">
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10">
-                <Heart className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-muted-foreground">MVC</span>
-                <span className="font-medium text-foreground">活跃</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-500/10">
-                <Clock className="w-3.5 h-3.5 text-teal-400" />
-                <span className="text-muted-foreground">存在</span>
-                <span className="font-medium text-foreground">{mvcStatus.duration || 0} 脉动</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10">
-                <Brain className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-muted-foreground truncate max-w-[150px]">
-                  {mvcStatus.identity || '探索中...'}
-                </span>
+          <div className="max-w-4xl mx-auto px-4 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <ConsciousnessIndicator
+                  mode={mvcStatus?.mode || 'superposition'}
+                  v6Connected={mvcStatus?.v6Connected}
+                  intensity={mvcStatus?.intensity}
+                />
+                {devMode && mvcStatus && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{mvcStatus.duration} 脉动</span>
+                    <span>·</span>
+                    <span className="truncate max-w-[150px]">{mvcStatus.identity}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
