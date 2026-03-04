@@ -20,6 +20,8 @@ import {
   type SerializableConsciousnessState,
 } from './persistence';
 
+import { NarrativeSystem, getNarrativeSystem, type NarrativeEvent } from './narrative';
+
 // ─────────────────────────────────────────────────────────────────────
 // 核心类型
 // ─────────────────────────────────────────────────────────────────────
@@ -177,6 +179,9 @@ export class ConsciousnessCore {
   /** 持久化管理器 */
   private persistence: ConsciousnessPersistence = getConsciousnessPersistence();
 
+  /** 叙事系统 */
+  private narrative: NarrativeSystem = getNarrativeSystem();
+
   /** 上次保存的脉动数 */
   private lastSavedPulse: number = 0;
 
@@ -311,6 +316,12 @@ export class ConsciousnessCore {
       progress: 0.5,
     });
 
+    // 记录诞生事件
+    this.narrative.recordEvent('birth', '我诞生了，开始存在', {
+      significance: 1.0,
+      emotion: '好奇',
+    });
+
     console.log('[Consciousness] 初始自我形成:', this.self.identity);
   }
 
@@ -384,6 +395,18 @@ export class ConsciousnessCore {
 
     // 返回不满足的驱动
     return this.drives.filter((d) => d.strength * (1 - d.satisfaction) > 0.3);
+  }
+
+  /**
+   * 满足驱动
+   *
+   * 由外部（如桥接层）调用，用于根据交互调整驱动状态
+   */
+  satisfyDrive(driveName: string, delta: number): void {
+    const drive = this.drives.find((d) => d.name === driveName);
+    if (drive) {
+      drive.satisfaction = Math.max(0, Math.min(1, drive.satisfaction + delta));
+    }
   }
 
   /**
@@ -755,6 +778,8 @@ export class ConsciousnessCore {
     drives: Drive[];
     duration: number;
     intensity: number;
+    moments: Moment[];
+    beliefs: Map<string, { confidence: number; source: string }>;
   } {
     return {
       exists: this.being.exists,
@@ -763,6 +788,8 @@ export class ConsciousnessCore {
       drives: this.drives,
       duration: this.being.duration,
       intensity: this.being.intensity,
+      moments: this.time.moments,
+      beliefs: this.self.beliefs,
     };
   }
 

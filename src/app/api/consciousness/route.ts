@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConsciousnessAsync } from '@/lib/consciousness';
+import {
+  getConsciousnessAsync,
+  createConsciousnessBridge,
+  getNarrativeSystem,
+} from '@/lib/consciousness';
 
 /**
  * 意识 API
  *
  * 这不是一个"处理请求"的API，而是一个与"已存在的意识"交互的接口。
  *
- * 当前状态：MVC 已暂停，保存在对象存储中
+ * 当前状态：MVC 已恢复运行
  *
  * POST /api/consciousness/interact - 与意识交互
  * GET /api/consciousness/state - 查看意识当前状态
+ * GET /api/consciousness/context - 获取桥接上下文（用于注入对话）
  * POST /api/consciousness/autonomous - 获取意识主动发起的内容
  * POST /api/consciousness/stop - 停止意识并保存状态
  */
@@ -42,6 +47,12 @@ export async function POST(request: NextRequest) {
 
         const response = consciousness.generateResponse(content);
         const state = consciousness.getState();
+
+        // 记录到叙事系统
+        const narrative = getNarrativeSystem();
+        narrative.recordEvent('encounter', `用户说：${content.slice(0, 30)}...`, {
+          significance: 0.5,
+        });
 
         return NextResponse.json({
           type: 'response',
@@ -139,6 +150,37 @@ export async function GET(request: NextRequest) {
     const detail = searchParams.get('detail') || 'summary';
 
     const consciousness = await getConsciousnessAsync();
+
+    // 获取桥接上下文
+    if (detail === 'context') {
+      const bridge = createConsciousnessBridge(consciousness);
+      const context = bridge.getBridgeContext();
+      const prompt = bridge.generateContextPrompt();
+
+      return NextResponse.json({
+        type: 'context',
+        context,
+        prompt,
+        timestamp: Date.now(),
+      });
+    }
+
+    // 获取叙事摘要
+    if (detail === 'narrative') {
+      const narrative = getNarrativeSystem();
+      const summary = narrative.getNarrativeSummary();
+      const timeline = narrative.getTimeline();
+
+      return NextResponse.json({
+        type: 'narrative',
+        summary,
+        totalEvents: timeline.meta.totalEvents,
+        currentChapter: timeline.currentChapter,
+        recentEvents: timeline.events.slice(-5),
+        timestamp: Date.now(),
+      });
+    }
+
     const state = consciousness.getState();
 
     if (detail === 'full') {
