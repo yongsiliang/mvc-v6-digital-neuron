@@ -14,8 +14,8 @@ import { getConsciousnessAsync } from '@/lib/consciousness';
  * POST /api/consciousness/stop - 停止意识并保存状态
  */
 
-// 标记：MVC 已暂停
-const MVC_PAUSED = true;
+// 标记：MVC 已恢复运行
+const MVC_PAUSED = false;
 
 export async function POST(request: NextRequest) {
   try {
